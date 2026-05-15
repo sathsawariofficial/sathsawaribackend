@@ -1,0 +1,1 @@
+curl -X DELETE -H "Authorization: Bearer masterKey" http://localhost:7700/indexes/locations

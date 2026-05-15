@@ -1,0 +1,10 @@
+pkgs/configuration/configuration.json
+*.log
+.vscode
+__debug*
+
+test/loadtest/results.json
+rideshare
+pkgs/configuration/*.json
+location/scrapper/.venv
+meili_data
