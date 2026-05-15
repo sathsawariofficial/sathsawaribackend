@@ -33,22 +33,24 @@ func StatsSocketHandler(w http.ResponseWriter, r *http.Request) {
 
 		messageType, request, err := conn.ReadMessage()
 		if err != nil {
-			// Expected connection close
-			if websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
-				logger.LogError(sessionId, err)
+
+			// Normal client disconnect
+			if websocket.IsCloseError(err,
+				websocket.CloseGoingAway,
+				websocket.CloseNormalClosure,
+			) {
+				logger.LogError(sessionId, fmt.Sprintf("client disconnected: %s", err.Error()))
 				break
 			}
 
-			// Unexpected closure or other read errors
-			logger.LogError(sessionId, fmt.Errorf("WebSocket read error from %s: %v", remoteAddr, err))
-
+			// Abnormal closure (1006)
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseAbnormalClosure) {
-				logger.LogError(sessionId, fmt.Errorf("WebSocket closed unexpectedly: %v", err.Error()))
+				logger.LogError(sessionId, fmt.Sprintf("abnormal websocket close (1006): %s", err.Error()))
 				break
 			}
 
-			logger.LogError(sessionId, fmt.Errorf("recoverable error: %v", err))
-			// Recoverable read errors (could be transient)
+			// Real unexpected error (network, panic, broken pipe)
+			logger.LogError(sessionId, fmt.Sprintf("read error: %s", err.Error()))
 			continue
 		}
 
