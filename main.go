@@ -38,7 +38,7 @@ func main() {
 	router.Use(middleware.Logger())
 
 	router.GET("/terms", general_rest.GetTermsAndConditions)
-	router.GET("/policy/privacy", general_rest.GetPrivacyPolicy)
+	router.GET("/privacy-policy", general_rest.GetPrivacyPolicy)
 
 	v1 := router.Group("/api/v1")
 	// open protection
