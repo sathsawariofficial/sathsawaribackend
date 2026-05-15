@@ -25,7 +25,7 @@ const (
 	Unable_To_Do_Job        = "Unable to %s"
 	Driver_Not_Found        = "Unknown driver"
 	Vehicle_Not_Found       = "You have not registered any vehicle"
-	Ride_Not_Found          = "You have not created any ride"
+	Ride_Not_Found          = "There are no rides available"
 	Invalid_Password        = "Invalid password"
 	Invalid_Session         = "Invalid session"
 	General_Error           = "Error occured please, try again later"

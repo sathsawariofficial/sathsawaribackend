@@ -37,7 +37,8 @@ func main() {
 	router.Use(cors.New(config))
 	router.Use(middleware.Logger())
 
-	router.GET("/terms", middleware.Authentication(), general_rest.GetTermsAndConditions)
+	router.GET("/terms", general_rest.GetTermsAndConditions)
+	router.GET("/policy/privacy", general_rest.GetPrivacyPolicy)
 
 	v1 := router.Group("/api/v1")
 	// open protection

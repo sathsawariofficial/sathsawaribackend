@@ -7,5 +7,5 @@ const (
 
 // Socket Request Type
 const (
-	SR_LOCATION_SEARCH = "LOCATION_SEARCH"
+	SR_PLACE_SEARCH = "PLACE_SEARCH"
 )

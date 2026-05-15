@@ -13,9 +13,10 @@ var (
 )
 
 const (
-	TERMS_ENGLISH = "terms_en.html"
-	TERMS_URDU    = "terms_ur.html"
-	DELETE_PAGE   = "delete_account.html"
+	TERMS_ENGLISH  = "terms_en.html"
+	TERMS_URDU     = "terms_ur.html"
+	DELETE_PAGE    = "delete_account.html"
+	PRIVACY_POLICY = "privacy_policy.html"
 )
 
 const (

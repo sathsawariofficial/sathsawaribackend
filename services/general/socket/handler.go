@@ -97,7 +97,7 @@ func StatsSocketMultiplexer(sessionId string, request []byte) []byte {
 
 	var data any
 	switch strings.ToUpper(wrapperReq.Type) {
-	case constants.SR_LOCATION_SEARCH:
+	case constants.SR_PLACE_SEARCH:
 		data = LocationSearch(ctx, sessionId, requestId, wrapperReq.Type, request)
 	default:
 		return utils.GeneralSocketResp(sessionId, http.StatusBadRequest, fmt.Sprintf(constants.Invalid_Data, "Type"))

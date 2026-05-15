@@ -90,6 +90,26 @@ func GetTermsAndConditions(ctx *gin.Context) {
 	ctx.Data(http.StatusOK, "text/html; charset=utf-8", data)
 }
 
+func GetPrivacyPolicy(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetPrivacyPolicy", sessionId)
+
+	basePath := configuration.ConfigurationData.General.DocsPath
+	path := basePath + constants.PRIVACY_POLICY
+
+	logger.LogDebug("Reading terms from path", sessionId, path)
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		ctx.Status(http.StatusNotFound)
+		return
+	}
+
+	logger.LogInfo("Response returned from GetPrivacyPolicy", sessionId)
+
+	ctx.Data(http.StatusOK, "text/html; charset=utf-8", data)
+}
+
 func GetDeletePage(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in GetDeletePage", sessionId)
