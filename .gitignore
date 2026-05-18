@@ -12,3 +12,4 @@ docker/logs
 
 docker/configuration.json
 docker/sathsawari-935e4-firebase-adminsdk-fbsvc-bdf6727dee.json
+*.tar.gz
