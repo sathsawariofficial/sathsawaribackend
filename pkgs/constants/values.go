@@ -13,6 +13,7 @@ var (
 )
 
 const (
+	HOME_PAGE      = "home.html"
 	TERMS_ENGLISH  = "terms_en.html"
 	TERMS_URDU     = "terms_ur.html"
 	DELETE_PAGE    = "delete_account.html"

@@ -61,6 +61,26 @@ func GetNotificationsHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, userNotificationResp)
 }
 
+func GetHomePage(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetHomePage", sessionId)
+
+	basePath := configuration.ConfigurationData.General.DocsPath
+	path := basePath + constants.HOME_PAGE
+
+	logger.LogDebug("Reading terms from path", sessionId, path)
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		ctx.Status(http.StatusNotFound)
+		return
+	}
+
+	logger.LogInfo("Response returned from GetHomePage", sessionId)
+
+	ctx.Data(http.StatusOK, "text/html; charset=utf-8", data)
+}
+
 func GetTermsAndConditions(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in GetTermsAndConditions", sessionId)

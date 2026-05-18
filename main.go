@@ -37,6 +37,7 @@ func main() {
 	router.Use(cors.New(config))
 	router.Use(middleware.Logger())
 
+	router.GET("/", general_rest.GetHomePage)
 	router.GET("/terms", general_rest.GetTermsAndConditions)
 	router.GET("/privacy-policy", general_rest.GetPrivacyPolicy)
 

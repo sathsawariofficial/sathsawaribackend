@@ -8,3 +8,7 @@ rideshare
 pkgs/configuration/*.json
 location/scrapper/.venv
 meili_data
+docker/logs
+
+docker/configuration.json
+docker/sathsawari-935e4-firebase-adminsdk-fbsvc-bdf6727dee.json
