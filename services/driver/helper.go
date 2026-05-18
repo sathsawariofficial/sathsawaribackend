@@ -247,7 +247,7 @@ func saveDriverInfo(orgCtx *gin.Context, sessionId string, request DriverRegistr
 		DriverId: driver.ID,
 		DeviceId: request.DeviceId,
 	}).Error
-	if err = tx.Create(&driver).Error; err != nil {
+	if err != nil {
 		logger.LogError(sessionId, err)
 		tx.Rollback() // Roll back the transaction if there is an error
 		err = fmt.Errorf(constants.Registeration_Failed, "driver")
