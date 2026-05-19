@@ -1,6 +1,8 @@
 package constants
 
-import "regexp"
+import (
+	"regexp"
+)
 
 // regex
 var (
@@ -39,5 +41,5 @@ const (
 // notification message
 const (
 	NOTIFICATION_MESSAGE_RIDE_CREATION  = "You have created a ride"
-	NOTIFICATION_MESSAGE_SMS_TO_SERVICE = `<#>Sathsawari verification code is 940728.\nDo not share this code with anyone.\nFA+9qCX9VSu`
+	NOTIFICATION_MESSAGE_SMS_TO_SERVICE = "<#> Sathsawari verification code: %s. Do not share this code with anyone.\n%s"
 )
