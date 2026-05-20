@@ -7,8 +7,9 @@ import (
 
 func mapSMSFcmRequest(request SMSFCMRequest) *postgress.SMSFCM {
 	return &postgress.SMSFCM{
-		ID:  utils.GenerateUUID(),
-		App: request.App,
-		FCM: request.FCM,
+		ID:      utils.GenerateUUID(),
+		App:     request.App,
+		FCM:     request.FCM,
+		APPHash: request.AppHash,
 	}
 }

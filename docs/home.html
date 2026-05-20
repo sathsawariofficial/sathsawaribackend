@@ -1,503 +1,1146 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SathSawari</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SathSawari</title>
 
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+  <!-- FONT AWESOME -->
+  <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
 
-        body {
-            font-family: Arial, sans-serif;
-            background: #ffffff;
-            color: #111827;
-            line-height: 1.6;
-        }
+  <style>
 
-        a {
-            text-decoration: none;
-            color: inherit;
-        }
+    *{
+      margin:0;
+      padding:0;
+      box-sizing:border-box;
+    }
 
-        .container {
-            width: 100%;
-            max-width: 1200px;
-            margin: auto;
-            padding: 0 20px;
-        }
+    html,body{
+      height:100%;
+      font-family:Arial, sans-serif;
+      background:#ffffff;
+      color:#111827;
+    }
 
-        header {
-            position: sticky;
-            top: 0;
-            background: rgba(255, 255, 255, 0.95);
-            border-bottom: 1px solid #e5e7eb;
-            z-index: 1000;
-        }
+    body{
+      display:flex;
+      flex-direction:column;
+    }
 
-        .navbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 0;
-            gap: 20px;
-        }
+    main{
+      flex:1;
+    }
 
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            cursor: pointer;
-        }
+    a{
+      text-decoration:none;
+      color:inherit;
+    }
 
-        .logo img {
-            width: 52px;
-            height: 52px;
-            border-radius: 16px;
-        }
+    .container{
+      width:100%;
+      max-width:1200px;
+      margin:auto;
+      padding:0 20px;
+    }
 
-        .logo h1 {
-            font-size: 28px;
-            color: #2563eb;
-        }
+    /* HEADER */
 
-        nav {
-            display: flex;
-            gap: 24px;
-            flex-wrap: wrap;
-        }
+    header{
+      position:sticky;
+      top:0;
+      z-index:1000;
+      background:rgba(255,255,255,0.95);
+      backdrop-filter:blur(10px);
+      border-bottom:1px solid #e5e7eb;
+    }
 
-        nav button {
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 15px;
-            transition: 0.3s;
-        }
+    .navbar{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding:18px 0;
+      gap:20px;
+      flex-wrap:wrap;
+    }
 
-        nav button:hover {
-            color: #2563eb;
-        }
+    .logo{
+      display:flex;
+      align-items:center;
+      gap:14px;
+      cursor:pointer;
+    }
 
-        section {
-            padding: 80px 20px;
-        }
+    .logo img{
+      width:56px;
+      height:56px;
+      border-radius:18px;
+    }
 
-        .hero {
-            background: linear-gradient(to bottom right, #eff6ff, #ffffff, #eef2ff);
-        }
+    .logo h1{
+      font-size:28px;
+      color:#2563eb;
+    }
 
-        .hero-grid,
-        .about-grid,
-        .feature-grid,
-        .card-grid {
-            display: grid;
-            gap: 30px;
-        }
+    .logo p{
+      font-size:13px;
+      color:#6b7280;
+    }
 
-        .hero-grid,
-        .about-grid {
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            align-items: center;
-        }
+    nav{
+      display:flex;
+      align-items:center;
+      gap:18px;
+      flex-wrap:wrap;
+    }
 
-        .hero-badge {
-            display: inline-block;
-            background: #dbeafe;
-            color: #2563eb;
-            padding: 10px 18px;
-            border-radius: 999px;
-            font-weight: bold;
-            margin-bottom: 20px;
-        }
+    nav button{
+      border:none;
+      background:none;
+      cursor:pointer;
+      font-size:15px;
+      font-weight:600;
+      color:#374151;
+      transition:0.3s;
+    }
 
-        .hero h2 {
-            font-size: 56px;
-            line-height: 1.1;
-            margin-bottom: 20px;
-        }
+    nav button:hover{
+      color:#2563eb;
+    }
 
-        .hero p {
-            color: #6b7280;
-            margin-bottom: 30px;
-            font-size: 18px;
-        }
+    /* PAGES */
 
-        .btn-group {
-            display: flex;
-            gap: 16px;
-            flex-wrap: wrap;
-        }
+    .page{
+      display:none;
+    }
 
-        .btn {
-            padding: 14px 28px;
-            border-radius: 16px;
-            border: none;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: bold;
-            transition: 0.3s;
-        }
+    .page.active{
+      display:block;
+    }
 
-        .btn-primary {
-            background: #2563eb;
-            color: white;
-        }
+    section{
+      padding:80px 20px;
+    }
 
-        .btn-primary:hover {
-            background: #1d4ed8;
-        }
+    /* HERO */
 
-        .btn-outline {
-            border: 1px solid #d1d5db;
-            background: white;
-        }
+    .hero{
+      background:linear-gradient(to bottom right,#eff6ff,#ffffff,#eef2ff);
+    }
 
-        .hero-card {
-            background: linear-gradient(to right, #2563eb, #4f46e5);
-            border-radius: 32px;
-            padding: 50px 30px;
-            text-align: center;
-            color: white;
-        }
+    .hero-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+      align-items:center;
+      gap:40px;
+    }
 
-        .hero-card img {
-            width: 120px;
-            border-radius: 28px;
-            margin-bottom: 20px;
-        }
+    .hero-badge{
+      display:inline-block;
+      background:#dbeafe;
+      color:#2563eb;
+      padding:10px 18px;
+      border-radius:999px;
+      font-weight:bold;
+      margin-bottom:24px;
+    }
 
-        h2.section-title {
-            font-size: 42px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
+    .hero h2{
+      font-size:60px;
+      line-height:1.1;
+      margin-bottom:24px;
+    }
 
-        .section-subtitle {
-            text-align: center;
-            color: #6b7280;
-            margin-bottom: 50px;
-        }
+    .hero p{
+      color:#6b7280;
+      font-size:18px;
+      line-height:1.7;
+      margin-bottom:32px;
+    }
 
-        .card-grid {
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        }
+    .btn-group{
+      display:flex;
+      flex-wrap:wrap;
+      gap:16px;
+    }
 
-        .card {
-            background: white;
-            padding: 30px;
-            border-radius: 24px;
-            border: 1px solid #e5e7eb;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-            transition: 0.3s;
-        }
+    .btn{
+      border:none;
+      cursor:pointer;
+      padding:15px 30px;
+      border-radius:18px;
+      font-size:16px;
+      font-weight:bold;
+      transition:0.3s;
+    }
 
-        .card:hover {
-            transform: translateY(-5px);
-        }
+    .btn-primary{
+      background:#2563eb;
+      color:white;
+    }
 
-        .card-icon {
-            font-size: 48px;
-            margin-bottom: 20px;
-        }
+    .btn-primary:hover{
+      background:#1d4ed8;
+    }
 
-        .card h3 {
-            margin-bottom: 14px;
-            font-size: 24px;
-        }
+    .btn-outline{
+      border:1px solid #d1d5db;
+      background:white;
+    }
 
-        .gray-section {
-            background: #f9fafb;
-        }
+    .hero-card{
+      background:linear-gradient(to right,#2563eb,#4f46e5);
+      border-radius:36px;
+      padding:50px 30px;
+      color:white;
+      text-align:center;
+      box-shadow:0 10px 30px rgba(0,0,0,0.1);
+    }
 
-        .contact {
-            background: linear-gradient(to right, #2563eb, #4338ca);
-            color: white;
-        }
+    .hero-card img{
+      width:130px;
+      height:130px;
+      border-radius:30px;
+      margin-bottom:24px;
+    }
 
-        .contact .card {
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
+    .hero-card h3{
+      font-size:34px;
+      margin-bottom:14px;
+    }
 
-        .download-box {
-            background: #f9fafb;
-            padding: 20px;
-            border-radius: 24px;
-            text-align: center;
-        }
+    /* TITLES */
 
-        .download-box img {
-            width: 200px;
-            height: 200px;
-        }
+    .section-title{
+      font-size:46px;
+      margin-bottom:20px;
+      text-align:center;
+    }
 
-        footer {
-            background: #030712;
-            color: #9ca3af;
-            padding: 40px 20px;
-        }
+    .section-subtitle{
+      text-align:center;
+      color:#6b7280;
+      max-width:700px;
+      margin:0 auto 50px;
+      line-height:1.7;
+    }
 
-        .footer-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 20px;
-        }
+    /* CARDS */
 
-        .socials {
-            display: flex;
-            gap: 18px;
-            align-items: center;
-        }
+    .card-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+      gap:25px;
+    }
 
-        .socials a {
-            font-size: 22px;
-        }
+    .card{
+      background:white;
+      border-radius:28px;
+      padding:30px;
+      border:1px solid #e5e7eb;
+      box-shadow:0 5px 15px rgba(0,0,0,0.05);
+      transition:0.3s;
+    }
 
-        .page {
-            display: none;
-        }
+    .card:hover{
+      transform:translateY(-6px);
+    }
 
-        .page.active {
-            display: block;
-        }
+    .card-icon{
+      font-size:48px;
+      margin-bottom:20px;
+    }
 
-        @media (max-width: 768px) {
-            .hero h2 {
-                font-size: 38px;
-            }
+    .card h3{
+      margin-bottom:12px;
+      font-size:24px;
+    }
 
-            nav {
-                justify-content: center;
-            }
+    .gray-section{
+      background:#f9fafb;
+    }
 
-            .navbar {
-                flex-direction: column;
-            }
-        }
-    </style>
+    /* CONTACT */
+
+    .contact-wrapper{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:50px;
+      align-items:flex-start;
+    }
+
+    .contact-info h2{
+      font-size:48px;
+      margin-bottom:20px;
+    }
+
+    .contact-info p{
+      color:#6b7280;
+      margin-bottom:30px;
+      line-height:1.7;
+    }
+
+    .contact-cards{
+      display:flex;
+      flex-direction:column;
+      gap:20px;
+    }
+
+    .info-card{
+      background:white;
+      border-radius:24px;
+      padding:22px;
+      display:flex;
+      gap:18px;
+      align-items:center;
+      border:1px solid #e5e7eb;
+      box-shadow:0 4px 12px rgba(0,0,0,0.04);
+    }
+
+    .info-icon{
+      font-size:30px;
+    }
+
+    /* FORM */
+
+    .contact-form-box{
+      background:white;
+      border-radius:32px;
+      padding:35px;
+      border:1px solid #e5e7eb;
+      box-shadow:0 8px 24px rgba(0,0,0,0.06);
+    }
+
+    .contact-form-box h3{
+      margin-bottom:25px;
+      font-size:28px;
+    }
+
+    .form-group{
+      margin-bottom:22px;
+    }
+
+    .form-group label{
+      display:block;
+      margin-bottom:8px;
+      font-weight:600;
+      color:#374151;
+    }
+
+    .input-icon{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      border:1px solid #d1d5db;
+      border-radius:16px;
+      padding:16px;
+    }
+
+    .input-icon i{
+      color:#6b7280;
+      width:18px;
+    }
+
+    .form-group input,
+    .form-group textarea{
+      width:100%;
+      border:none;
+      outline:none;
+      font-size:16px;
+      background:transparent;
+    }
+
+    .form-group textarea{
+      border:1px solid #d1d5db;
+      border-radius:16px;
+      padding:16px;
+      resize:none;
+    }
+
+    .send-btn{
+      width:100%;
+      border:none;
+      padding:16px;
+      border-radius:999px;
+      background:linear-gradient(to right,#7c3aed,#9333ea);
+      color:white;
+      font-size:18px;
+      font-weight:bold;
+      cursor:pointer;
+      transition:0.3s;
+    }
+
+    .send-btn:hover{
+      opacity:0.9;
+    }
+
+    /* SOCIALS */
+
+    .contact-socials{
+      margin-top:35px;
+    }
+
+    .contact-socials p{
+      margin-bottom:20px;
+      font-weight:600;
+    }
+
+    .social-icons{
+      display:flex;
+      flex-wrap:wrap;
+      gap:22px;
+    }
+
+    .social-icons a{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:8px;
+      font-size:13px;
+      color:#374151;
+    }
+
+    .social-icons i{
+      font-size:34px;
+    }
+
+    .fa-whatsapp{
+      color:#25D366;
+    }
+
+    .fa-instagram{
+      color:#E1306C;
+    }
+
+    .fa-facebook{
+      color:#1877F2;
+    }
+
+    .fa-linkedin{
+      color:#0A66C2;
+    }
+
+    .fa-x-twitter{
+      color:#111827;
+    }
+
+    /* DOWNLOAD */
+
+    .download-box{
+      background:#f9fafb;
+      border-radius:30px;
+      padding:30px;
+      display:inline-block;
+      margin-top:20px;
+    }
+
+    .download-box img{
+      width:220px;
+      height:220px;
+    }
+
+    /* FOOTER */
+
+    footer{
+      background:#030712;
+      color:#9ca3af;
+      padding:40px 20px;
+      margin-top:auto;
+    }
+
+    .footer-content{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:30px;
+      flex-wrap:wrap;
+    }
+
+    .footer-socials{
+      display:flex;
+      gap:18px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+    .footer-socials a{
+      width:44px;
+      height:44px;
+      border-radius:50%;
+      background:#111827;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:white;
+      font-size:18px;
+      transition:0.3s;
+    }
+
+    .footer-socials a:hover{
+      transform:translateY(-4px);
+      background:#2563eb;
+    }
+
+    /* MOBILE */
+
+    @media(max-width:900px){
+
+      .contact-wrapper{
+        grid-template-columns:1fr;
+      }
+
+      .hero h2{
+        font-size:42px;
+      }
+
+      .section-title{
+        font-size:38px;
+      }
+
+      .navbar{
+        flex-direction:column;
+      }
+
+      nav{
+        justify-content:center;
+      }
+
+      .footer-content{
+        flex-direction:column;
+        text-align:center;
+      }
+    }
+
+  </style>
 </head>
 
 <body>
 
-    <header>
-        <div class="container navbar">
-            <div class="logo" onclick="showPage('home')">
-                <img src="https://play-lh.googleusercontent.com/hb2zovQAdYzghiiIkIDJg-gEGQYnc1k7KCTwV2C9LwY8KR2yRjDySU7VLkp316bgEu-bbg6oYX1frkrKBak2xw=w240-h480-rw"
-                    alt="Logo">
-                <div>
-                    <h1>SathSawari</h1>
-                    <small>CarPool, Ride Sharing Platform</small>
-                </div>
+<header>
+  <div class="container navbar">
+
+    <div class="logo" onclick="showPage('home')">
+      <img src="https://play-lh.googleusercontent.com/hb2zovQAdYzghiiIkIDJg-gEGQYnc1k7KCTwV2C9LwY8KR2yRjDySU7VLkp316bgEu-bbg6oYX1frkrKBak2xw=w240-h480-rw">
+      <div>
+        <h1>SathSawari</h1>
+        <p>Ride Sharing Platform</p>
+      </div>
+    </div>
+
+    <nav>
+      <button onclick="showPage('home')">Home</button>
+      <button onclick="showPage('how')">How It Works</button>
+      <button onclick="showPage('features')">Features</button>
+      <button onclick="showPage('contact')">Contact</button>
+      <button onclick="showPage('privacy')">Privacy</button>
+      <button onclick="showPage('download')">Download</button>
+    </nav>
+
+  </div>
+</header>
+
+<main>
+
+<!-- HOME -->
+<div id="home" class="page active">
+
+  <section class="hero">
+
+    <div class="container hero-grid">
+
+      <div>
+
+        <div class="hero-badge">
+          🚗 Affordable Ride Sharing for Everyone
+        </div>
+
+        <h2>
+          Share rides, save money, travel smarter.
+        </h2>
+
+        <p>
+          SathSawari connects passengers and drivers through ride sharing.
+          Our platform helps reduce travel costs, improve convenience,
+          and create smarter transportation experiences.
+        </p>
+
+        <div class="btn-group">
+
+          <button class="btn btn-primary"
+            onclick="showPage('download')">
+            Get Started
+          </button>
+
+          <button class="btn btn-outline"
+            onclick="showPage('how')">
+            Learn More
+          </button>
+
+        </div>
+
+      </div>
+
+      <div class="hero-card">
+
+        <img src="https://play-lh.googleusercontent.com/hb2zovQAdYzghiiIkIDJg-gEGQYnc1k7KCTwV2C9LwY8KR2yRjDySU7VLkp316bgEu-bbg6oYX1frkrKBak2xw=w240-h480-rw">
+
+        <h3>SathSawari</h3>
+
+        <h4>
+          Find your route, share your journey,
+          and travel affordably together.
+        </h4>
+
+      </div>
+
+    </div>
+
+  </section>
+
+</div>
+
+<!-- HOW -->
+<div id="how" class="page">
+
+  <section class="gray-section">
+
+    <div class="container">
+
+      <h2 class="section-title">
+        How SathSawari Works
+      </h2>
+
+      <p class="section-subtitle">
+        A simple and smart way to connect passengers and drivers.
+      </p>
+
+      <div class="card-grid">
+
+        <div class="card">
+          <div class="card-icon">📍</div>
+          <h3>Search Ride</h3>
+          <p>
+            Passengers search rides according to destination
+            and travel preferences.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">🤝</div>
+          <h3>Connect & Confirm</h3>
+          <p>
+            Drivers and passengers confirm ride details
+            through the platform.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">🚗</div>
+          <h3>Travel Together</h3>
+          <p>
+            Enjoy affordable and shared transportation experiences.
+          </p>
+        </div>
+
+      </div>
+
+    </div>
+
+  </section>
+
+</div>
+
+<!-- FEATURES -->
+<div id="features" class="page">
+
+  <section>
+
+    <div class="container">
+
+      <h2 class="section-title">
+        Why Choose SathSawari
+      </h2>
+
+      <p class="section-subtitle">
+        Designed to make ride-sharing simple and affordable.
+      </p>
+
+      <div class="card-grid">
+
+        <div class="card">
+          <h3>✔ Affordable Shared Rides</h3>
+        </div>
+
+        <div class="card">
+          <h3>✔ Modern Interface</h3>
+        </div>
+
+        <div class="card">
+          <h3>✔ Fast Ride Searching</h3>
+        </div>
+
+        <div class="card">
+          <h3>✔ Flexible Travel Options</h3>
+        </div>
+
+        <div class="card">
+          <h3>✔ Community Transport</h3>
+        </div>
+
+      </div>
+
+    </div>
+
+  </section>
+
+</div>
+
+<!-- CONTACT -->
+<div id="contact" class="page">
+
+  <section>
+
+    <div class="container">
+
+      <div class="contact-wrapper">
+
+        <!-- LEFT -->
+        <div class="contact-info">
+
+          <h2>Contact Us</h2>
+
+          <p>
+            Have questions, suggestions, or business inquiries?
+            Reach out to the SathSawari team anytime.
+          </p>
+
+          <div class="contact-cards">
+
+            <div class="info-card">
+              <div class="info-icon">📧</div>
+              <div>
+                <h3>Email</h3>
+                <p>sathsawariofficial@gmail.com</p>
+              </div>
+            </div>
+            <div class="info-card">
+              <div class="info-icon">📍</div>
+              <div>
+                <h3>Location</h3>
+                <p>Pakistan</p>
+              </div>
             </div>
 
-            <nav>
-                <button onclick="showPage('home')">Home</button>
-                <button onclick="showPage('how')">How It Works</button>
-                <button onclick="showPage('features')">Features</button>
-                <button onclick="showPage('privacy')">Privacy</button>
-                <button onclick="showPage('contact')">Contact</button>
-                <button onclick="showPage('download')">Download</button>
-            </nav>
-        </div>
-    </header>
+          </div>
 
-    <main>
-
-        <div id="home" class="page active">
-            <section class="hero">
-                <div class="container hero-grid">
-                    <div>
-                        <div class="hero-badge">🚗 Affordable Ride Sharing for Everyone</div>
-                        <h2>Share rides, save money, travel smarter.</h2>
-                        <p>
-                            SathSawari connects passengers and drivers through ride sharing.
-                            Our platform helps reduce travel costs and improve convenience.
-                        </p>
-                        <div class="btn-group">
-                            <button class="btn btn-primary" onclick="showPage('download')">
-                                Get Started
-                            </button>
-
-                            <button class="btn btn-outline" onclick="showPage('how')">
-                                Learn More
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="hero-card">
-                        <img
-                            src="https://play-lh.googleusercontent.com/hb2zovQAdYzghiiIkIDJg-gEGQYnc1k7KCTwV2C9LwY8KR2yRjDySU7VLkp316bgEu-bbg6oYX1frkrKBak2xw=w240-h480-rw">
-                        <h2>SathSawari</h2>
-                        <h4>Find your route, share your journey with SathSawari.</h4>
-                    </div>
-                </div>
-            </section>
         </div>
 
-        <div id="how" class="page">
-            <section class="gray-section">
-                <div class="container">
-                    <h2 class="section-title">How SathSawari Works</h2>
-                    <p class="section-subtitle">A simple and smart way to connect passengers and drivers.</p>
+        <!-- RIGHT FORM -->
+        <div class="contact-form-box">
 
-                    <div class="card-grid">
-                        <div class="card">
-                            <div class="card-icon">📍</div>
-                            <h3>Search Ride</h3>
-                            <p>Passengers search rides according to destination and travel preferences.</p>
-                        </div>
+          <h3>Get in touch with us</h3>
 
-                        <div class="card">
-                            <div class="card-icon">🤝</div>
-                            <h3>Connect & Confirm</h3>
-                            <p>Drivers and passengers confirm ride details through the platform.</p>
-                        </div>
+<form id="contactForm">
 
-                        <div class="card">
-                            <div class="card-icon">🚗</div>
-                            <h3>Travel Together</h3>
-                            <p>Enjoy affordable and shared transportation experiences.</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </div>
+  <div class="form-group">
+    <label>Full Name</label>
 
-        <div id="features" class="page">
-            <section>
-                <div class="container">
-                    <h2 class="section-title">Why Choose SathSawari</h2>
-                    <p class="section-subtitle">Designed to make ride-sharing simple and affordable.</p>
+    <div class="input-icon">
+      <i class="fa-regular fa-user"></i>
+      <input
+        type="text"
+        id="name"
+        placeholder="Name"
+        required>
+    </div>
+  </div>
 
-                    <div class="card-grid">
-                        <div class="card">
-                            <h3>✔ Affordable shared rides</h3>
-                        </div>
-                        <div class="card">
-                            <h3>✔ Modern interface</h3>
-                        </div>
-                        <div class="card">
-                            <h3>✔ Fast ride searching</h3>
-                        </div>
-                        <div class="card">
-                            <h3>✔ Flexible travel options</h3>
-                        </div>
-                        <div class="card">
-                            <h3>✔ Community transport</h3>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </div>
+  <div class="form-group">
+    <label>Email</label>
 
-        <div id="contact" class="page">
-            <section class="contact">
-                <div class="container">
-                    <h2 class="section-title">Contact Us</h2>
-                    <p class="section-subtitle">Reach out to the SathSawari team anytime.</p>
+    <div class="input-icon">
+      <i class="fa-regular fa-envelope"></i>
+      <input
+        type="email"
+        id="email"
+        placeholder="Enter your email"
+        required>
+    </div>
+  </div>
 
-                    <div class="card-grid">
-                        <div class="card">
-                            <div class="card-icon">📧</div>
-                            <h3>Email</h3>
-                            <p>sathsawariofficial@gmail.com</p>
-                        </div>
-                        <div class="card">
-                            <div class="card-icon">📍</div>
-                            <h3>Location</h3>
-                            <p>Pakistan</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </div>
+  <div class="form-group">
+    <label>Phone</label>
 
-        <div id="privacy" class="page">
-            <section class="gray-section">
-                <div class="container">
-                    <h2 class="section-title">Privacy & Terms</h2>
+    <div class="input-icon">
+      <span>🇵🇰 +92</span>
+      <input
+        type="tel"
+        id="number"
+        placeholder="Phone Number"
+        required>
+    </div>
+  </div>
 
-                    <div class="card">
-                        <p><strong>Effective Date:</strong> January 01, 2026</p>
-                        <br>
-                        <p>SathSawari is a peer-to-peer connection platform.</p>
-                        <br>
-                        <p>Users are responsible for their own interactions and travel decisions.</p>
-                        <br>
-                        <p>We do not verify users or guarantee safety.</p>
-                    </div>
-                </div>
-            </section>
-        </div>
+  <div class="form-group">
+    <label>Message</label>
 
-        <div id="download" class="page">
-            <section>
-                <div class="container" style="text-align:center;">
-                    <h2 class="section-title">Download SathSawari App</h2>
-                    <p class="section-subtitle">Scan the QR code to download the app.</p>
+    <textarea
+      id="message"
+      rows="4"
+      placeholder="Enter your message"
+      required></textarea>
+  </div>
 
-                    <div class="download-box">
-                        <img
-                            src="https://quickchart.io/qr?text=https://play.google.com/store/apps/details?id=com.sawari.sathsawari">
-                        <p>Scan to download</p>
-                    </div>
+  <button type="submit" class="send-btn" id="sendBtn">
+    Send
+  </button>
 
-                    <br><br>
+</form>
 
-                    <a class="btn btn-primary"
-                        href="https://play.google.com/store/apps/details?id=com.sawari.sathsawari" target="_blank">
-                        Get it on Google Play
-                    </a>
-                </div>
-            </section>
-        </div>
+          <div class="contact-socials">
 
-    </main>
+            <p>Contact us on social media</p>
 
-    <footer>
-        <div class="container footer-content">
-            <div>
-                <h3 style="color:white; margin-bottom:8px;">SathSawari</h3>
-                <p>Smart ride-sharing platform for affordable travel.</p>
+            <div class="social-icons">
+
+              <a href="https://whatsapp.com/channel/0029Va8vGhR89incuJRuyR3K" target="_blank">
+                <i class="fa-brands fa-whatsapp"></i>
+                <span>WhatsApp</span>
+              </a>
+
+              <a href="https://www.instagram.com/sathsawari.official" target="_blank">
+                <i class="fa-brands fa-instagram"></i>
+                <span>Instagram</span>
+              </a>
+
+              <a href="https://www.facebook.com/profile.php?id=61587014528042" target="_blank">
+                <i class="fa-brands fa-facebook"></i>
+                <span>Facebook</span>
+              </a>
+
+              <a href="https://www.linkedin.com/company/sathsawari" target="_blank">
+                <i class="fa-brands fa-linkedin"></i>
+                <span>LinkedIn</span>
+              </a>
+
+              <a href="https://x.com/Sathsawari" target="_blank">
+                <i class="fa-brands fa-x-twitter"></i>
+                <span>X</span>
+              </a>
+
             </div>
 
-            <div class="socials">
-                <a href="https://www.facebook.com/profile.php?id=61587014528042" target="_blank">📘</a>
-                <a href="https://www.instagram.com/sathsawari.official" target="_blank">📸</a>
-                <a href="https://x.com/Sathsawari" target="_blank">✖</a>
-                <a href="https://www.linkedin.com/company/sathsawari" target="_blank">💼</a>
-                <a href="https://whatsapp.com/channel/0029Va8vGhR89incuJRuyR3K" target="_blank">🟢</a>
-            </div>
+          </div>
 
-            <div>
-                © 2026 SathSawari. All rights reserved.
-            </div>
         </div>
-    </footer>
 
-    <script>
-        function showPage(pageId) {
-            const pages = document.querySelectorAll('.page');
+      </div>
 
-            pages.forEach(page => {
-                page.classList.remove('active');
-            });
+    </div>
 
-            document.getElementById(pageId).classList.add('active');
+  </section>
 
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-    </script>
+</div>
+
+<!-- PRIVACY -->
+<div id="privacy" class="page">
+
+  <section class="gray-section">
+
+    <div class="container">
+
+      <h2 class="section-title">
+        Privacy & Terms
+      </h2>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terms of Service</title>
+<style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 0 20px;
+      background-color: #f9f9f9;
+      color: #333;
+    }
+    h1, h2 {
+      color: #2c3e50;
+    }
+    h1 {
+      text-align: center;
+    }
+    p {
+      margin-bottom: 20px;
+    }
+    ul {
+      margin-bottom: 20px;
+    }
+    .section {
+      margin-bottom: 30px;
+    }
+    footer {
+      text-align: center;
+      font-size: 0.9em;
+      color: #777;
+      margin-top: 50px;
+    }
+</style>
+</head>
+<body>
+<h1>Terms of Service</h1>
+<p><strong>Effective Date:</strong> December 31, 2025</p>
+ 
+  <div class="section">
+<p>Please read these Terms of Service ("Terms") carefully before using the App. This App is operated by a private group of independent developers. By using this App, you agree to be bound by these Terms.</p>
+</div>
+ 
+  <div class="section">
+<h2>1. Description of Service</h2>
+<p>The App is a peer-to-peer connection platform. We provide a directory service that allows:</p>
+<ul>
+<li>Passengers to search for routes and view available rides.</li>
+<li>Drivers to list their contact and vehicle information.</li>
+</ul>
+<p>The App's sole function is to facilitate the initial contact between these two parties.</p>
+</div>
+ 
+  <div class="section">
+<h2>2. No Verification (Use at Your Own Risk)</h2>
+<p>WE DO NOT VERIFY USERS. We do not perform background checks, identity verification, or criminal record checks on any Passenger or Driver. We do not verify vehicle safety, insurance status, or the validity of driver’s licenses. Users assume all responsibility for verifying the identity and safety of the person they are meeting. We strongly recommend meeting in well-lit, public areas and sharing your trip status with friends or family.</p>
+</div>
+ 
+  <div class="section">
+<h2>3. No Employment or Agency</h2>
+<p>Nothing in these Terms creates a partnership, joint venture, agency, or employment relationship between the Developers and any User. Drivers are independent individuals and are not employees, contractors, or agents of the App developers.</p>
+</div>
+ 
+  <div class="section">
+<h2>4. User Responsibilities</h2>
+<ul>
+<li><strong>Accuracy:</strong> Drivers agree to provide honest information regarding their name, vehicle, and contact details.</li>
+<li><strong>Legality:</strong> Users must comply with all local traffic and transport laws.</li>
+<li><strong>Conduct:</strong> Users must treat each other with respect. We reserve the right to remove any user info from our database at our sole discretion for any reported misconduct.</li>
+</ul>
+</div>
+ 
+  <div class="section">
+<h2>5. Exclusion of Liability</h2>
+<p>To the maximum extent permitted by law, the Developers shall not be liable for any damages, losses, or disputes arising from:</p>
+<ul>
+<li>Any physical harm, accidents, or criminal activity occurring during a ride.</li>
+<li>Any financial disputes between Passengers and Drivers regarding fares or payments.</li>
+<li>Any technical failures or inaccuracies in the location data or contact info provided.</li>
+</ul>
+<p>You agree that your use of the App is at your sole risk.</p>
+</div>
+ 
+  <div class="section">
+<h2>6. Payments</h2>
+<p>The App does not process payments. Any financial transaction or agreement regarding the cost of a ride is strictly between the Passenger and the Driver. We do not take a commission and are not responsible for payment disputes.</p>
+</div>
+ 
+  <div class="section">
+<h2>7. Limitation of Service</h2>
+<p>We provide the App "as-is" and "as-available." We do not guarantee that the App will always be online or error-free. As a team of independent developers, we reserve the right to modify or shut down the service at any time without notice.</p>
+</div>
+ 
+  <div class="section">
+<h2>8. Governing Law</h2>
+<p>Since we are not a registered company, any disputes related to these terms will be governed by the laws of the jurisdiction where the developers reside.</p>
+</div>
+ 
+  <div class="section">
+<h2>9. Changes to Terms</h2>
+<p>We may update these Terms at any time. Continued use of the App after changes are posted constitutes acceptance of the new Terms.</p>
+</div>
 
 </body>
+</html>
 
+    </div>
+
+  </section>
+
+</div>
+
+<!-- DOWNLOAD -->
+<div id="download" class="page">
+
+  <section>
+
+    <div class="container" style="text-align:center;">
+
+      <h2 class="section-title">
+        Download SathSawari App
+      </h2>
+
+      <p class="section-subtitle">
+        Scan the QR code to download the app.
+      </p>
+
+      <div class="download-box">
+
+        <img src="https://quickchart.io/qr?text=https://play.google.com/store/apps/details?id=com.sawari.sathsawari">
+
+        <p style="margin-top:16px;">
+          Scan to download
+        </p>
+
+      </div>
+
+      <br><br>
+
+      <a class="btn btn-primary"
+        href="https://play.google.com/store/apps/details?id=com.sawari.sathsawari"
+        target="_blank">
+
+        Get it on Google Play
+
+      </a>
+
+    </div>
+
+  </section>
+
+</div>
+
+</main>
+
+<!-- FOOTER -->
+
+<footer>
+
+  <div class="container footer-content">
+
+    <div>
+      <h3 style="color:white;margin-bottom:10px;">
+        SathSawari
+      </h3>
+
+      <p>
+        Smart ride-sharing platform for affordable travel.
+      </p>
+    </div>
+
+    <div class="footer-socials">
+
+      <a href="https://www.facebook.com/profile.php?id=61587014528042" target="_blank">
+        <i class="fa-brands fa-facebook-f"></i>
+      </a>
+
+      <a href="https://www.instagram.com/sathsawari.official" target="_blank">
+        <i class="fa-brands fa-instagram"></i>
+      </a>
+
+      <a href="https://x.com/Sathsawari" target="_blank">
+        <i class="fa-brands fa-x-twitter"></i>
+      </a>
+
+      <a href="https://www.linkedin.com/company/sathsawari" target="_blank">
+        <i class="fa-brands fa-linkedin-in"></i>
+      </a>
+
+      <a href="https://whatsapp.com/channel/0029Va8vGhR89incuJRuyR3K" target="_blank">
+        <i class="fa-brands fa-whatsapp"></i>
+      </a>
+
+    </div>
+
+    <div>
+      ©️ 2026 SathSawari. All rights reserved.
+    </div>
+
+  </div>
+
+</footer>
+
+<script>
+
+  function showPage(pageId){
+
+    const pages = document.querySelectorAll('.page');
+
+    pages.forEach(page => {
+      page.classList.remove('active');
+    });
+
+    document.getElementById(pageId)
+      .classList.add('active');
+
+    window.scrollTo({
+      top:0,
+      behavior:'smooth'
+    });
+  }
+
+  // CONTACT FORM API
+
+  document.getElementById("contactForm")
+    .addEventListener("submit", async function(e){
+
+      e.preventDefault();
+
+      const sendBtn = document.getElementById("sendBtn");
+
+      const data = {
+        name: document.getElementById("name").value,
+        number: document.getElementById("number").value,
+        email: document.getElementById("email").value,
+        message: document.getElementById("message").value
+      };
+
+      try {
+
+        sendBtn.innerText = "Sending...";
+        sendBtn.disabled = true;
+
+        const response = await fetch(
+          "https://sathsawari.com/api/v1/ride/approach",
+          {
+            method: "POST",
+ headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiIiLCJpYXQiOjE3Nzg3NTc5NDksImV4cCI6MTgxMDI5Mzk0OSwiYXVkIjoiIiwic3ViIjoiIiwidG9rZW5UeXBlIjoib3Blbl90b2tlbiJ9.3Ig44Rd_2pvhUQQ8vvaP9p5bRBd5h_7Bv_-GV1NV_pQ"},
+            body: JSON.stringify(data)
+          }
+        );
+
+        const result = await response.json();
+
+        if(response.ok){
+
+          alert("Message sent successfully!");
+
+          document.getElementById("contactForm").reset();
+
+        } else {
+
+          alert(result.message || "Failed to send message.");
+
+        }
+
+      } catch(error){
+
+        console.error(error);
+
+        alert("Something went wrong.");
+
+      } finally {
+
+        sendBtn.innerText = "Send";
+        sendBtn.disabled = false;
+
+      }
+
+    });
+
+</script>
+
+</body>
 </html>

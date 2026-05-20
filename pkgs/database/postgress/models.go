@@ -6,6 +6,7 @@ type SMSFCM struct {
 	ID        string    `json:"id" gorm:"primary_key"`
 	App       string    `json:"app"`
 	FCM       string    `json:"fcm" gorm:"not null"`
+	APPHash   string    `json:"app_hash"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
