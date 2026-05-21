@@ -122,9 +122,8 @@ func getAllActiveRides(orgCtx *gin.Context, page int) (rides []postgress.RideDet
 		Limit(pageSize).
 		Offset(offset)
 
-	countQuery := query
 	err = query.Order("created_at desc").Find(&rides).Error
-	err = countQuery.Count(&totalRows).Error
+	err = query.Count(&totalRows).Error
 
 	return
 }

@@ -2,6 +2,14 @@ package postgress
 
 import "time"
 
+type Admin struct {
+	ID        string    `json:"id" gorm:"primary_key"`
+	Username  string    `json:"user_name" gorm:"not null"`
+	Password  string    `json:"password" gorm:"not null"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type SMSFCM struct {
 	ID        string    `json:"id" gorm:"primary_key"`
 	App       string    `json:"app"`
@@ -184,4 +192,19 @@ type MissingLocations struct {
 	Place    string  `json:"place"`
 	UserLat  float64 `json:"lat"`
 	UserLng  float64 `json:"long"`
+}
+
+type DriverWithVehicle struct {
+	ID            string    `json:"id" gorm:"primaryKey"`
+	DriverMobile  string    `json:"driver_mobile"`
+	DriverName    string    `json:"driver_name"`
+	Password      string    `json:"password"`
+	Pin           string    `json:"pin"`
+	Rating        string    `json:"rating"`
+	NumberOfVotes string    `json:"number_of_votes"`
+	Status        string    `json:"status"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+
+	Vehicles []Vehicle `json:"vehicle" gorm:"foreignKey:DriverId;references:ID"`
 }

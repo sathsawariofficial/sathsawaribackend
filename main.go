@@ -8,6 +8,7 @@ import (
 	"rideshare/pkgs/constants"
 	"rideshare/pkgs/logger"
 	"rideshare/pkgs/middleware"
+	"rideshare/services/admin"
 	"rideshare/services/driver"
 	general_rest "rideshare/services/general/rest"
 	"rideshare/services/general/socket"
@@ -53,6 +54,11 @@ func main() {
 
 			// TODO: this is a temp open api it will be moved to admin later
 			public.POST("/sms/partner", general_rest.SaveSMSFCMHandler)
+
+			adminPublic := public.Group("/admin")
+			{
+				adminPublic.POST("/login", admin.LoginAdminHandler)
+			}
 
 			driverPublic := public.Group("/driver")
 			{

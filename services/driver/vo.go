@@ -50,8 +50,6 @@ func loginDriverResp(driverSessionId, otp string, driver postgress.Driver) utils
 			DriverName:   driver.DriverName,
 			Rating:       driver.Rating,
 			HasPin:       !utils.IsStringEmpty(driver.Pin),
-			CreatedAt:    driver.CreatedAt,
-			UpdatedAt:    driver.UpdatedAt,
 		},
 	}
 
@@ -110,8 +108,6 @@ func vehicleInfoResp(vehicles []postgress.Vehicle) utils.APIResponse {
 			VehicleNumber: val.VehicleNumber,
 			VehicleInfo:   val.VehicleInfo,
 			Status:        val.Status,
-			CreatedAt:     val.CreatedAt,
-			UpdatedAt:     val.UpdatedAt,
 		})
 	}
 

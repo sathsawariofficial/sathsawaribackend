@@ -105,6 +105,7 @@ func LoginDriver(ctx *gin.Context, sessionId string, request DriverLoginRequest)
 	driver, err = getDriver(ctx, request.MobileNumber)
 	if err != nil {
 		logger.LogError(sessionId, err)
+		err = errors.New(constants.Login_Failed)
 		return
 	}
 	if utils.IsStringEmpty(driver.ID) {
@@ -167,15 +168,7 @@ func handleFCM(ctx *gin.Context, sessionId, driverId, fcm string) {
 }
 
 func loginTokenCreation(sessionId string, request DriverLoginRequest, driver postgress.Driver) (token string, err error) {
-	excryptedPassword, err := utils.EncryptAES(sessionId, request.Password)
-	if err != nil {
-		logger.LogError(sessionId, "failed to encrypt password password error")
-		logger.LogError(sessionId, err)
-		err = errors.New(constants.Invalid_Password)
-		return
-	}
-
-	if excryptedPassword != driver.Password {
+	if err = utils.ComparePassword(request.Password, driver.Password); err != nil {
 		logger.LogError(sessionId, "invalid password error")
 		err = errors.New(constants.Invalid_Password)
 		return
@@ -368,7 +361,7 @@ func ChangePassword(ctx *gin.Context, sessionId, driverId string, request Change
 		return
 	}
 
-	encryptedOldPassword, err := utils.EncryptAES(sessionId, request.OldPassword)
+	encryptedOldPassword, err := utils.HashPassword(sessionId, request.OldPassword)
 	if err != nil {
 		logger.LogError(sessionId, err)
 		err = fmt.Errorf(constants.Registeration_Failed, "vehicle")
@@ -382,7 +375,7 @@ func ChangePassword(ctx *gin.Context, sessionId, driverId string, request Change
 	}
 
 	// save the password
-	excryptedNewPassword, err := utils.EncryptAES(sessionId, request.NewPassword)
+	excryptedNewPassword, err := utils.HashPassword(sessionId, request.NewPassword)
 	if err != nil {
 		logger.LogError(sessionId, err)
 		err = fmt.Errorf(constants.Registeration_Failed, "vehicle")
@@ -610,7 +603,7 @@ func updatePassword(ctx *gin.Context, sessionId, mobileNumber, otp string) (err 
 func updateForgottonPassword(ctx *gin.Context, sessionId, mobileNumber, password, otp string) (err error) {
 	logger.LogInfo("Request recevied in updateForgottonPassword", sessionId)
 
-	excryptedPassword, err := utils.EncryptAES(sessionId, password)
+	excryptedPassword, err := utils.HashPassword(sessionId, password)
 	if err != nil {
 		logger.LogError(sessionId, err)
 		err = fmt.Errorf(constants.Registeration_Failed, "vehicle")

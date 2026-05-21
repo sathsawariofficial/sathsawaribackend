@@ -33,6 +33,8 @@ const (
 	Operation_Not_Permitted = "Operation is not permitted"
 	Unverified_Driver       = "Unverified driver"
 	Perform_this_operation  = "Perform this operation"
+	General_Unknown         = "Unknown %s"
+	Not_Found               = "%s not found"
 )
 
 // keys
@@ -91,8 +93,12 @@ const (
 const (
 	Name_Min_Len              = 3
 	Name_Max_Len              = 128
+	Username_Min_Len          = 5
+	Username_Max_Len          = 50
 	Password_Min_Len          = 8
 	Password_Max_Len          = 12
+	Long_Password_Min_Len     = 8
+	Long_Password_Max_Len     = 70
 	Pin_Len                   = 6
 	VehicleNumber_Min_Len     = 1
 	VehicleNumber_Max_Len     = 20
@@ -128,5 +134,6 @@ const (
 const (
 	DateTimeLayout = "2006-01-02 15:04:05"
 	DRIVER_TOKEN   = "driver_token"
+	ADMIN_TOKEN    = "admin_token"
 	OPEN_TOKEN     = "open_token"
 )

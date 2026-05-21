@@ -2,7 +2,6 @@ package driver
 
 import (
 	"rideshare/pkgs/utils"
-	"time"
 )
 
 type DriverRegistrationRequest struct {
@@ -82,14 +81,12 @@ type DriverDetails struct {
 }
 
 type DriverLogin struct {
-	ID           string    `json:"id"`
-	VehicleID    string    `json:"vehicleId"`
-	DriverMobile string    `json:"driverMobile"`
-	DriverName   string    `json:"driverName"`
-	Rating       string    `json:"rating"`
-	HasPin       bool      `json:"hasPin"`
-	CreatedAt    time.Time `json:"createdAt"`
-	UpdatedAt    time.Time `json:"updatedAt"`
+	ID           string `json:"id"`
+	VehicleID    string `json:"vehicleId"`
+	DriverMobile string `json:"driverMobile"`
+	DriverName   string `json:"driverName"`
+	Rating       string `json:"rating"`
+	HasPin       bool   `json:"hasPin"`
 }
 
 type VehiclesResponse struct {
@@ -97,13 +94,11 @@ type VehiclesResponse struct {
 }
 
 type Vehicles struct {
-	ID            string    `json:"id"`
-	DriverId      string    `json:"driverId"`
-	VehicleNumber string    `json:"vehicleNumber"`
-	VehicleInfo   string    `json:"vehicleInfo"`
-	Status        string    `json:"status"`
-	CreatedAt     time.Time `json:"createdAt"`
-	UpdatedAt     time.Time `json:"updatedAt"`
+	ID            string `json:"id"`
+	DriverId      string `json:"driverId"`
+	VehicleNumber string `json:"vehicleNumber"`
+	VehicleInfo   string `json:"vehicleInfo"`
+	Status        string `json:"status"`
 }
 
 type ChangePasswordRequest struct {

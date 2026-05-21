@@ -1,9 +1,5 @@
 package ride
 
-import (
-	"time"
-)
-
 type RideCreationRequest struct {
 	VehicleId            string  `json:"vehicleId"`
 	StartDatetime        string  `json:"startDatetime"`
@@ -38,24 +34,22 @@ type DriverRideResponse struct {
 }
 
 type RideDetails struct {
-	ID                   string    `json:"id"`
-	DriverID             string    `json:"driverId"`
-	DriverName           string    `json:"driverName"`
-	DriverMobile         string    `json:"driverMobile"`
-	Rating               string    `json:"rating"`
-	VehicleNumber        string    `json:"vehicleNumber"`
-	VehicleInfo          string    `json:"vehicleInfo"`
-	StartDatetime        string    `json:"startDatetime"`
-	EstimatedEndDatetime string    `json:"estimatedEndDatetime"`
-	NumberOfSeats        int       `json:"numberOfSeats"`
-	SeatsTaken           int       `json:"seatsTaken"`
-	StartLocation        string    `json:"startLocation"`
-	EndLocation          string    `json:"endLocation"`
-	Fare                 float64   `json:"fare"`
-	RouteDetails         string    `json:"routeDetails"`
-	IsActive             bool      `json:"isActive"`
-	CreatedAt            time.Time `json:"createdAt"`
-	UpdatedAt            time.Time `json:"updatedAt"`
+	ID                   string  `json:"id"`
+	DriverID             string  `json:"driverId"`
+	DriverName           string  `json:"driverName"`
+	DriverMobile         string  `json:"driverMobile"`
+	Rating               string  `json:"rating"`
+	VehicleNumber        string  `json:"vehicleNumber"`
+	VehicleInfo          string  `json:"vehicleInfo"`
+	StartDatetime        string  `json:"startDatetime"`
+	EstimatedEndDatetime string  `json:"estimatedEndDatetime"`
+	NumberOfSeats        int     `json:"numberOfSeats"`
+	SeatsTaken           int     `json:"seatsTaken"`
+	StartLocation        string  `json:"startLocation"`
+	EndLocation          string  `json:"endLocation"`
+	Fare                 float64 `json:"fare"`
+	RouteDetails         string  `json:"routeDetails"`
+	IsActive             bool    `json:"isActive"`
 }
 
 type UpdateRideRequest struct {

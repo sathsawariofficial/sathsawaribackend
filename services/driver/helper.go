@@ -224,7 +224,7 @@ func saveDriverInfo(orgCtx *gin.Context, sessionId string, request DriverRegistr
 		}
 	}()
 
-	excryptedPassword, err := utils.EncryptAES(sessionId, request.Password)
+	excryptedPassword, err := utils.HashPassword(sessionId, request.Password)
 	if err != nil {
 		logger.LogError(sessionId, err)
 		tx.Rollback() // Roll back the transaction if there is an error
@@ -280,7 +280,7 @@ func saveDriverPin(orgCtx *gin.Context, sessionId, driverId, pin string) (err er
 		return
 	}
 
-	excryptedPin, err := utils.EncryptAES(sessionId, pin)
+	excryptedPin, err := utils.HashPassword(sessionId, pin)
 	if err != nil {
 		logger.LogError(sessionId, err)
 		err = fmt.Errorf(constants.Invalid_Data, "pin")
@@ -560,7 +560,7 @@ func validatePin(orgCtx *gin.Context, sessionId string, driver postgress.Driver,
 		driverPin = driver.Pin
 	}
 
-	excryptedPin, err := utils.EncryptAES(sessionId, pin)
+	excryptedPin, err := utils.HashPassword(sessionId, pin)
 	if err != nil {
 		logger.LogError(sessionId, err)
 		err = fmt.Errorf(constants.Invalid_Data, "pin")

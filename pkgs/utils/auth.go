@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var secret []byte
@@ -103,6 +104,26 @@ func VerifyJWT(sessionId, tokenString string) (string, error) {
 	logger.LogError(sessionId, err)
 
 	return "", err
+}
+
+func HashPassword(sessionId, password string) (string, error) {
+	hashedBytes, err := bcrypt.GenerateFromPassword(
+		[]byte(password),
+		bcrypt.DefaultCost,
+	)
+	if err != nil {
+		logger.LogError(sessionId, err)
+		return "", fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	return string(hashedBytes), nil
+}
+
+func ComparePassword(hashedPassword, plainPassword string) error {
+	return bcrypt.CompareHashAndPassword(
+		[]byte(hashedPassword),
+		[]byte(plainPassword),
+	)
 }
 
 // Encrypt encrypts the plaintext using AES with the provided key

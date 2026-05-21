@@ -1,0 +1,27 @@
+package admin
+
+import (
+	"fmt"
+	"rideshare/pkgs/constants"
+	"rideshare/pkgs/utils"
+)
+
+func ValidateAdminLogin(request *AdminLoginRequest) error {
+	var errMessage string
+	if utils.IsStringEmptyWithKey(request.Username, "Username", &errMessage) ||
+		utils.IsStringEmptyWithKey(request.Password, "Password", &errMessage) {
+		return fmt.Errorf(constants.Missing_Data, errMessage)
+	}
+
+	usernameLen := len(request.Username)
+	passwordLen := len(request.Password)
+
+	if !(usernameLen >= constants.Username_Min_Len && usernameLen <= constants.Username_Max_Len) {
+		return fmt.Errorf("length of the username should be between %v and %v characters", constants.MobileNumber_Min_Len, constants.MobileNumber_Max_Len)
+	}
+	if !(passwordLen >= constants.Long_Password_Min_Len && passwordLen <= constants.Long_Password_Max_Len) {
+		return fmt.Errorf("length of the password should be between %v and %v characters", constants.Long_Password_Min_Len, constants.Long_Password_Max_Len)
+	}
+
+	return nil
+}

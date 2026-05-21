@@ -1,0 +1,99 @@
+package admin
+
+import (
+	"fmt"
+	"net/http"
+	"rideshare/pkgs/constants"
+	"rideshare/pkgs/logger"
+	"rideshare/pkgs/utils"
+
+	"github.com/gin-gonic/gin"
+	"github.com/rs/xid"
+)
+
+// create a session for admin
+func LoginAdminHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in LoginAdminHandler", sessionId)
+
+	var request AdminLoginRequest
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		logger.LogError(sessionId, "binding error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: constants.General_Error,
+		})
+		return
+	}
+
+	logger.LogDebug2("Request received in LoginAdminHandler", sessionId, request)
+
+	err := ValidateAdminLogin(&request)
+	if err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	adminSessionId, admin, err := LoginAdmin(ctx, sessionId, request)
+	if err != nil {
+		logger.LogError(sessionId, "login error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	adminLoginResp := loginAdminResp(adminSessionId, admin)
+
+	logger.LogInfo("Response received in LoginAdminHandler", sessionId)
+	logger.LogDebug2("Response received in LoginAdminHandler", sessionId, adminLoginResp)
+
+	ctx.JSON(http.StatusOK, adminLoginResp)
+}
+
+func GetDriverDetailsHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetDriverDetailsHandler", sessionId)
+
+	page, err := utils.GetPageNumber(ctx)
+	if err != nil {
+		logger.LogError(sessionId, "binding error: "+err.Error())
+		err = fmt.Errorf(constants.Invalid_Data, "page")
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	driverDetails, totalRows, err := GetDrivers(ctx, sessionId, page)
+	if err != nil {
+		logger.LogError(sessionId, "get driver details error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	if totalRows == 0 {
+		logger.LogError(sessionId, "no drivers found error")
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusNoContent,
+			Message: fmt.Sprintf(constants.Not_Found, "Driver"),
+		})
+		return
+	}
+
+	rideDetailsResp := driverDetailsResp(driverDetails, totalRows)
+
+	logger.LogInfo("Response returned from GetDriverDetailsHandler", sessionId)
+	logger.LogDebug2("Response returned from GetDriverDetailsHandler", sessionId, rideDetailsResp)
+
+	ctx.JSON(http.StatusOK, rideDetailsResp)
+}

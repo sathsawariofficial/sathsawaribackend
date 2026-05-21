@@ -40,8 +40,6 @@ func getDriverRidesResp(rides []postgress.RideDetails, totalPages int, driverId 
 			Fare:                 ride.Fare,
 			RouteDetails:         ride.RouteDetails,
 			IsActive:             ride.IsActive,
-			CreatedAt:            ride.CreatedAt,
-			UpdatedAt:            ride.UpdatedAt,
 		})
 	}
 
@@ -78,8 +76,6 @@ func filteredRidesResp(rides []postgress.RideDetails, totalRows int64) utils.API
 			Fare:                 ride.Fare,
 			RouteDetails:         ride.RouteDetails,
 			IsActive:             ride.IsActive,
-			CreatedAt:            ride.CreatedAt,
-			UpdatedAt:            ride.UpdatedAt,
 		})
 	}
 

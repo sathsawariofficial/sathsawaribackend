@@ -44,6 +44,7 @@ func NewPortgress() (db *gorm.DB, err error) {
 
 	// Auto migrate models
 	err = db.AutoMigrate(
+		&Admin{},
 		&Driver{},
 		&Vehicle{},
 		&Ride{},
