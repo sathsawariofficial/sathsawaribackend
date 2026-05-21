@@ -53,3 +53,19 @@ func GetDrivers(ctx *gin.Context, sessionId string, page int) (driverDetails []p
 
 	return
 }
+
+func GetVehicles(ctx *gin.Context, sessionId string, page int) (vehicles []postgress.Vehicle, totalRows int64, err error) {
+	logger.LogInfo("Request received in GetVehicles", sessionId)
+
+	vehicles, totalRows, err = getAllActiveVehicles(ctx, page)
+	if err != nil {
+		logger.LogError(sessionId, " get driver details error: "+err.Error())
+		err = errors.New(constants.Unknown_Error)
+		return
+	}
+
+	logger.LogInfo("Response returned from GetVehicles", sessionId)
+	logger.LogDebug2("Response returned from GetVehicles", sessionId, fmt.Sprintf("vehicles: %v, total rows: %v", vehicles, totalRows))
+
+	return
+}

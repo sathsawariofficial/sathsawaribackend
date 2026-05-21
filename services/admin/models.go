@@ -26,12 +26,18 @@ type DriverWithVehicle struct {
 
 type Vehicle struct {
 	ID            string `json:"id"`
+	DriverId      string `json:"driverId"`
 	VehicleNumber string `json:"vehicleNumber"`
 	VehicleInfo   string `json:"vehicleInfo"`
 	Status        string `json:"status"`
 }
 
-type RidesDetailsResponse struct {
+type DriverDetailsResponse struct {
 	TotalPages int                 `json:"totalPages"`
 	Details    []DriverWithVehicle `json:"details"`
+}
+
+type VehicleDetailsResponse struct {
+	TotalPages int       `json:"totalPages"`
+	Vehicles   []Vehicle `json:"vehicle"`
 }

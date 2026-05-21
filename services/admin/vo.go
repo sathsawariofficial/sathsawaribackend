@@ -35,6 +35,7 @@ func driverDetailsResp(drivers []postgress.DriverWithVehicle, totalRows int64) u
 		for _, v := range driver.Vehicles {
 			vehicles = append(vehicles, Vehicle{
 				ID:            v.ID,
+				DriverId:      v.DriverId,
 				VehicleNumber: v.VehicleNumber,
 				VehicleInfo:   v.VehicleInfo,
 				Status:        v.Status,
@@ -55,11 +56,36 @@ func driverDetailsResp(drivers []postgress.DriverWithVehicle, totalRows int64) u
 	driverDetailsResp := utils.APIResponse{
 		Code:    http.StatusOK,
 		Message: constants.Success,
-		Data: RidesDetailsResponse{
+		Data: DriverDetailsResponse{
 			TotalPages: utils.CalculatePagesize(totalRows),
 			Details:    driverDetails,
 		},
 	}
 
 	return driverDetailsResp
+}
+
+func vechileDetailsResp(vehicles []postgress.Vehicle, totalRows int64) utils.APIResponse {
+	var vehicleDetails []Vehicle
+
+	for _, v := range vehicles {
+		vehicleDetails = append(vehicleDetails, Vehicle{
+			ID:            v.ID,
+			DriverId:      v.DriverId,
+			VehicleNumber: v.VehicleNumber,
+			VehicleInfo:   v.VehicleInfo,
+			Status:        v.Status,
+		})
+	}
+
+	vehicleDetailsResp := utils.APIResponse{
+		Code:    http.StatusOK,
+		Message: constants.Success,
+		Data: VehicleDetailsResponse{
+			TotalPages: utils.CalculatePagesize(totalRows),
+			Vehicles:   vehicleDetails,
+		},
+	}
+
+	return vehicleDetailsResp
 }

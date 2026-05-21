@@ -90,10 +90,52 @@ func GetDriverDetailsHandler(ctx *gin.Context) {
 		return
 	}
 
-	rideDetailsResp := driverDetailsResp(driverDetails, totalRows)
+	driverDetailsResp := driverDetailsResp(driverDetails, totalRows)
 
 	logger.LogInfo("Response returned from GetDriverDetailsHandler", sessionId)
-	logger.LogDebug2("Response returned from GetDriverDetailsHandler", sessionId, rideDetailsResp)
+	logger.LogDebug2("Response returned from GetDriverDetailsHandler", sessionId, driverDetailsResp)
 
-	ctx.JSON(http.StatusOK, rideDetailsResp)
+	ctx.JSON(http.StatusOK, driverDetailsResp)
+}
+
+func GetVehiclesHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetVehiclesHandler", sessionId)
+
+	page, err := utils.GetPageNumber(ctx)
+	if err != nil {
+		logger.LogError(sessionId, "binding error: "+err.Error())
+		err = fmt.Errorf(constants.Invalid_Data, "page")
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	vehicles, totalRows, err := GetVehicles(ctx, sessionId, page)
+	if err != nil {
+		logger.LogError(sessionId, "get vechile details error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	if totalRows == 0 {
+		logger.LogError(sessionId, "no vehicles found error")
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusNoContent,
+			Message: fmt.Sprintf(constants.Not_Found, "Driver"),
+		})
+		return
+	}
+
+	vehicleDetailsResp := vechileDetailsResp(vehicles, totalRows)
+
+	logger.LogInfo("Response returned from GetVehiclesHandler", sessionId)
+	logger.LogDebug2("Response returned from GetVehiclesHandler", sessionId, vehicleDetailsResp)
+
+	ctx.JSON(http.StatusOK, vehicleDetailsResp)
 }
