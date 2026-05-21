@@ -9,3 +9,7 @@ const (
 const (
 	SR_PLACE_SEARCH = "PLACE_SEARCH"
 )
+
+const (
+	DEFAULT_APP_HASH = "aqfUly2KTch"
+)

@@ -194,7 +194,7 @@ func SendNotification(orgCtx *gin.Context, sessionId, notificationType, driverId
 			return
 		}
 		fcm = smsFCM.FCM
-		message = fmt.Sprintf(message, smsFCM.APPHash)
+		message = fmt.Sprintf(message, ChoiseMaker(smsFCM.APPHash, constants.DEFAULT_APP_HASH))
 	default:
 		logger.LogWarning(sessionId, fmt.Sprintf("unhandled notification type: %s", notificationType))
 		return

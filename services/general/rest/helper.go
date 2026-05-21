@@ -1,6 +1,7 @@
 package general
 
 import (
+	"rideshare/pkgs/constants"
 	"rideshare/pkgs/database/postgress"
 	"rideshare/pkgs/utils"
 )
@@ -10,6 +11,6 @@ func mapSMSFcmRequest(request SMSFCMRequest) *postgress.SMSFCM {
 		ID:      utils.GenerateUUID(),
 		App:     request.App,
 		FCM:     request.FCM,
-		APPHash: request.AppHash,
+		APPHash: utils.ChoiseMaker(request.AppHash, constants.DEFAULT_APP_HASH),
 	}
 }
