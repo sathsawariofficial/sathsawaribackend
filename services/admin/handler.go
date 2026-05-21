@@ -71,6 +71,17 @@ func GetDriverDetailsHandler(ctx *gin.Context) {
 		return
 	}
 
+	err = ValidatePage(page)
+	if err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		err = fmt.Errorf(constants.Invalid_Data, "page")
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
 	driverDetails, totalRows, err := GetDrivers(ctx, sessionId, page)
 	if err != nil {
 		logger.LogError(sessionId, "get driver details error: "+err.Error())
@@ -113,6 +124,17 @@ func GetVehiclesHandler(ctx *gin.Context) {
 		return
 	}
 
+	err = ValidatePage(page)
+	if err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		err = fmt.Errorf(constants.Invalid_Data, "page")
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
 	vehicles, totalRows, err := GetVehicles(ctx, sessionId, page)
 	if err != nil {
 		logger.LogError(sessionId, "get vechile details error: "+err.Error())
@@ -138,4 +160,57 @@ func GetVehiclesHandler(ctx *gin.Context) {
 	logger.LogDebug2("Response returned from GetVehiclesHandler", sessionId, vehicleDetailsResp)
 
 	ctx.JSON(http.StatusOK, vehicleDetailsResp)
+}
+
+func GetRidesHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetRidesHandler", sessionId)
+
+	page, err := utils.GetPageNumber(ctx)
+	if err != nil {
+		logger.LogError(sessionId, "binding error: "+err.Error())
+		err = fmt.Errorf(constants.Invalid_Data, "page")
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	err = ValidatePage(page)
+	if err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		err = fmt.Errorf(constants.Invalid_Data, "page")
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	rides, totalRows, err := GetRides(ctx, sessionId, page)
+	if err != nil {
+		logger.LogError(sessionId, "get ride details error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	if totalRows == 0 {
+		logger.LogError(sessionId, "no rides found error")
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusNoContent,
+			Message: fmt.Sprintf(constants.Not_Found, "Driver"),
+		})
+		return
+	}
+
+	rideDetailsResp := rideDetailsResp(rides, totalRows)
+
+	logger.LogInfo("Response returned from GetRidesHandler", sessionId)
+	logger.LogDebug2("Response returned from GetRidesHandler", sessionId, rideDetailsResp)
+
+	ctx.JSON(http.StatusOK, rideDetailsResp)
 }

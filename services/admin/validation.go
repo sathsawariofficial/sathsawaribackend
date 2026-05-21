@@ -25,3 +25,13 @@ func ValidateAdminLogin(request *AdminLoginRequest) error {
 
 	return nil
 }
+
+func ValidatePage(page int) error {
+	if page != 0 {
+		if page < constants.Page_Min_Value || page > constants.Page_Max_Value {
+			return fmt.Errorf("value of the page number should be between %v and %v", constants.Page_Min_Value, constants.Page_Max_Value)
+		}
+	}
+
+	return nil
+}

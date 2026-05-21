@@ -46,7 +46,7 @@ func Authentication() gin.HandlerFunc {
 			return
 		}
 
-		encryptedDriverId, err := utils.VerifyJWT(sessionId, token)
+		encryptedId, err := utils.VerifyJWT(sessionId, token)
 		if err != nil {
 			err = errors.New(constants.Invalid_Session)
 			logger.LogError(sessionId, "failed to encrypt driver id from token: "+err.Error())
@@ -57,8 +57,8 @@ func Authentication() gin.HandlerFunc {
 			return
 		}
 
-		if !utils.IsStringEmpty(encryptedDriverId) {
-			_, err = redis.GetRedisValue(database.DatabaseConn.RedisConn, encryptedDriverId)
+		if !utils.IsStringEmpty(encryptedId) {
+			_, err = redis.GetRedisValue(database.DatabaseConn.RedisConn, encryptedId)
 			if err != nil {
 				logger.LogError(sessionId, "session not found error: "+err.Error())
 				err = fmt.Errorf(constants.Unable_To_Do_Job, "verify user")
@@ -69,7 +69,7 @@ func Authentication() gin.HandlerFunc {
 				return
 			}
 
-			driverId, err := utils.DecryptAES(sessionId, encryptedDriverId)
+			driverId, err := utils.DecryptAES(sessionId, encryptedId)
 			if err != nil {
 				err = errors.New(constants.Invalid_Session)
 				logger.LogError(sessionId, "failed to decrypt driver id: "+err.Error())
@@ -105,7 +105,7 @@ func Authentication() gin.HandlerFunc {
 
 			ctx.Set(constants.Sessoin_KEY, token)
 			ctx.Set(constants.Driver_KEY, driverId)
-			ctx.Set(constants.Encrypted_Driver_KEY, encryptedDriverId)
+			ctx.Set(constants.Encrypted_Driver_KEY, encryptedId)
 		}
 
 		ctx.Next()
@@ -123,7 +123,7 @@ func SocketAuth(oldCtx *context.Context, sessionId, token string) []byte {
 		return utils.GeneralSocketResp(sessionId, http.StatusUnauthorized, err.Error())
 	}
 
-	encryptedDriverId, err := utils.VerifyJWT(sessionId, token)
+	encryptedId, err := utils.VerifyJWT(sessionId, token)
 	if err != nil {
 		err = errors.New(constants.Invalid_Session)
 		logger.LogError(sessionId, "failed to encrypt driver id from token: "+err.Error())
@@ -131,15 +131,15 @@ func SocketAuth(oldCtx *context.Context, sessionId, token string) []byte {
 	}
 
 	// Driver token handling
-	if utils.IsStringEmpty(encryptedDriverId) {
-		_, err = redis.GetRedisValue(database.DatabaseConn.RedisConn, encryptedDriverId)
+	if utils.IsStringEmpty(encryptedId) {
+		_, err = redis.GetRedisValue(database.DatabaseConn.RedisConn, encryptedId)
 		if err != nil {
 			logger.LogError(sessionId, "session not found error: "+err.Error())
 			err = fmt.Errorf(constants.Unable_To_Do_Job, "verify user")
 			return utils.GeneralSocketResp(sessionId, http.StatusUnauthorized, err.Error())
 		}
 
-		driverId, err := utils.DecryptAES(sessionId, encryptedDriverId)
+		driverId, err := utils.DecryptAES(sessionId, encryptedId)
 		if err != nil {
 			err = errors.New(constants.Invalid_Session)
 			logger.LogError(sessionId, "failed to decrypt driver id: "+err.Error())
@@ -163,7 +163,7 @@ func SocketAuth(oldCtx *context.Context, sessionId, token string) []byte {
 
 		ctx := context.WithValue(*oldCtx, constants.Sessoin_KEY, token)
 		ctx = context.WithValue(ctx, constants.Driver_KEY, driverId)
-		ctx = context.WithValue(ctx, constants.Encrypted_Driver_KEY, encryptedDriverId)
+		ctx = context.WithValue(ctx, constants.Encrypted_Driver_KEY, encryptedId)
 		oldCtx = &ctx
 	}
 

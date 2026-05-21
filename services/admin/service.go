@@ -69,3 +69,19 @@ func GetVehicles(ctx *gin.Context, sessionId string, page int) (vehicles []postg
 
 	return
 }
+
+func GetRides(ctx *gin.Context, sessionId string, page int) (rides []postgress.RideDetails, totalRows int64, err error) {
+	logger.LogInfo("Request received in GetRides", sessionId)
+
+	rides, totalRows, err = getAllActiveRides(ctx, page)
+	if err != nil {
+		logger.LogError(sessionId, " get ride details error: "+err.Error())
+		err = errors.New(constants.Unknown_Error)
+		return
+	}
+
+	logger.LogInfo("Response returned from GetRides", sessionId)
+	logger.LogDebug2("Response returned from GetRides", sessionId, fmt.Sprintf("rides: %v, total rows: %v", rides, totalRows))
+
+	return
+}

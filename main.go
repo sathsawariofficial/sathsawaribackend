@@ -89,6 +89,13 @@ func main() {
 		{
 			protected.POST("/otp/send", driver.SendOTPHandler)
 
+			adminProtected := protected.Group("/admin")
+			{
+				adminProtected.POST("/rides", admin.GetRidesHandler)
+				adminProtected.POST("/veicles", admin.GetVehiclesHandler)
+				adminProtected.POST("/driver", admin.GetDriverDetailsHandler)
+			}
+
 			driverProtected := protected.Group("/driver")
 			{
 				driverProtected.GET("/rides", ride.DriverRideHandler)

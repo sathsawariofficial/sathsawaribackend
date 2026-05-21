@@ -94,7 +94,6 @@ func getAllActiveRides(orgCtx *gin.Context, page int) (rides []postgress.RideDet
 		`).
 		Joins("JOIN drivers ON rides.driver_id = drivers.id").
 		Joins("JOIN vehicles ON rides.vehicle_id = vehicles.id").
-		Where("rides.estimated_end_datetime >= ?", utils.GetCurrentTime()).
 		Where(`rides.is_active = ?`, true).
 		Limit(pageSize).
 		Offset(offset)

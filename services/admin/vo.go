@@ -32,13 +32,13 @@ func driverDetailsResp(drivers []postgress.DriverWithVehicle, totalRows int64) u
 	for _, driver := range drivers {
 
 		var vehicles []Vehicle
-		for _, v := range driver.Vehicles {
+		for _, vehicle := range driver.Vehicles {
 			vehicles = append(vehicles, Vehicle{
-				ID:            v.ID,
-				DriverId:      v.DriverId,
-				VehicleNumber: v.VehicleNumber,
-				VehicleInfo:   v.VehicleInfo,
-				Status:        v.Status,
+				ID:            vehicle.ID,
+				DriverId:      vehicle.DriverId,
+				VehicleNumber: vehicle.VehicleNumber,
+				VehicleInfo:   vehicle.VehicleInfo,
+				Status:        vehicle.Status,
 			})
 		}
 
@@ -68,13 +68,13 @@ func driverDetailsResp(drivers []postgress.DriverWithVehicle, totalRows int64) u
 func vechileDetailsResp(vehicles []postgress.Vehicle, totalRows int64) utils.APIResponse {
 	var vehicleDetails []Vehicle
 
-	for _, v := range vehicles {
+	for _, vehicle := range vehicles {
 		vehicleDetails = append(vehicleDetails, Vehicle{
-			ID:            v.ID,
-			DriverId:      v.DriverId,
-			VehicleNumber: v.VehicleNumber,
-			VehicleInfo:   v.VehicleInfo,
-			Status:        v.Status,
+			ID:            vehicle.ID,
+			DriverId:      vehicle.DriverId,
+			VehicleNumber: vehicle.VehicleNumber,
+			VehicleInfo:   vehicle.VehicleInfo,
+			Status:        vehicle.Status,
 		})
 	}
 
@@ -88,4 +88,40 @@ func vechileDetailsResp(vehicles []postgress.Vehicle, totalRows int64) utils.API
 	}
 
 	return vehicleDetailsResp
+}
+
+func rideDetailsResp(rides []postgress.RideDetails, totalRows int64) utils.APIResponse {
+	var rideDetails []RideDetail
+
+	for _, ride := range rides {
+		rideDetails = append(rideDetails, RideDetail{
+			ID:                   ride.ID,
+			DriverID:             ride.DriverID,
+			DriverName:           ride.DriverName,
+			DriverMobile:         ride.DriverMobile,
+			Rating:               ride.Rating,
+			VehicleNumber:        ride.VehicleNumber,
+			VehicleInfo:          ride.VehicleInfo,
+			StartDatetime:        ride.StartDatetime,
+			EstimatedEndDatetime: ride.EstimatedEndDatetime,
+			NumberOfSeats:        ride.NumberOfSeats,
+			SeatsTaken:           ride.SeatsTaken,
+			StartLocation:        ride.StartLocation,
+			EndLocation:          ride.EndLocation,
+			Fare:                 ride.Fare,
+			RouteDetails:         ride.RouteDetails,
+			IsActive:             ride.IsActive,
+		})
+	}
+
+	rideDetailsResp := utils.APIResponse{
+		Code:    http.StatusOK,
+		Message: constants.Success,
+		Data: RideDetailsResponse{
+			TotalPages: utils.CalculatePagesize(totalRows),
+			Rides:      rideDetails,
+		},
+	}
+
+	return rideDetailsResp
 }

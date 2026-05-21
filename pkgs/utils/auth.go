@@ -91,6 +91,15 @@ func VerifyJWT(sessionId, tokenString string) (string, error) {
 			}
 
 			return driverID, nil
+		} else if tokenType == constants.ADMIN_TOKEN {
+			adminID, ok := claims["adminId"].(string)
+			if !ok {
+				err = fmt.Errorf("adminId not found or invalid")
+				logger.LogError(sessionId, err)
+				return "", err
+			}
+
+			return adminID, nil
 		} else if tokenType == constants.OPEN_TOKEN {
 			return "", nil
 		} else {
