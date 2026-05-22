@@ -446,7 +446,8 @@ func ForgotPassword(ctx *gin.Context, sessionId, mobileNumber string) (otp strin
 	driver, err := getDriver(ctx, mobileNumber)
 	if err != nil {
 		logger.LogError(sessionId, "get driver error: "+err.Error())
-		err = errors.New(constants.Driver_Not_Found)
+		// NOTE: we dont want to let the people know weather a number actuly exist or not
+		err = nil
 		return
 	}
 
