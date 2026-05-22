@@ -94,7 +94,7 @@ func getOTP(ctx *gin.Context, sessionId, mobileNumber string) (otp string, err e
 	return
 }
 
-func sendOTP(ctx *gin.Context, sessionId, mobileNumber string) (otp string, err error) {
+func sendOTP(ctx *gin.Context, sessionId, mobileNumber, operation string) (otp string, err error) {
 	logger.LogInfo("Request received in sendOTP", sessionId)
 
 	otp = utils.GenerateOTP()
@@ -107,7 +107,8 @@ func sendOTP(ctx *gin.Context, sessionId, mobileNumber string) (otp string, err 
 		"message":      message,
 	})
 
-	err = redis.SetRedisValueTTL(database.DatabaseConn.RedisConn, mobileNumber, otp, time.Duration(configuration.ConfigurationData.Database.Redis.TTL)*time.Second)
+	key := fmt.Sprintf("%s:%s", mobileNumber, operation)
+	err = redis.SetRedisValueTTL(database.DatabaseConn.RedisConn, key, otp, time.Duration(configuration.ConfigurationData.Database.Redis.TTL)*time.Second)
 	if err != nil {
 		logger.LogError(sessionId, "session deleted error: "+err.Error())
 		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)

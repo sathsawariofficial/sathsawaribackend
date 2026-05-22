@@ -181,11 +181,17 @@ func ValidateForgotPassword(mobileNumber string) error {
 	return nil
 }
 
-func ValidateSendOTP(mobileNumber string) error {
+func ValidateSendOTP(mobileNumber, operation string) error {
 	mobileLen := len(mobileNumber)
 
 	if !(mobileLen > constants.MobileNumber_Min_Len && mobileLen <= constants.MobileNumber_Max_Len) {
 		return fmt.Errorf("length of the mobile number should be between %v and %v characters", constants.MobileNumber_Min_Len, constants.MobileNumber_Max_Len)
+	}
+
+	isValid := utils.VerifyOTPOperations(operation)
+	if !isValid {
+		err := fmt.Errorf(constants.Invalid_Data, "operation")
+		return err
 	}
 
 	return nil
@@ -204,7 +210,7 @@ func ValidateOTP(request *VerifyOTPRequest) error {
 		return fmt.Errorf("length of the mobile number should be between %v and %v characters", constants.MobileNumber_Min_Len, constants.MobileNumber_Max_Len)
 	}
 
-	if request.Operation == FORGOT_PASSWORD_OPERATION {
+	if request.Operation == constants.FORGOT_PASSWORD_OPERATION {
 		passwordLen := len(request.Password)
 
 		if !(passwordLen >= constants.Password_Min_Len && passwordLen <= constants.Password_Max_Len) {

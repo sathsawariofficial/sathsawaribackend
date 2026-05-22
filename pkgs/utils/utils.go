@@ -258,3 +258,15 @@ func GetSocketUpgrader() websocket.Upgrader {
 	Upgrade = upgrader
 	return upgrader
 }
+
+func VerifyOTPOperations(operation string) (isValid bool) {
+	switch operation {
+	case constants.ACTIVATE_DRIVER_OPERATION,
+		constants.ACTIVATE_VEHICLE_OPERATION,
+		constants.UPDATE_PASSWORD_OPERATION,
+		constants.FORGOT_PASSWORD_OPERATION:
+		return true
+	default:
+		return false
+	}
+}

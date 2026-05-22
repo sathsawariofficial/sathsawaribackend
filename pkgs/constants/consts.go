@@ -41,6 +41,7 @@ const (
 // keys
 const (
 	Sessoin_KEY            = "session"
+	Operaion_KEY           = "operation"
 	User_KEY               = "user_id"
 	Vehicle_KEY            = "vehicle_id"
 	Pin_Key                = "pin"
@@ -87,6 +88,7 @@ const (
 const (
 	Postgress_PK_Size         = 2730
 	MOBILE_NUMBER_QUERY       = "mobile_number"
+	OTP_OPERATION             = "otp_operation"
 	FIREBASE_CREDENTIALS_JSON = "FIREBASE_CREDENTIALS_JSON"
 )
 
@@ -141,4 +143,13 @@ const (
 	ADMIN_TOKEN   = "admin_token"
 	OPEN_TOKEN    = "open_token"
 	NO_TOKEN_TYPE = "no_token_type" // such token whose type dont matter
+)
+
+// OTP Operations
+// NOTE: if u add anything here then also add in VerifyOTPOperations function in utils
+const (
+	ACTIVATE_DRIVER_OPERATION  = "ACTIVATE_DRIVER"
+	ACTIVATE_VEHICLE_OPERATION = "ACTIVATE_VEHICLE"
+	UPDATE_PASSWORD_OPERATION  = "UPDATE_PASSWORD"
+	FORGOT_PASSWORD_OPERATION  = "FORGOT_PASSWORD"
 )

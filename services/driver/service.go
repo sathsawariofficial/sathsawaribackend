@@ -45,7 +45,7 @@ func RegisterDriver(ctx *gin.Context, sessionId string, request DriverRegistrati
 		return
 	}
 
-	otp, err = sendOTP(ctx, sessionId, request.MobileNumber)
+	otp, err = sendOTP(ctx, sessionId, request.MobileNumber, constants.ACTIVATE_DRIVER_OPERATION)
 	if err != nil {
 		logger.LogError(sessionId, err)
 	}
@@ -115,7 +115,7 @@ func LoginDriver(ctx *gin.Context, sessionId string, request DriverLoginRequest)
 		return
 	}
 	if driver.Status == constants.Status_PendingApproval {
-		otp, err = sendOTP(ctx, sessionId, request.MobileNumber)
+		otp, err = sendOTP(ctx, sessionId, request.MobileNumber, constants.ACTIVATE_DRIVER_OPERATION)
 		if err != nil {
 			logger.LogError(sessionId, err)
 			err = errors.New(constants.Login_Failed)
@@ -419,7 +419,7 @@ func ChangePassword(ctx *gin.Context, sessionId, driverId string, request Change
 	}
 
 	// send otp
-	otp, err = sendOTP(ctx, sessionId, driver.DriverMobile)
+	otp, err = sendOTP(ctx, sessionId, driver.DriverMobile, constants.UPDATE_PASSWORD_OPERATION)
 	if err != nil {
 		logger.LogError(sessionId, "failed to send otp: "+err.Error())
 		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
@@ -451,7 +451,7 @@ func ForgotPassword(ctx *gin.Context, sessionId, mobileNumber string) (otp strin
 	}
 
 	// send otp
-	otp, err = sendOTP(ctx, sessionId, driver.DriverMobile)
+	otp, err = sendOTP(ctx, sessionId, driver.DriverMobile, constants.FORGOT_PASSWORD_OPERATION)
 	if err != nil {
 		logger.LogError(sessionId, "failed to send otp: "+err.Error())
 		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
@@ -485,7 +485,7 @@ func GetVehicles(ctx *gin.Context, sessionId, driverId, status string) (vehicles
 	return
 }
 
-func ResendOTP(ctx *gin.Context, sessionId, mobileNumber string) (otp string, err error) {
+func ResendOTP(ctx *gin.Context, sessionId, mobileNumber, operation string) (otp string, err error) {
 	logger.LogInfo("Request received in ResendOTP", sessionId)
 
 	// make sure driver exist
@@ -496,7 +496,8 @@ func ResendOTP(ctx *gin.Context, sessionId, mobileNumber string) (otp string, er
 		return
 	}
 
-	otp, err = getOTP(ctx, sessionId, driver.DriverMobile)
+	key := fmt.Sprintf("%s:%s", driver.DriverMobile, operation)
+	otp, err = getOTP(ctx, sessionId, key)
 	if err != nil {
 		logger.LogError(sessionId, "failed to send otp: "+err.Error())
 		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
@@ -504,7 +505,7 @@ func ResendOTP(ctx *gin.Context, sessionId, mobileNumber string) (otp string, er
 	}
 	if !utils.IsStringEmpty(otp) {
 		// send otp
-		otp, err = sendOTP(ctx, sessionId, driver.DriverMobile)
+		otp, err = sendOTP(ctx, sessionId, driver.DriverMobile, operation)
 		if err != nil {
 			logger.LogError(sessionId, "failed to send otp: "+err.Error())
 			err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
@@ -518,7 +519,7 @@ func ResendOTP(ctx *gin.Context, sessionId, mobileNumber string) (otp string, er
 	return
 }
 
-func SendOTP(ctx *gin.Context, sessionId, driverId string) (otp string, err error) {
+func SendOTP(ctx *gin.Context, sessionId, driverId, operation string) (otp string, err error) {
 	logger.LogInfo("Request received in SendOTP", sessionId)
 
 	// make sure driver exist
@@ -530,7 +531,7 @@ func SendOTP(ctx *gin.Context, sessionId, driverId string) (otp string, err erro
 	}
 
 	// send otp
-	otp, err = sendOTP(ctx, sessionId, driver.DriverMobile)
+	otp, err = sendOTP(ctx, sessionId, driver.DriverMobile, operation)
 	if err != nil {
 		logger.LogError(sessionId, "failed to send otp: "+err.Error())
 		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
@@ -546,7 +547,8 @@ func SendOTP(ctx *gin.Context, sessionId, driverId string) (otp string, err erro
 func VerifyOTP(ctx *gin.Context, sessionId string, request VerifyOTPRequest) (replyMessage string, err error) {
 	logger.LogInfo("Request received in VerifyOTP", sessionId)
 
-	sentOTP, err := getOTP(ctx, sessionId, request.MobileNumber)
+	key := fmt.Sprintf("%s:%s", request.MobileNumber, request.Operation)
+	sentOTP, err := getOTP(ctx, sessionId, key)
 	if err != nil {
 		logger.LogError(sessionId, "failed to get otp: "+err.Error())
 		err = fmt.Errorf(constants.Invalid_Data, "OTP")
@@ -560,7 +562,7 @@ func VerifyOTP(ctx *gin.Context, sessionId string, request VerifyOTPRequest) (re
 	}
 
 	switch request.Operation {
-	case FORGOT_PASSWORD_OPERATION:
+	case constants.FORGOT_PASSWORD_OPERATION:
 		err = updateForgottonPassword(ctx, sessionId, request.MobileNumber, request.Password, sentOTP)
 		if err != nil {
 			logger.LogError(sessionId, "update forgotton password error: "+err.Error())
@@ -568,7 +570,7 @@ func VerifyOTP(ctx *gin.Context, sessionId string, request VerifyOTPRequest) (re
 			return
 		}
 		replyMessage = "Your password was resetted successfully"
-	case UPDATE_PASSWORD_OPERATION:
+	case constants.UPDATE_PASSWORD_OPERATION:
 		err = updatePassword(ctx, sessionId, request.MobileNumber, sentOTP)
 		if err != nil {
 			logger.LogError(sessionId, "update password error: "+err.Error())
@@ -576,7 +578,7 @@ func VerifyOTP(ctx *gin.Context, sessionId string, request VerifyOTPRequest) (re
 			return
 		}
 		replyMessage = "Your password was updated successfully"
-	case ACTIVATE_DRIVER_OPERATION:
+	case constants.ACTIVATE_DRIVER_OPERATION:
 		err = activateDriverByMobile(ctx, request.MobileNumber)
 		if err != nil {
 			logger.LogError(sessionId, "driver activation error: "+err.Error())
@@ -584,7 +586,7 @@ func VerifyOTP(ctx *gin.Context, sessionId string, request VerifyOTPRequest) (re
 			return
 		}
 		replyMessage = "Driver activated successfully"
-	case ACTIVATE_VEHICLE_OPERATION:
+	case constants.ACTIVATE_VEHICLE_OPERATION:
 		var driver postgress.Driver
 		driver, err = getActiveDriver(ctx, sessionId, request.MobileNumber)
 		if err != nil {
@@ -600,9 +602,6 @@ func VerifyOTP(ctx *gin.Context, sessionId string, request VerifyOTPRequest) (re
 			return
 		}
 		replyMessage = "Vehicle activated successfully"
-	case VERIFY_OTP_OPERATION:
-		logger.LogInfo("otp verification", sessionId)
-		replyMessage = "OTP verified successfully"
 	default:
 		logger.LogError(sessionId, "invalid operation error: "+err.Error())
 		err = fmt.Errorf(constants.Invalid_Data, "operation")

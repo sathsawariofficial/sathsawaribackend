@@ -60,7 +60,7 @@ func SetDriverPinHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in SetDriverPinHandler", sessionId)
 
-	driverId := ctx.GetString(constants.User_KEY)
+	driverId := ctx.GetString(constants.Operaion_KEY)
 	pin := ctx.Query(constants.Pin_Key)
 
 	logger.LogDebug2("Response received in SetDriverPinHandler", sessionId, pin)
@@ -563,10 +563,11 @@ func ResendOTPHandler(ctx *gin.Context) {
 	logger.LogInfo("Request received in ResendOTPHandler", sessionId)
 
 	mobileNumber := ctx.Query(constants.MOBILE_NUMBER_QUERY)
+	operation := ctx.Query(constants.OTP_OPERATION)
 
 	logger.LogDebug2("Response received in ResendOTPHandler", sessionId, mobileNumber)
 
-	err := ValidateSendOTP(mobileNumber)
+	err := ValidateSendOTP(mobileNumber, operation)
 	if err != nil {
 		logger.LogError(sessionId, "validation error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
@@ -576,7 +577,7 @@ func ResendOTPHandler(ctx *gin.Context) {
 		return
 	}
 
-	otp, err := ResendOTP(ctx, sessionId, mobileNumber)
+	otp, err := ResendOTP(ctx, sessionId, mobileNumber, operation)
 	if err != nil {
 		logger.LogError(sessionId, "send otp error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
@@ -599,10 +600,11 @@ func SendOTPHandler(ctx *gin.Context) {
 	logger.LogInfo("Request received in SendOTPHandler", sessionId)
 
 	driverId := ctx.GetString(constants.User_KEY)
+	operation := ctx.GetString(constants.Operaion_KEY)
 
 	logger.LogDebug2("Response received in SendOTPHandler", sessionId, driverId)
 
-	otp, err := SendOTP(ctx, sessionId, driverId)
+	otp, err := SendOTP(ctx, sessionId, driverId, operation)
 	if err != nil {
 		logger.LogError(sessionId, "send otp error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
