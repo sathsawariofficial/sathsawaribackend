@@ -28,7 +28,7 @@ func CreateRideHandler(ctx *gin.Context) {
 
 	logger.LogDebug2("Response received in CreateRideHandler", sessionId, request)
 
-	driverId := ctx.GetString(constants.Driver_KEY)
+	driverId := ctx.GetString(constants.User_KEY)
 	err := ValidateRideCreation(sessionId, driverId, &request)
 	if err != nil {
 		logger.LogError(sessionId, "validation error: "+err.Error())
@@ -119,7 +119,7 @@ func DriverRideHandler(ctx *gin.Context) {
 	logger.LogInfo("Request received in DriverRideHandler", sessionId)
 
 	rideStatus, _ := ctx.GetQuery(constants.Status_Key)
-	driverId := ctx.GetString(constants.Driver_KEY)
+	driverId := ctx.GetString(constants.User_KEY)
 
 	startTime, endTime, startLoc, endLoc := getQueryParams(ctx)
 

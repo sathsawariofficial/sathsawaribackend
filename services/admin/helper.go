@@ -26,7 +26,7 @@ func getAdmin(orgCtx *gin.Context, mobile string) (admin postgress.Admin, err er
 }
 
 func loginTokenCreation(sessionId string, request AdminLoginRequest, admin postgress.Admin) (token string, err error) {
-	if err = utils.ComparePassword(request.Password, admin.Password); err != nil {
+	if err = utils.ComparePassword(admin.Password, request.Password); err != nil {
 		logger.LogError(sessionId, "invalid password error")
 		err = errors.New(constants.Invalid_Password)
 		return
@@ -138,7 +138,7 @@ func getAllActiveVehicles(orgCtx *gin.Context, page int) (vehicles []postgress.V
 	return
 }
 
-func getAllActiveDriversWithVehicles(orgCtx *gin.Context, page int) (drivers []postgress.DriverWithVehicle, totalRows int64, err error) {
+func getAllActiveDriversWithVehicles(orgCtx *gin.Context, page int) (drivers []postgress.Driver, totalRows int64, err error) {
 	pageSize := configuration.ConfigurationData.PageSize
 	offset := (page - 1) * pageSize
 
@@ -150,7 +150,7 @@ func getAllActiveDriversWithVehicles(orgCtx *gin.Context, page int) (drivers []p
 
 	db := database.DatabaseConn.Postgres.WithContext(ctx)
 
-	// Count query (NO preload)
+	// Step 1: Count active drivers
 	err = db.Model(&postgress.Driver{}).
 		Where("status = ?", constants.Status_Active).
 		Count(&totalRows).Error
@@ -158,14 +158,18 @@ func getAllActiveDriversWithVehicles(orgCtx *gin.Context, page int) (drivers []p
 		return
 	}
 
-	// Main query with preload
+	// Step 2: Fetch drivers with vehicles
 	err = db.
-		Where("status = ?", "active").
-		Preload("Vehicle").
-		Order("created_at desc").
+		Where("status = ?", constants.Status_Active).
+		Preload("Vehicles").
+		Order("created_at DESC").
 		Limit(pageSize).
 		Offset(offset).
 		Find(&drivers).Error
+
+	if err != nil {
+		return
+	}
 
 	return
 }

@@ -72,7 +72,7 @@ func SetDriverPin(ctx *gin.Context, sessionId, driverId, pin string) (err error)
 func RegisterVehicle(ctx *gin.Context, sessionId string, request VehicleRegistrationRequest) (vehicleId, otp string, err error) {
 	logger.LogInfo("Request returned from RegisterDriver", sessionId)
 
-	driverId := ctx.GetString(constants.Driver_KEY)
+	driverId := ctx.GetString(constants.User_KEY)
 	driver, err := database.GetDriverById(ctx, driverId)
 	if err != nil {
 		logger.LogError(sessionId, "failed to get driver error: "+err.Error())
@@ -168,7 +168,7 @@ func handleFCM(ctx *gin.Context, sessionId, driverId, fcm string) {
 }
 
 func loginTokenCreation(sessionId string, request DriverLoginRequest, driver postgress.Driver) (token string, err error) {
-	if err = utils.ComparePassword(request.Password, driver.Password); err != nil {
+	if err = utils.ComparePassword(driver.Password, request.Password); err != nil {
 		logger.LogError(sessionId, "invalid password error")
 		err = errors.New(constants.Invalid_Password)
 		return
@@ -210,7 +210,7 @@ func loginTokenCreation(sessionId string, request DriverLoginRequest, driver pos
 func LogoutDriver(ctx *gin.Context, sessionId string) (err error) {
 	logger.LogInfo("Request returned from CreateRideHandler", sessionId)
 
-	driverId := ctx.GetString(constants.Encrypted_Driver_KEY)
+	driverId := ctx.GetString(constants.Encrypted_User_KEY)
 
 	err = redis.DeleteRedisValue(database.DatabaseConn.RedisConn, driverId)
 	if err != nil {
@@ -330,7 +330,7 @@ func UpdateDriverData(ctx *gin.Context, sessionId string, request UpdateDriverRe
 func UpdateVehicle(ctx *gin.Context, sessionId string, request VehicleUpdateRequest) (err error) {
 	logger.LogInfo("Request returned from UpdateVehicle", sessionId)
 
-	driverId := ctx.GetString(constants.Driver_KEY)
+	driverId := ctx.GetString(constants.User_KEY)
 	if !validatePin(ctx, sessionId, postgress.Driver{ID: driverId}, request.Pin) {
 		logger.LogError(sessionId, "error failed to validate pin")
 		err = fmt.Errorf(constants.Invalid_Data, "pin")

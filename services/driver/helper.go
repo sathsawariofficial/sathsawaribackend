@@ -560,13 +560,7 @@ func validatePin(orgCtx *gin.Context, sessionId string, driver postgress.Driver,
 		driverPin = driver.Pin
 	}
 
-	excryptedPin, err := utils.HashPassword(sessionId, pin)
-	if err != nil {
-		logger.LogError(sessionId, err)
-		err = fmt.Errorf(constants.Invalid_Data, "pin")
-		return false
-	}
-	if driverPin != excryptedPin {
+	if err := utils.ComparePassword(driverPin, pin); err != nil {
 		logger.LogError(sessionId, err)
 		err = fmt.Errorf(constants.Invalid_Data, "pin")
 		return false

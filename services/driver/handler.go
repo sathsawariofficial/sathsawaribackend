@@ -60,7 +60,7 @@ func SetDriverPinHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in SetDriverPinHandler", sessionId)
 
-	driverId := ctx.Query(constants.Driver_KEY)
+	driverId := ctx.GetString(constants.User_KEY)
 	pin := ctx.Query(constants.Pin_Key)
 
 	logger.LogDebug2("Response received in SetDriverPinHandler", sessionId, pin)
@@ -265,7 +265,7 @@ func DriverProfileInfoHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in DriverProfileInfoHandler", sessionId)
 
-	driverId := ctx.GetString(constants.Driver_KEY)
+	driverId := ctx.GetString(constants.User_KEY)
 	err := ValidateDriverProfileInfo(driverId)
 	if err != nil {
 		logger.LogError(sessionId, "validation error: "+err.Error())
@@ -298,7 +298,7 @@ func UpdateProfileStatusHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in UpdateProfileStatusHandler", sessionId)
 
-	driverId := ctx.GetString(constants.Driver_KEY)
+	driverId := ctx.GetString(constants.User_KEY)
 	pin := ctx.Query(constants.Pin_Key)
 	err := ValidateDriverProfileInfo(driverId)
 	if err != nil {
@@ -387,7 +387,7 @@ func DeleteDriverProfileHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in DeleteDriverProfileHandler", sessionId)
 
-	driverId := ctx.GetString(constants.Driver_KEY)
+	driverId := ctx.GetString(constants.User_KEY)
 	pin := ctx.Query(constants.Pin_Key)
 
 	err := ValidateDriverProfileInfo(driverId)
@@ -446,7 +446,7 @@ func ChangePasswordHandler(ctx *gin.Context) {
 
 	logger.LogDebug2("Response received in ChangePasswordHandler", sessionId, request)
 
-	driverId := ctx.GetString(constants.Driver_KEY)
+	driverId := ctx.GetString(constants.User_KEY)
 	err := ValidateChangePassword(driverId, &request)
 	if err != nil {
 		logger.LogError(sessionId, "validation error: "+err.Error())
@@ -516,7 +516,7 @@ func GetVehicleHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in GetVehicleHandler", sessionId)
 
-	driverId := ctx.GetString(constants.Driver_KEY)
+	driverId := ctx.GetString(constants.User_KEY)
 	status := ctx.Query(constants.Status_Key)
 	err := ValidateDriverProfileInfo(driverId)
 	if err != nil {
@@ -599,7 +599,7 @@ func SendOTPHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in SendOTPHandler", sessionId)
 
-	driverId := ctx.GetString(constants.Driver_KEY)
+	driverId := ctx.GetString(constants.User_KEY)
 
 	logger.LogDebug2("Response received in SendOTPHandler", sessionId, driverId)
 

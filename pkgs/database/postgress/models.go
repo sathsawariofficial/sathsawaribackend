@@ -30,6 +30,9 @@ type Driver struct {
 	Status        string    `json:"status"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
+
+	// forign key relation
+	Vehicles []Vehicle `json:"vehicles" gorm:"foreignKey:DriverId;references:ID"`
 }
 
 type DriverDevice struct {
@@ -192,19 +195,4 @@ type MissingLocations struct {
 	Place    string  `json:"place"`
 	UserLat  float64 `json:"lat"`
 	UserLng  float64 `json:"long"`
-}
-
-type DriverWithVehicle struct {
-	ID            string    `json:"id" gorm:"primaryKey"`
-	DriverMobile  string    `json:"driver_mobile"`
-	DriverName    string    `json:"driver_name"`
-	Password      string    `json:"password"`
-	Pin           string    `json:"pin"`
-	Rating        string    `json:"rating"`
-	NumberOfVotes string    `json:"number_of_votes"`
-	Status        string    `json:"status"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
-
-	Vehicles []Vehicle `json:"vehicle" gorm:"foreignKey:DriverId;references:ID"`
 }

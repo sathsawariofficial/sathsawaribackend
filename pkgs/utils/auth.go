@@ -50,7 +50,7 @@ func CreateJWT(sessionId string, tokenClaims map[string]string) (string, error) 
 }
 
 // VerifyJWT validates a JWT token and extracts the driver_id
-func VerifyJWT(sessionId, tokenString string) (string, error) {
+func VerifyJWT(sessionId, tokenString string) (userId string, tokenType string, err error) {
 	logger.LogInfo("Request received in VerifyJWT", sessionId)
 
 	// Parse the token
@@ -67,43 +67,46 @@ func VerifyJWT(sessionId, tokenString string) (string, error) {
 		logger.LogError(sessionId, err)
 		// Handle specific error for expired token
 		if err.Error() == "token is expired" {
-			return "", fmt.Errorf("token has expired")
+			err = fmt.Errorf("token has expired")
+			return
 		}
 
-		return "", fmt.Errorf("error parsing token: %w", err)
+		err = fmt.Errorf("error parsing token: %w", err)
+		return
 	}
 
 	// Extract and verify claims
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		tokenType, ok := claims["tokenType"].(string)
+		tokenType, ok = claims["tokenType"].(string)
 		if !ok {
 			err = fmt.Errorf("token type not found")
 			logger.LogError(sessionId, err)
-			return "", err
+			return
 		}
 
 		if tokenType == constants.DRIVER_TOKEN {
-			driverID, ok := claims["driverId"].(string)
+			userId, ok = claims["driverId"].(string)
 			if !ok {
 				err = fmt.Errorf("driverId not found or invalid")
 				logger.LogError(sessionId, err)
-				return "", err
+				return
 			}
 
-			return driverID, nil
+			return
 		} else if tokenType == constants.ADMIN_TOKEN {
-			adminID, ok := claims["adminId"].(string)
+			userId, ok = claims["adminId"].(string)
 			if !ok {
 				err = fmt.Errorf("adminId not found or invalid")
 				logger.LogError(sessionId, err)
-				return "", err
+				return
 			}
 
-			return adminID, nil
+			return
 		} else if tokenType == constants.OPEN_TOKEN {
-			return "", nil
+			return
 		} else {
-			return "", fmt.Errorf("invalid token type")
+			err = fmt.Errorf("invalid token type")
+			return
 		}
 	}
 
@@ -112,7 +115,7 @@ func VerifyJWT(sessionId, tokenString string) (string, error) {
 	err = fmt.Errorf("invalid token")
 	logger.LogError(sessionId, err)
 
-	return "", err
+	return
 }
 
 func HashPassword(sessionId, password string) (string, error) {

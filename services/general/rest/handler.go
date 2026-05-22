@@ -17,7 +17,7 @@ func GetNotificationsHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in GetNotificationsHandler", sessionId)
 
-	driverId := ctx.GetString(constants.Driver_KEY)
+	driverId := ctx.GetString(constants.User_KEY)
 	err := utils.ValidateId(driverId)
 	if err != nil {
 		logger.LogError(sessionId, "validation error: "+err.Error())

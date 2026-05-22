@@ -15,7 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func Authentication() gin.HandlerFunc {
+func Authentication(expectedTokenType string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		// Get the Authorization header
 		authHeader := ctx.GetHeader("Authorization")
@@ -46,10 +46,20 @@ func Authentication() gin.HandlerFunc {
 			return
 		}
 
-		encryptedId, err := utils.VerifyJWT(sessionId, token)
+		encryptedId, tokenType, err := utils.VerifyJWT(sessionId, token)
 		if err != nil {
 			err = errors.New(constants.Invalid_Session)
-			logger.LogError(sessionId, "failed to encrypt driver id from token: "+err.Error())
+			logger.LogError(sessionId, "failed to encrypt user id from token: "+err.Error())
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, utils.APIResponse{
+				Code:    http.StatusUnauthorized,
+				Message: err.Error(),
+			})
+			return
+		}
+
+		if expectedTokenType != constants.NO_TOKEN_TYPE && tokenType != expectedTokenType {
+			err = errors.New(constants.Invalid_Session)
+			logger.LogError(sessionId, "invalid token token: "+tokenType)
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, utils.APIResponse{
 				Code:    http.StatusUnauthorized,
 				Message: err.Error(),
@@ -69,10 +79,10 @@ func Authentication() gin.HandlerFunc {
 				return
 			}
 
-			driverId, err := utils.DecryptAES(sessionId, encryptedId)
+			userId, err := utils.DecryptAES(sessionId, encryptedId)
 			if err != nil {
 				err = errors.New(constants.Invalid_Session)
-				logger.LogError(sessionId, "failed to decrypt driver id: "+err.Error())
+				logger.LogError(sessionId, "failed to decrypt user id: "+err.Error())
 				ctx.AbortWithStatusJSON(http.StatusUnauthorized, utils.APIResponse{
 					Code:    http.StatusUnauthorized,
 					Message: err.Error(),
@@ -80,19 +90,9 @@ func Authentication() gin.HandlerFunc {
 				return
 			}
 
-			driverStatus, err := getDriverStatusById(driverId)
+			err = checkUserStatusById(userId, tokenType)
 			if err != nil {
-				logger.LogError(sessionId, "get driver error: "+err.Error())
-				err = errors.New(constants.Driver_Not_Found)
-				ctx.AbortWithStatusJSON(http.StatusUnauthorized, utils.APIResponse{
-					Code:    http.StatusUnauthorized,
-					Message: err.Error(),
-				})
-				return
-			}
-
-			if driverStatus != constants.Status_Active {
-				logger.LogError(sessionId, "invalid driver status error: "+driverStatus)
+				logger.LogError(sessionId, "get user error: "+err.Error())
 				err = errors.New(constants.Operation_Not_Permitted)
 				ctx.AbortWithStatusJSON(http.StatusUnauthorized, utils.APIResponse{
 					Code:    http.StatusUnauthorized,
@@ -104,8 +104,8 @@ func Authentication() gin.HandlerFunc {
 			logger.LogInfo("forwarding request to handler", sessionId)
 
 			ctx.Set(constants.Sessoin_KEY, token)
-			ctx.Set(constants.Driver_KEY, driverId)
-			ctx.Set(constants.Encrypted_Driver_KEY, encryptedId)
+			ctx.Set(constants.User_KEY, userId)
+			ctx.Set(constants.Encrypted_User_KEY, encryptedId)
 		}
 
 		ctx.Next()
@@ -123,14 +123,13 @@ func SocketAuth(oldCtx *context.Context, sessionId, token string) []byte {
 		return utils.GeneralSocketResp(sessionId, http.StatusUnauthorized, err.Error())
 	}
 
-	encryptedId, err := utils.VerifyJWT(sessionId, token)
+	encryptedId, tokenType, err := utils.VerifyJWT(sessionId, token)
 	if err != nil {
 		err = errors.New(constants.Invalid_Session)
-		logger.LogError(sessionId, "failed to encrypt driver id from token: "+err.Error())
+		logger.LogError(sessionId, "failed to encrypt user id from token: "+err.Error())
 		return utils.GeneralSocketResp(sessionId, http.StatusUnauthorized, constants.Operation_Not_Permitted)
 	}
 
-	// Driver token handling
 	if utils.IsStringEmpty(encryptedId) {
 		_, err = redis.GetRedisValue(database.DatabaseConn.RedisConn, encryptedId)
 		if err != nil {
@@ -139,22 +138,16 @@ func SocketAuth(oldCtx *context.Context, sessionId, token string) []byte {
 			return utils.GeneralSocketResp(sessionId, http.StatusUnauthorized, err.Error())
 		}
 
-		driverId, err := utils.DecryptAES(sessionId, encryptedId)
+		userId, err := utils.DecryptAES(sessionId, encryptedId)
 		if err != nil {
 			err = errors.New(constants.Invalid_Session)
-			logger.LogError(sessionId, "failed to decrypt driver id: "+err.Error())
+			logger.LogError(sessionId, "failed to decrypt user id: "+err.Error())
 			return utils.GeneralSocketResp(sessionId, http.StatusUnauthorized, err.Error())
 		}
 
-		driverStatus, err := getDriverStatusById(driverId)
+		err = checkUserStatusById(userId, tokenType)
 		if err != nil {
-			logger.LogError(sessionId, "get driver error: "+err.Error())
-			err = errors.New(constants.Driver_Not_Found)
-			return utils.GeneralSocketResp(sessionId, http.StatusUnauthorized, err.Error())
-		}
-
-		if driverStatus != constants.Status_Active {
-			logger.LogError(sessionId, "invalid driver status error: "+driverStatus)
+			logger.LogError(sessionId, "get user error: "+err.Error())
 			err = errors.New(constants.Operation_Not_Permitted)
 			return utils.GeneralSocketResp(sessionId, http.StatusUnauthorized, err.Error())
 		}
@@ -162,8 +155,8 @@ func SocketAuth(oldCtx *context.Context, sessionId, token string) []byte {
 		logger.LogInfo("forwarding request to handler", sessionId)
 
 		ctx := context.WithValue(*oldCtx, constants.Sessoin_KEY, token)
-		ctx = context.WithValue(ctx, constants.Driver_KEY, driverId)
-		ctx = context.WithValue(ctx, constants.Encrypted_Driver_KEY, encryptedId)
+		ctx = context.WithValue(ctx, constants.User_KEY, userId)
+		ctx = context.WithValue(ctx, constants.Encrypted_User_KEY, encryptedId)
 		oldCtx = &ctx
 	}
 

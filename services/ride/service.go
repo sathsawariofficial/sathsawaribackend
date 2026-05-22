@@ -22,6 +22,11 @@ func CreateRide(ctx *gin.Context, sessionId string, request RideCreationRequest)
 		err = errors.New(constants.Vehicle_Not_Found)
 		return
 	}
+	if utils.IsStringEmpty(vehicle.ID) {
+		logger.LogError(sessionId, "failed to get vehicle error")
+		err = errors.New(constants.Vehicle_Not_Found)
+		return
+	}
 
 	// Save the ride in the database
 	ride := mapRideData(request, "", request.EXTDriverId, vehicle.ID)
@@ -244,7 +249,7 @@ func SaveApprochDetails(ctx *gin.Context, sessionId string, request ApprochReque
 func BookSeatByDriver(ctx *gin.Context, sessionId string, request BookSeatRequest) (err error) {
 	logger.LogInfo("Request returned from BookSeatByDriver", sessionId)
 
-	driverId := ctx.GetString(constants.Driver_KEY)
+	driverId := ctx.GetString(constants.User_KEY)
 	bookedRide, err := bookSeatByDriver(ctx, sessionId, driverId, request)
 	if err != nil {
 		logger.LogError(sessionId, err)
@@ -260,7 +265,7 @@ func BookSeatByDriver(ctx *gin.Context, sessionId string, request BookSeatReques
 func GetBookedSeats(ctx *gin.Context, sessionId, rideId string) (bookSeats []postgress.RidePassenger, err error) {
 	logger.LogInfo("Request returned from GetBookedSeats", sessionId)
 
-	driverId := ctx.GetString(constants.Driver_KEY)
+	driverId := ctx.GetString(constants.User_KEY)
 	ride, err := getRideById(ctx, rideId)
 	if err != nil {
 		logger.LogError(sessionId, err)
@@ -306,7 +311,7 @@ func UpdateBookedSeat(ctx *gin.Context, sessionId, ridePassengerId string) (err 
 func GetRideTemplates(ctx *gin.Context, sessionId string) (rideTemplates []postgress.RideTemplate, err error) {
 	logger.LogInfo("Request returned from GetRideTemplates", sessionId)
 
-	driverId := ctx.GetString(constants.Driver_KEY)
+	driverId := ctx.GetString(constants.User_KEY)
 	logger.LogDebug("Request returned from GetRideTemplates", sessionId, driverId)
 
 	rideTemplates, err = getRideTemplates(ctx, sessionId, driverId)

@@ -24,7 +24,7 @@ const (
 	Login_Failed            = "Login failed, please use correct credentials"
 	Unable_To_Do_Job        = "Unable to %s"
 	Driver_Not_Found        = "Unknown driver"
-	Vehicle_Not_Found       = "You have not registered any vehicle"
+	Vehicle_Not_Found       = "vehicle details are invalid"
 	Ride_Not_Found          = "There are no rides available"
 	Invalid_Password        = "Invalid password"
 	Invalid_Session         = "Invalid session"
@@ -40,10 +40,10 @@ const (
 // keys
 const (
 	Sessoin_KEY            = "session"
-	Driver_KEY             = "driver_id"
+	User_KEY               = "user_id"
 	Vehicle_KEY            = "vehicle_id"
 	Pin_Key                = "pin"
-	Encrypted_Driver_KEY   = "encrypted_driver_id"
+	Encrypted_User_KEY     = "encrypted_user_id"
 	Page_Key               = "page"
 	Start_Time_Key         = "start_time"
 	Extimated_End_Time_Key = "estimated_end_time"
@@ -133,7 +133,11 @@ const (
 
 const (
 	DateTimeLayout = "2006-01-02 15:04:05"
-	DRIVER_TOKEN   = "driver_token"
-	ADMIN_TOKEN    = "admin_token"
-	OPEN_TOKEN     = "open_token"
+)
+
+const (
+	DRIVER_TOKEN  = "driver_token"
+	ADMIN_TOKEN   = "admin_token"
+	OPEN_TOKEN    = "open_token"
+	NO_TOKEN_TYPE = "no_token_type" // such token whose type dont matter
 )

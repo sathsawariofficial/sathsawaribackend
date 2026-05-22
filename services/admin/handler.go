@@ -67,6 +67,9 @@ func GetDriverDetailsHandler(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
 			Message: err.Error(),
+			Data: DriverDetailsResponse{
+				Details: []DriverWithVehicle{},
+			},
 		})
 		return
 	}
@@ -78,6 +81,9 @@ func GetDriverDetailsHandler(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
 			Message: err.Error(),
+			Data: DriverDetailsResponse{
+				Details: []DriverWithVehicle{},
+			},
 		})
 		return
 	}
@@ -88,6 +94,9 @@ func GetDriverDetailsHandler(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
 			Message: err.Error(),
+			Data: DriverDetailsResponse{
+				Details: []DriverWithVehicle{},
+			},
 		})
 		return
 	}
@@ -97,6 +106,9 @@ func GetDriverDetailsHandler(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusNoContent,
 			Message: fmt.Sprintf(constants.Not_Found, "Driver"),
+			Data: DriverDetailsResponse{
+				Details: []DriverWithVehicle{},
+			},
 		})
 		return
 	}
@@ -120,6 +132,9 @@ func GetVehiclesHandler(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
 			Message: err.Error(),
+			Data: VehicleDetailsResponse{
+				Vehicles: []Vehicle{},
+			},
 		})
 		return
 	}
@@ -131,6 +146,9 @@ func GetVehiclesHandler(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
 			Message: err.Error(),
+			Data: VehicleDetailsResponse{
+				Vehicles: []Vehicle{},
+			},
 		})
 		return
 	}
@@ -141,6 +159,9 @@ func GetVehiclesHandler(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
 			Message: err.Error(),
+			Data: VehicleDetailsResponse{
+				Vehicles: []Vehicle{},
+			},
 		})
 		return
 	}
@@ -149,7 +170,10 @@ func GetVehiclesHandler(ctx *gin.Context) {
 		logger.LogError(sessionId, "no vehicles found error")
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusNoContent,
-			Message: fmt.Sprintf(constants.Not_Found, "Driver"),
+			Message: fmt.Sprintf(constants.Not_Found, "Vehicles"),
+			Data: VehicleDetailsResponse{
+				Vehicles: []Vehicle{},
+			},
 		})
 		return
 	}
@@ -173,6 +197,9 @@ func GetRidesHandler(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
 			Message: err.Error(),
+			Data: RideDetailsResponse{
+				Rides: []RideDetail{},
+			},
 		})
 		return
 	}
@@ -184,6 +211,9 @@ func GetRidesHandler(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
 			Message: err.Error(),
+			Data: RideDetailsResponse{
+				Rides: []RideDetail{},
+			},
 		})
 		return
 	}
@@ -194,6 +224,9 @@ func GetRidesHandler(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
 			Message: err.Error(),
+			Data: RideDetailsResponse{
+				Rides: []RideDetail{},
+			},
 		})
 		return
 	}
@@ -202,7 +235,10 @@ func GetRidesHandler(ctx *gin.Context) {
 		logger.LogError(sessionId, "no rides found error")
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusNoContent,
-			Message: fmt.Sprintf(constants.Not_Found, "Driver"),
+			Message: fmt.Sprintf(constants.Not_Found, "Rides"),
+			Data: RideDetailsResponse{
+				Rides: []RideDetail{},
+			},
 		})
 		return
 	}

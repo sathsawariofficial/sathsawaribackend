@@ -26,12 +26,12 @@ func loginAdminResp(adminSessionId string, admin postgress.Admin) utils.APIRespo
 	}
 }
 
-func driverDetailsResp(drivers []postgress.DriverWithVehicle, totalRows int64) utils.APIResponse {
-	var driverDetails []DriverWithVehicle
+func driverDetailsResp(drivers []postgress.Driver, totalRows int64) utils.APIResponse {
+	driverDetails := []DriverWithVehicle{}
 
 	for _, driver := range drivers {
 
-		var vehicles []Vehicle
+		vehicles := []Vehicle{}
 		for _, vehicle := range driver.Vehicles {
 			vehicles = append(vehicles, Vehicle{
 				ID:            vehicle.ID,
@@ -66,7 +66,7 @@ func driverDetailsResp(drivers []postgress.DriverWithVehicle, totalRows int64) u
 }
 
 func vechileDetailsResp(vehicles []postgress.Vehicle, totalRows int64) utils.APIResponse {
-	var vehicleDetails []Vehicle
+	vehicleDetails := []Vehicle{}
 
 	for _, vehicle := range vehicles {
 		vehicleDetails = append(vehicleDetails, Vehicle{
@@ -91,7 +91,7 @@ func vechileDetailsResp(vehicles []postgress.Vehicle, totalRows int64) utils.API
 }
 
 func rideDetailsResp(rides []postgress.RideDetails, totalRows int64) utils.APIResponse {
-	var rideDetails []RideDetail
+	rideDetails := []RideDetail{}
 
 	for _, ride := range rides {
 		rideDetails = append(rideDetails, RideDetail{

@@ -43,10 +43,9 @@ func main() {
 	router.GET("/privacy-policy", general_rest.GetPrivacyPolicy)
 
 	v1 := router.Group("/api/v1")
-	// open protection
-	v1.Use(middleware.Authentication())
 	{
 		public := v1.Group("")
+		public.Use(middleware.Authentication(constants.OPEN_TOKEN))
 		{
 			public.POST("/otp/resend", driver.ResendOTPHandler)
 			public.POST("/otp/verify", driver.VerifyOTPHandler)
@@ -63,7 +62,6 @@ func main() {
 			driverPublic := public.Group("/driver")
 			{
 				driverPublic.POST("/register", driver.RegisterDriverHandler)
-				driverPublic.POST("/pin", driver.SetDriverPinHandler)
 				driverPublic.POST("/login", driver.LoginDriverHandler)
 				driverPublic.GET("/password/forgot", driver.ForgotPasswordHandler)
 				driverPublic.POST("/rate", driver.RateDriverHandler)
@@ -85,19 +83,25 @@ func main() {
 		}
 
 		protected := v1.Group("")
-		protected.Use(middleware.Authentication())
 		{
-			protected.POST("/otp/send", driver.SendOTPHandler)
+			noTokenProtected := protected.Group("")
+			noTokenProtected.Use(middleware.Authentication(constants.NO_TOKEN_TYPE))
+			{
+				noTokenProtected.POST("/otp/send", driver.SendOTPHandler)
+			}
 
 			adminProtected := protected.Group("/admin")
+			adminProtected.Use(middleware.Authentication(constants.ADMIN_TOKEN))
 			{
-				adminProtected.POST("/rides", admin.GetRidesHandler)
-				adminProtected.POST("/veicles", admin.GetVehiclesHandler)
-				adminProtected.POST("/driver", admin.GetDriverDetailsHandler)
+				adminProtected.GET("/rides", admin.GetRidesHandler)
+				adminProtected.GET("/vehicles", admin.GetVehiclesHandler)
+				adminProtected.GET("/drivers", admin.GetDriverDetailsHandler)
 			}
 
 			driverProtected := protected.Group("/driver")
+			driverProtected.Use(middleware.Authentication(constants.DRIVER_TOKEN))
 			{
+				driverProtected.POST("/pin", driver.SetDriverPinHandler)
 				driverProtected.GET("/rides", ride.DriverRideHandler)
 				driverProtected.PATCH("/ride/update", ride.UpdateRideHandler)
 				driverProtected.GET("/logout", driver.LogoutDriverHandler)
@@ -114,6 +118,7 @@ func main() {
 			}
 
 			vehicleProtected := protected.Group("/vehicle")
+			vehicleProtected.Use(middleware.Authentication(constants.DRIVER_TOKEN))
 			{
 				vehicleProtected.GET("/", driver.GetVehicleHandler)
 				vehicleProtected.PATCH("/update", driver.UpdateVehicleHandler)
@@ -121,6 +126,7 @@ func main() {
 			}
 
 			rideProtected := protected.Group("/ride")
+			rideProtected.Use(middleware.Authentication(constants.DRIVER_TOKEN))
 			{
 				rideProtected.POST("/create", ride.CreateRideHandler)
 				rideProtected.GET("/templates", ride.GetRideTemplatesHandler)
@@ -128,6 +134,7 @@ func main() {
 			}
 
 			userProtected := protected.Group("/user")
+			userProtected.Use(middleware.Authentication(constants.DRIVER_TOKEN))
 			{
 				userProtected.GET("/notifications", general_rest.GetNotificationsHandler)
 			}

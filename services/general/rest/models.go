@@ -19,5 +19,5 @@ type NotificationRequest struct {
 type SMSFCMRequest struct {
 	FCM     string `json:"fcm"`
 	App     string `json:"app"`
-	AppHash string `json:"app_hash"`
+	AppHash string `json:"appHash"`
 }

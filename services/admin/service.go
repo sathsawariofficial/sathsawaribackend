@@ -38,7 +38,7 @@ func LoginAdmin(ctx *gin.Context, sessionId string, request AdminLoginRequest) (
 	return
 }
 
-func GetDrivers(ctx *gin.Context, sessionId string, page int) (driverDetails []postgress.DriverWithVehicle, totalRows int64, err error) {
+func GetDrivers(ctx *gin.Context, sessionId string, page int) (driverDetails []postgress.Driver, totalRows int64, err error) {
 	logger.LogInfo("Request received in GetDrivers", sessionId)
 
 	driverDetails, totalRows, err = getAllActiveDriversWithVehicles(ctx, page)
