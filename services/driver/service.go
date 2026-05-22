@@ -291,11 +291,40 @@ func UpdateProfileStatus(ctx *gin.Context, sessionId, driverId, pin, status stri
 	err = updateDriverStatus(ctx, driverId, status)
 	if err != nil {
 		logger.LogError(sessionId, "error failed to update driver status: "+err.Error())
-		err = fmt.Errorf(constants.Update_Failed, "driver")
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "finish operation")
 		return
 	}
 
 	logger.LogInfo("Response returned from UpdateProfileStatus", sessionId)
+
+	return
+}
+
+func DeleteProfile(ctx *gin.Context, sessionId, driverId, pin string) (err error) {
+	logger.LogInfo("Request returned from DeleteProfile", sessionId)
+	logger.LogDebug("Request returned from DeleteProfile", sessionId, driverId)
+
+	if !validatePin(ctx, sessionId, postgress.Driver{ID: driverId}, pin) {
+		logger.LogError(sessionId, "error failed to validate pin")
+		err = fmt.Errorf(constants.Invalid_Data, "pin")
+		return
+	}
+
+	driver, err := getActiveDriverById(ctx, driverId)
+	if err != nil {
+		logger.LogError(sessionId, "error failed to get driver status: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "find driver")
+		return
+	}
+
+	err = deleteDriver(ctx, driver)
+	if err != nil {
+		logger.LogError(sessionId, "error failed to delete driver status: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "finish operation")
+		return
+	}
+
+	logger.LogInfo("Response returned from DeleteProfile", sessionId)
 
 	return
 }

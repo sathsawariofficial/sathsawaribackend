@@ -185,6 +185,20 @@ func updateDriverStatus(orgCtx *gin.Context, driverId, status string) (err error
 		Error
 }
 
+func deleteDriver(orgCtx *gin.Context, driver postgress.Driver) (err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	return database.DatabaseConn.Postgres.WithContext(ctx).
+		Model(&postgress.Driver{}).
+		Where("id = ?", driver.ID).
+		Update("status", constants.Status_InActive).
+		Update("driver_mobile", fmt.Sprintf("DEL_", driver.DriverMobile)).
+		Update("driver_name", fmt.Sprintf("DEL_", driver.DriverName)).
+		Error
+}
+
 func getActiveVehiclesByDriverId(orgCtx *gin.Context, driverId, status string) (vehicles []postgress.Vehicle, err error) {
 	var cancel context.CancelFunc
 	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)

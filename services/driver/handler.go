@@ -409,9 +409,8 @@ func DeleteDriverProfileHandler(ctx *gin.Context) {
 		})
 		return
 	}
-	status := constants.Status_InActive
 
-	err = UpdateProfileStatus(ctx, sessionId, driverId, pin, status)
+	err = DeleteProfile(ctx, sessionId, driverId, pin)
 	if err != nil {
 		logger.LogError(sessionId, err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{

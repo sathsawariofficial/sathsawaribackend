@@ -17,6 +17,7 @@ const (
 	// ERROR
 	Registeration_Failed    = "Failed to register %s"
 	Update_Failed           = "Failed to update %s"
+	DELETE_Failed           = "Failed to update %s"
 	Creation_Failed         = "Failed to create %s"
 	Missing_Data            = "%v is missing"
 	Invalid_Data            = "%v is invalid"
