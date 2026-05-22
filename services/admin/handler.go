@@ -250,3 +250,26 @@ func GetRidesHandler(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, rideDetailsResp)
 }
+
+func DeleteDriverHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in DeleteDriverHandler", sessionId)
+
+	err := DeleteDriver(ctx, sessionId)
+	if err != nil {
+		logger.LogError(sessionId, err)
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+			Data: DriverDetailsResponse{
+				Details: []DriverWithVehicle{},
+			},
+		})
+		return
+	}
+
+	logger.LogInfo("Response returned from DeleteDriverHandler", sessionId)
+	logger.LogDebug2("Response returned from DeleteDriverHandler", sessionId, driverDetailsResp)
+
+	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(constants.Success))
+}

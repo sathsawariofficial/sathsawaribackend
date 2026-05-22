@@ -10,6 +10,7 @@ import (
 	"rideshare/pkgs/database/redis"
 	"rideshare/pkgs/logger"
 	"rideshare/pkgs/utils"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -31,7 +32,7 @@ func RegisterDriver(ctx *gin.Context, sessionId string, request DriverRegistrati
 			return
 		}
 	}
-	if !utils.IsStringEmpty(driver.ID) {
+	if !utils.IsStringEmpty(driver.ID) && driver.Status == constants.Status_Active {
 		logger.LogError(sessionId, "driver already exist error")
 		err = fmt.Errorf(constants.Unable_To_Do_Job, "register driver")
 		return
@@ -73,7 +74,7 @@ func RegisterVehicle(ctx *gin.Context, sessionId string, request VehicleRegistra
 	logger.LogInfo("Request returned from RegisterDriver", sessionId)
 
 	driverId := ctx.GetString(constants.User_KEY)
-	driver, err := database.GetDriverById(ctx, driverId)
+	driver, err := database.GetActiveDriverById(ctx, driverId)
 	if err != nil {
 		logger.LogError(sessionId, "failed to get driver error: "+err.Error())
 		err = errors.New(constants.Driver_Not_Found)
@@ -228,7 +229,7 @@ func LogoutDriver(ctx *gin.Context, sessionId string) (err error) {
 func RateDriver(ctx *gin.Context, sessionId string, request RateDriverRequest) (err error) {
 	logger.LogInfo("Request returned from RateDriver", sessionId)
 	// get the driver details from rideid  and save the number of persion who gave the review
-	driver, err := database.GetDriverById(ctx, request.DriverId)
+	driver, err := database.GetActiveDriverById(ctx, request.DriverId)
 	if err != nil {
 		logger.LogError(sessionId, "get driver error: "+err.Error())
 		err = errors.New(constants.Driver_Not_Found)
@@ -310,14 +311,20 @@ func DeleteProfile(ctx *gin.Context, sessionId, driverId, pin string) (err error
 		return
 	}
 
-	driver, err := getActiveDriverById(ctx, driverId)
+	driver, err := database.GetActiveDriverById(ctx, driverId)
 	if err != nil {
 		logger.LogError(sessionId, "error failed to get driver status: "+err.Error())
 		err = fmt.Errorf(constants.Failed_To_Do_Job, "find driver")
 		return
 	}
 
-	err = deleteDriver(ctx, driver)
+	if !strings.EqualFold(driver.Status, constants.Status_Active) {
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "delete the driver")
+		logger.LogError(sessionId, "error failed to delete driver: "+err.Error())
+		return
+	}
+
+	err = database.DeleteDriver(ctx, driver, driverId)
 	if err != nil {
 		logger.LogError(sessionId, "error failed to delete driver status: "+err.Error())
 		err = fmt.Errorf(constants.Failed_To_Do_Job, "finish operation")
@@ -383,7 +390,7 @@ func ChangePassword(ctx *gin.Context, sessionId, driverId string, request Change
 	logger.LogInfo("Request received in ChangePassword", sessionId)
 
 	// make sure driver exist
-	driver, err := getActiveDriverById(ctx, driverId)
+	driver, err := database.GetActiveDriverById(ctx, driverId)
 	if err != nil {
 		logger.LogError(sessionId, "get driver error: "+err.Error())
 		err = errors.New(constants.Driver_Not_Found)
@@ -515,7 +522,7 @@ func SendOTP(ctx *gin.Context, sessionId, driverId string) (otp string, err erro
 	logger.LogInfo("Request received in SendOTP", sessionId)
 
 	// make sure driver exist
-	driver, err := database.GetDriverById(ctx, driverId)
+	driver, err := database.GetActiveDriverById(ctx, driverId)
 	if err != nil {
 		logger.LogError(sessionId, "get driver error: "+err.Error())
 		err = errors.New(constants.Driver_Not_Found)

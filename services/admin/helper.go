@@ -64,7 +64,7 @@ func loginTokenCreation(sessionId string, request AdminLoginRequest, admin postg
 	return
 }
 
-func getAllActiveRides(orgCtx *gin.Context, page int) (rides []postgress.RideDetails, totalRows int64, err error) {
+func getAllRides(orgCtx *gin.Context, page int) (rides []postgress.RideDetails, totalRows int64, err error) {
 	pageSize := configuration.ConfigurationData.PageSize
 	offset := (page - 1) * pageSize
 
@@ -94,7 +94,6 @@ func getAllActiveRides(orgCtx *gin.Context, page int) (rides []postgress.RideDet
 		`).
 		Joins("JOIN drivers ON rides.driver_id = drivers.id").
 		Joins("JOIN vehicles ON rides.vehicle_id = vehicles.id").
-		Where(`rides.is_active = ?`, true).
 		Limit(pageSize).
 		Offset(offset)
 
@@ -104,7 +103,7 @@ func getAllActiveRides(orgCtx *gin.Context, page int) (rides []postgress.RideDet
 	return
 }
 
-func getAllActiveVehicles(orgCtx *gin.Context, page int) (vehicles []postgress.Vehicle, totalRows int64, err error) {
+func getAllVehicles(orgCtx *gin.Context, page int) (vehicles []postgress.Vehicle, totalRows int64, err error) {
 	pageSize := configuration.ConfigurationData.PageSize
 	offset := (page - 1) * pageSize
 
@@ -123,7 +122,6 @@ func getAllActiveVehicles(orgCtx *gin.Context, page int) (vehicles []postgress.V
 			created_at,
 			updated_at
 		`).
-		Where("status = ?", constants.Status_Active).
 		Limit(pageSize).
 		Offset(offset)
 
@@ -138,7 +136,7 @@ func getAllActiveVehicles(orgCtx *gin.Context, page int) (vehicles []postgress.V
 	return
 }
 
-func getAllActiveDriversWithVehicles(orgCtx *gin.Context, page int) (drivers []postgress.Driver, totalRows int64, err error) {
+func getAllDriversWithVehicles(orgCtx *gin.Context, page int) (drivers []postgress.Driver, totalRows int64, err error) {
 	pageSize := configuration.ConfigurationData.PageSize
 	offset := (page - 1) * pageSize
 
@@ -160,7 +158,6 @@ func getAllActiveDriversWithVehicles(orgCtx *gin.Context, page int) (drivers []p
 
 	// Step 2: Fetch drivers with vehicles
 	err = db.
-		Where("status = ?", constants.Status_Active).
 		Preload("Vehicles").
 		Order("created_at DESC").
 		Limit(pageSize).

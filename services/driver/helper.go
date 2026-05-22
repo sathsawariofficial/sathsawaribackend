@@ -185,20 +185,6 @@ func updateDriverStatus(orgCtx *gin.Context, driverId, status string) (err error
 		Error
 }
 
-func deleteDriver(orgCtx *gin.Context, driver postgress.Driver) (err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	return database.DatabaseConn.Postgres.WithContext(ctx).
-		Model(&postgress.Driver{}).
-		Where("id = ?", driver.ID).
-		Update("status", constants.Status_InActive).
-		Update("driver_mobile", fmt.Sprintf("DEL_", driver.DriverMobile)).
-		Update("driver_name", fmt.Sprintf("DEL_", driver.DriverName)).
-		Error
-}
-
 func getActiveVehiclesByDriverId(orgCtx *gin.Context, driverId, status string) (vehicles []postgress.Vehicle, err error) {
 	var cancel context.CancelFunc
 	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
@@ -209,15 +195,6 @@ func getActiveVehiclesByDriverId(orgCtx *gin.Context, driverId, status string) (
 		query = query.Where(`status = ?`, status)
 	}
 	err = query.Find(&vehicles).Error
-	return
-}
-
-func getActiveDriverById(orgCtx *gin.Context, driverId string) (driver postgress.Driver, err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	err = database.DatabaseConn.Postgres.WithContext(ctx).Where(`id = ?`, driverId).Where(`status = ?`, constants.Status_Active).Find(&driver).Error
 	return
 }
 
@@ -281,7 +258,7 @@ func saveDriverInfo(orgCtx *gin.Context, sessionId string, request DriverRegistr
 }
 
 func saveDriverPin(orgCtx *gin.Context, sessionId, driverId, pin string) (err error) {
-	driver, err := database.GetDriverById(orgCtx, driverId)
+	driver, err := database.GetActiveDriverById(orgCtx, driverId)
 	if err != nil {
 		logger.LogError(sessionId, err)
 		err = errors.New(constants.Driver_Not_Found)
@@ -534,7 +511,7 @@ func getActiveDriverAndVehicles(orgCtx *gin.Context, sessionId, driverId, status
 	logger.LogDebug("Request recevied in getActiveDriverAndVehicles", sessionId, fmt.Sprintf("driverId: %s, status: %s", driverId, status))
 
 	var driver postgress.Driver
-	driver, err = database.GetDriverById(orgCtx, driverId)
+	driver, err = database.GetActiveDriverById(orgCtx, driverId)
 	if err != nil {
 		logger.LogError(sessionId, "get driver error: "+err.Error())
 		err = errors.New(constants.Driver_Not_Found)
@@ -560,7 +537,7 @@ func getActiveDriverAndVehicles(orgCtx *gin.Context, sessionId, driverId, status
 func validatePin(orgCtx *gin.Context, sessionId string, driver postgress.Driver, pin string) bool {
 	driverPin := driver.Pin
 	if utils.IsStringEmpty(driverPin) {
-		driver, err := database.GetDriverById(orgCtx, driver.ID)
+		driver, err := database.GetActiveDriverById(orgCtx, driver.ID)
 		if err != nil {
 			logger.LogError(sessionId, err)
 			err = fmt.Errorf(constants.Invalid_Data, "pin")

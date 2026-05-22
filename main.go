@@ -96,6 +96,7 @@ func main() {
 				adminProtected.GET("/rides", admin.GetRidesHandler)
 				adminProtected.GET("/vehicles", admin.GetVehiclesHandler)
 				adminProtected.GET("/drivers", admin.GetDriverDetailsHandler)
+				adminProtected.DELETE("/driver", admin.DeleteDriverHandler)
 			}
 
 			driverProtected := protected.Group("/driver")

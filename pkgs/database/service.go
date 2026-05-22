@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"rideshare/pkgs/configuration"
 	"rideshare/pkgs/constants"
 	"rideshare/pkgs/database/postgress"
@@ -10,12 +11,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func GetDriverById(orgCtx *gin.Context, driverId string) (driver postgress.Driver, err error) {
+func GetActiveDriverById(orgCtx *gin.Context, driverId string) (driver postgress.Driver, err error) {
 	var cancel context.CancelFunc
 	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
 	defer cancel()
 
 	err = DatabaseConn.Postgres.WithContext(ctx).Where(`id = ?`, driverId).Where(`status = ?`, constants.Status_Active).Find(&driver).Error
+	return
+}
+
+func GetDriverById(orgCtx *gin.Context, driverId string) (driver postgress.Driver, err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	err = DatabaseConn.Postgres.WithContext(ctx).Where(`id = ?`, driverId).Find(&driver).Error
 	return
 }
 
@@ -72,4 +82,19 @@ func SaveMissingLocation(orgCtx context.Context, request postgress.MissingLocati
 
 	err = DatabaseConn.Postgres.WithContext(ctx).Create(&request).Error
 	return
+}
+
+func DeleteDriver(orgCtx *gin.Context, driver postgress.Driver, updateById string) (err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	return DatabaseConn.Postgres.WithContext(ctx).
+		Model(&postgress.Driver{}).
+		Where("id = ?", driver.ID).
+		Update("status", constants.Status_InActive).
+		Update("driver_mobile", fmt.Sprintf("DEL_%v", time.Now(), driver.DriverMobile)).
+		Update("driver_name", fmt.Sprintf("DEL_%v", time.Now(), driver.DriverName)).
+		Update("update_by", updateById).
+		Error
 }

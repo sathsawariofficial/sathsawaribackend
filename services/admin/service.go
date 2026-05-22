@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"rideshare/pkgs/constants"
+	"rideshare/pkgs/database"
 	"rideshare/pkgs/database/postgress"
 	"rideshare/pkgs/logger"
 	"rideshare/pkgs/utils"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -41,7 +43,7 @@ func LoginAdmin(ctx *gin.Context, sessionId string, request AdminLoginRequest) (
 func GetDrivers(ctx *gin.Context, sessionId string, page int) (driverDetails []postgress.Driver, totalRows int64, err error) {
 	logger.LogInfo("Request received in GetDrivers", sessionId)
 
-	driverDetails, totalRows, err = getAllActiveDriversWithVehicles(ctx, page)
+	driverDetails, totalRows, err = getAllDriversWithVehicles(ctx, page)
 	if err != nil {
 		logger.LogError(sessionId, " get driver details error: "+err.Error())
 		err = errors.New(constants.Unknown_Error)
@@ -57,7 +59,7 @@ func GetDrivers(ctx *gin.Context, sessionId string, page int) (driverDetails []p
 func GetVehicles(ctx *gin.Context, sessionId string, page int) (vehicles []postgress.Vehicle, totalRows int64, err error) {
 	logger.LogInfo("Request received in GetVehicles", sessionId)
 
-	vehicles, totalRows, err = getAllActiveVehicles(ctx, page)
+	vehicles, totalRows, err = getAllVehicles(ctx, page)
 	if err != nil {
 		logger.LogError(sessionId, " get driver details error: "+err.Error())
 		err = errors.New(constants.Unknown_Error)
@@ -73,7 +75,7 @@ func GetVehicles(ctx *gin.Context, sessionId string, page int) (vehicles []postg
 func GetRides(ctx *gin.Context, sessionId string, page int) (rides []postgress.RideDetails, totalRows int64, err error) {
 	logger.LogInfo("Request received in GetRides", sessionId)
 
-	rides, totalRows, err = getAllActiveRides(ctx, page)
+	rides, totalRows, err = getAllRides(ctx, page)
 	if err != nil {
 		logger.LogError(sessionId, " get ride details error: "+err.Error())
 		err = errors.New(constants.Unknown_Error)
@@ -82,6 +84,43 @@ func GetRides(ctx *gin.Context, sessionId string, page int) (rides []postgress.R
 
 	logger.LogInfo("Response returned from GetRides", sessionId)
 	logger.LogDebug2("Response returned from GetRides", sessionId, fmt.Sprintf("rides: %v, total rows: %v", rides, totalRows))
+
+	return
+}
+
+func DeleteDriver(ctx *gin.Context, sessionId string) (err error) {
+	logger.LogInfo("Request received in DeleteDriver", sessionId)
+
+	driverId := ctx.Query(constants.User_KEY)
+	adminId := ctx.GetString(constants.User_KEY)
+	logger.LogDebug("Driver to be deleted by admin", sessionId, driverId)
+
+	driver, err := database.GetDriverById(ctx, driverId)
+	if err != nil {
+		logger.LogError(sessionId, "error failed to get driver: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "find driver")
+		return
+	}
+	if utils.IsStringEmpty(driver.ID) {
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "find driver")
+		logger.LogError(sessionId, err)
+		return
+	}
+
+	if strings.EqualFold(driver.Status, constants.Status_InActive) {
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "driver, as it is already deleted")
+		logger.LogError(sessionId, "error failed to delete driver: "+err.Error())
+		return
+	}
+
+	err = database.DeleteDriver(ctx, driver, adminId)
+	if err != nil {
+		logger.LogError(sessionId, "error failed to delete driver status: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "finish operation")
+		return
+	}
+
+	logger.LogInfo("Response returned from DeleteDriver", sessionId)
 
 	return
 }

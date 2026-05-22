@@ -28,6 +28,7 @@ type Driver struct {
 	Rating        string    `json:"rating"`
 	NumberOfVotes string    `json:"number_of_votes"`
 	Status        string    `json:"status"`
+	UpdateBy      string    `json:"update_by"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 
