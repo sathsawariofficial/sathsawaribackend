@@ -99,7 +99,7 @@ func sendOTP(ctx *gin.Context, sessionId, mobileNumber, operation string) (otp s
 
 	otp = utils.GenerateOTP()
 
-	message := fmt.Sprintf(constants.NOTIFICATION_MESSAGE_SMS_TO_SERVICE, otp)
+	message := fmt.Sprintf(constants.NOTIFICATION_MESSAGE_SMS_TO_SERVICE, otp, constants.DEFAULT_APP_HASH)
 
 	// messaging partner
 	utils.SendNotification(ctx, sessionId, constants.NOTIFICATION_TYPE_SMS_TO_SERVICE, "", constants.NOTIFICATION_TYPE_SMS_TO_SERVICE, message, map[string]string{
