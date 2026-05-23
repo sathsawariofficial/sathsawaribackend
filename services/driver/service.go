@@ -545,31 +545,6 @@ func ResendOTP(ctx *gin.Context, sessionId, mobileNumber, operation string) (otp
 	return
 }
 
-func SendOTP(ctx *gin.Context, sessionId, driverId, operation string) (otp string, err error) {
-	logger.LogInfo("Request received in SendOTP", sessionId)
-
-	// make sure driver exist
-	driver, err := database.GetActiveDriverById(ctx, driverId)
-	if err != nil {
-		logger.LogError(sessionId, "get driver error: "+err.Error())
-		err = errors.New(constants.Driver_Not_Found)
-		return
-	}
-
-	// send otp
-	otp, err = sendOTP(ctx, sessionId, driver.DriverMobile, operation)
-	if err != nil {
-		logger.LogError(sessionId, "failed to send otp: "+err.Error())
-		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
-		return
-	}
-
-	logger.LogInfo("Response returned from SendOTP", sessionId)
-	logger.LogDebug2("Response returned from SendOTP", sessionId, otp)
-
-	return
-}
-
 func VerifyOTP(ctx *gin.Context, sessionId string, request VerifyOTPRequest) (replyMessage string, err error) {
 	logger.LogInfo("Request received in VerifyOTP", sessionId)
 

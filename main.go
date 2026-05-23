@@ -84,12 +84,6 @@ func main() {
 
 		protected := v1.Group("")
 		{
-			noTokenProtected := protected.Group("")
-			noTokenProtected.Use(middleware.Authentication(constants.NO_TOKEN_TYPE))
-			{
-				noTokenProtected.POST("/otp/send", driver.SendOTPHandler)
-			}
-
 			adminProtected := protected.Group("/admin")
 			adminProtected.Use(middleware.Authentication(constants.ADMIN_TOKEN))
 			{

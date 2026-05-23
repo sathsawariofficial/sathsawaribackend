@@ -595,33 +595,6 @@ func ResendOTPHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, resetResp)
 }
 
-func SendOTPHandler(ctx *gin.Context) {
-	sessionId := xid.New().String()
-	logger.LogInfo("Request received in SendOTPHandler", sessionId)
-
-	driverId := ctx.GetString(constants.User_KEY)
-	operation := ctx.GetString(constants.Operaion_KEY)
-
-	logger.LogDebug2("Response received in SendOTPHandler", sessionId, driverId)
-
-	otp, err := SendOTP(ctx, sessionId, driverId, operation)
-	if err != nil {
-		logger.LogError(sessionId, "send otp error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
-		return
-	}
-
-	resetResp := sendOTPResp(otp)
-
-	logger.LogInfo("Response received in SendOTPHandler", sessionId)
-	logger.LogDebug2("Response received in SendOTPHandler", sessionId, resetResp)
-
-	ctx.JSON(http.StatusOK, resetResp)
-}
-
 // verify otp
 func VerifyOTPHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
