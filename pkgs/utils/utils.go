@@ -180,7 +180,8 @@ func SendNotification(orgCtx *gin.Context, sessionId, notificationType, driverId
 	var fcm string
 
 	switch notificationType {
-	case constants.NOTIFICATION_TYPE_RIDE_CREATED:
+	case constants.NOTIFICATION_TYPE_RIDE_CREATED,
+		constants.NOTIFICATION_TYPE_PIN_CREATED:
 		driverFCM, err := database.GetDriverFCM(orgCtx, driverId)
 		if err != nil {
 			logger.LogError(sessionId, err)

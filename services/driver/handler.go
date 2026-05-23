@@ -60,7 +60,7 @@ func SetDriverPinHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in SetDriverPinHandler", sessionId)
 
-	driverId := ctx.GetString(constants.Operaion_KEY)
+	driverId := ctx.GetString(constants.User_KEY)
 	pin := ctx.Query(constants.Pin_Key)
 
 	logger.LogDebug2("Response received in SetDriverPinHandler", sessionId, pin)
