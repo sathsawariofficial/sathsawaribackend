@@ -11,7 +11,7 @@ import (
 func registerDriverResp(driverId, otp string) utils.APIResponse {
 	return utils.APIResponse{
 		Code:    http.StatusOK,
-		Message: fmt.Sprintf(constants.Registered_Successfully, "Driver"),
+		Message: "OTP sent to your registered number. Please verify.",
 		Data: DriverRegistrationResponse{
 			DriverId: driverId,
 			OTP:      otp,

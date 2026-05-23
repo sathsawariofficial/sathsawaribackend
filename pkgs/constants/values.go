@@ -41,5 +41,5 @@ const (
 // notification message
 const (
 	NOTIFICATION_MESSAGE_RIDE_CREATION  = "You have created a ride"
-	NOTIFICATION_MESSAGE_SMS_TO_SERVICE = "<#> Sathsawari verification code: %s. Do not share this code with anyone.\n%s"
+	NOTIFICATION_MESSAGE_SMS_TO_SERVICE = "<#> Sathsawari verification code: %s. Do not share this code with anyone.\n%%s"
 )
