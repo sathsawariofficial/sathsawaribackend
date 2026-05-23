@@ -128,10 +128,6 @@ func getDriver(orgCtx *gin.Context, mobile string) (driver postgress.Driver, err
 
 	err = database.DatabaseConn.Postgres.WithContext(ctx).Where(`driver_mobile = ?`, mobile).Find(&driver).Error
 
-	if utils.IsStringEmpty(driver.ID) {
-		err = errors.New(constants.Driver_Not_Found)
-	}
-
 	return
 }
 

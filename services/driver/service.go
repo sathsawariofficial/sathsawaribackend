@@ -450,6 +450,11 @@ func ForgotPassword(ctx *gin.Context, sessionId, mobileNumber string) (otp strin
 		err = nil
 		return
 	}
+	if utils.IsStringEmpty(driver.ID) {
+		logger.LogError(sessionId, "driver not found error")
+		err = errors.New(constants.Unknown_Error)
+		return
+	}
 
 	// send otp
 	otp, err = sendOTP(ctx, sessionId, driver.DriverMobile, constants.FORGOT_PASSWORD_OPERATION)
@@ -493,7 +498,12 @@ func ResendOTP(ctx *gin.Context, sessionId, mobileNumber, operation string) (otp
 	driver, err := getDriver(ctx, mobileNumber)
 	if err != nil {
 		logger.LogError(sessionId, "get driver error: "+err.Error())
-		err = errors.New(constants.Driver_Not_Found)
+		err = errors.New(constants.Unknown_Error)
+		return
+	}
+	if utils.IsStringEmpty(driver.ID) {
+		logger.LogError(sessionId, "driver not found error")
+		err = errors.New(constants.Unknown_Error)
 		return
 	}
 
