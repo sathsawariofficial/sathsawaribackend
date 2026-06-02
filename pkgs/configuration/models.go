@@ -1,6 +1,8 @@
 package configuration
 
-import "go.uber.org/zap/zapcore"
+import (
+	"go.uber.org/zap/zapcore"
+)
 
 type Configuration struct {
 	RestPort           string         `json:"rest_port"`
@@ -12,6 +14,7 @@ type Configuration struct {
 	Database           DatabaseConfig `json:"database"`
 	Tracing            Tracing        `json:"tracing"`
 	Auth               Auth           `json:"auth"`
+	Alert              AlertConfig    `json:"alertConfig"`
 	General            General        `json:"general"`
 }
 
@@ -55,4 +58,17 @@ type RedisConfig struct {
 	Password string `json:"password"`
 	Database int    `json:"database"`
 	TTL      int    `json:"ttl"`
+}
+
+type AlertConfig struct {
+	DiscordWebhookURL string `json:"discord_webhook_url"`
+	ResourceLogPath   string `json:"resource_log_path"`
+	APIStatsPath      string `json:"api_stats_path"`
+
+	MaxCPUPercent float64 `json:"max_cpu_percent"`
+	MaxMemPercent float64 `json:"max_mem_percent"`
+	MaxFDPercent  float64 `json:"max_fd_percent"`
+
+	CheckInterval    int `json:"check_interval"`
+	LogWriteInterval int `json:"log_write_interval"`
 }

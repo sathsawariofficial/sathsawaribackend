@@ -16,4 +16,7 @@ func StartWorkers() {
 
 	// send notifications
 	go ProcessNotifications()
+
+	// start stats monitor
+	go StartResourceMonitor()
 }

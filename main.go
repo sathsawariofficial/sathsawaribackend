@@ -8,6 +8,7 @@ import (
 	"rideshare/pkgs/constants"
 	"rideshare/pkgs/logger"
 	"rideshare/pkgs/middleware"
+	"rideshare/pkgs/monitoring"
 	"rideshare/services/admin"
 	"rideshare/services/driver"
 	general_rest "rideshare/services/general/rest"
@@ -36,7 +37,9 @@ func main() {
 	}
 
 	router.Use(cors.New(config))
-	router.Use(middleware.Logger())
+	router.Use(middleware.Logger(), middleware.RecoveryMiddleware(), middleware.StatsMiddleware())
+
+	setup()
 
 	router.GET("/", general_rest.GetHomePage)
 	router.GET("/terms", general_rest.GetTermsAndConditions)
@@ -175,4 +178,8 @@ func startSocketServer() {
 
 	logger.LogInfo("Socket server on port"+configuration.ConfigurationData.SocketPort, constants.DEFAULT_SESSION)
 	go http.ListenAndServe(fmt.Sprintf(":%s", configuration.ConfigurationData.SocketPort), nil)
+}
+
+func setup() {
+	monitoring.NewStatsStore()
 }
