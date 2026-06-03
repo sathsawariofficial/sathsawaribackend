@@ -15,4 +15,4 @@ docker/sathsawari-935e4-firebase-adminsdk-fbsvc-bdf6727dee.json
 *.tar.gz
 
 recourse_stats.json
-api_stats.json
+api_stats*.json
