@@ -201,3 +201,53 @@ func createAdminBroadcast(orgCtx *gin.Context, sessionId string, request AdminBr
 	logger.LogInfo("Response returned from createAdminBroadcast", sessionId)
 	return nil
 }
+
+func getApprochRequests(orgCtx *gin.Context, sessionId, approchType string, page int) (approchs []postgress.ApprochInfo, totalRows int64, err error) {
+	logger.LogInfo("Request received in getApprochRequests", sessionId)
+	logger.LogDebug("Request received in getApprochRequests", sessionId, fmt.Sprintf("approch type: %s, page: %d", approchType, page))
+
+	pageSize := configuration.ConfigurationData.PageSize
+	if page <= 0 {
+		page = 1
+	}
+	offset := (page - 1) * pageSize
+
+	ctx, cancel := context.WithTimeout(
+		orgCtx,
+		time.Duration(configuration.ConfigurationData.Timeout)*time.Second,
+	)
+	defer cancel()
+
+	db := database.DatabaseConn.Postgres.WithContext(ctx)
+
+	// Base query (shared for count + fetch)
+	baseQuery := db.Model(&postgress.ApprochInfo{})
+
+	if !utils.IsStringEmpty(approchType) {
+		baseQuery = baseQuery.Where("type = ?", approchType)
+	}
+
+	// Step 1: Count total rows
+	err = baseQuery.Count(&totalRows).Error
+	if err != nil {
+		logger.LogError(sessionId, err)
+		return
+	}
+
+	// Step 2: Fetch paginated data
+	query := baseQuery.
+		Order("created_at DESC").
+		Limit(pageSize).
+		Offset(offset)
+
+	err = query.Find(&approchs).Error
+	if err != nil {
+		logger.LogError(sessionId, err)
+		return
+	}
+
+	logger.LogInfo("Response returned from getApprochRequests", sessionId)
+	logger.LogDebug("Response returned from getApprochRequests", sessionId, approchs)
+
+	return
+}

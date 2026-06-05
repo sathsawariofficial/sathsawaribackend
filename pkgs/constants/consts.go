@@ -56,6 +56,7 @@ const (
 	Seat_Key               = "seat_id"
 	Ride_Template_Key      = "ride_template_id"
 	Language_Key           = "lang"
+	Type_Key               = "type"
 )
 
 // ride status

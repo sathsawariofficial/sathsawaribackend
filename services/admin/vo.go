@@ -125,3 +125,29 @@ func rideDetailsResp(rides []postgress.RideDetails, totalRows int64) utils.APIRe
 
 	return rideDetailsResp
 }
+
+func createApprochInfoResp(approches []postgress.ApprochInfo, totalRows int64) utils.APIResponse {
+	var approcheDetails []ApprochInfo
+
+	for _, approch := range approches {
+		approcheDetails = append(approcheDetails, ApprochInfo{
+			Name:      approch.Name,
+			Number:    approch.Number,
+			Email:     approch.Email,
+			Message:   approch.Message,
+			Type:      approch.Type,
+			CreatedAt: approch.CreatedAt,
+		})
+	}
+
+	approchInfoResp := utils.APIResponse{
+		Code:    http.StatusOK,
+		Message: constants.Success,
+		Data: ApprochInfoResponse{
+			TotalPages: utils.CalculatePagesize(totalRows),
+			Approches:  approcheDetails,
+		},
+	}
+
+	return approchInfoResp
+}

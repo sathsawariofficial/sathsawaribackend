@@ -139,3 +139,21 @@ func CreateAdminBroadcastRequest(ctx *gin.Context, sessionId string, request Adm
 
 	return
 }
+
+func GetApprochRequest(ctx *gin.Context, sessionId, approchType string, page int) (approches []postgress.ApprochInfo, totalRows int64, err error) {
+	logger.LogInfo("Request received in GetApprochRequest", sessionId)
+	logger.LogDebug("Request received in GetApprochRequest", sessionId, fmt.Sprintf("approch type: %s, page: %d", approchType, page))
+
+	approches, totalRows, err = getApprochRequests(ctx, sessionId, approchType, page)
+	if err != nil {
+		logger.LogError(sessionId, " create broadcast request: "+err.Error())
+		err = errors.New(constants.Unknown_Error)
+		return
+	}
+
+	logger.LogInfo("Response returned from GetApprochRequest", sessionId)
+	logger.LogDebug("Response returned from GetApprochRequest", sessionId, totalRows)
+	logger.LogDebug("Response returned from GetApprochRequest", sessionId, approches)
+
+	return
+}

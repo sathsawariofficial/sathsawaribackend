@@ -1,5 +1,7 @@
 package admin
 
+import "time"
+
 type AdminLoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -71,4 +73,18 @@ type AdminBroadcastRequest struct {
 	Title            string `json:"title"`
 	Message          string `json:"message"`
 	NotificationType string `json:"notificationType"`
+}
+
+type ApprochInfo struct {
+	Name      string    `json:"name"`
+	Number    string    `json:"number"`
+	Email     string    `json:"email"`
+	Message   string    `json:"message"`
+	Type      string    `json:"type"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type ApprochInfoResponse struct {
+	TotalPages int           `json:"totalPages"`
+	Approches  []ApprochInfo `json:"approches"`
 }

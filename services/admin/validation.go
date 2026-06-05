@@ -36,6 +36,14 @@ func ValidatePage(page int) error {
 	return nil
 }
 
+func ValidateApprochInfoReq(approchType, page string) error {
+	if utils.IsStringEmpty(approchType) && !constants.NewApprochType(approchType) {
+		return fmt.Errorf(constants.Invalid_Data, approchType)
+	}
+
+	return ValidatePage(utils.ToInt(page))
+}
+
 func ValidateBoardcastRequest(request *AdminBroadcastRequest) error {
 	var errMessage string
 	if utils.IsStringEmptyWithKey(request.Title, "Title", &errMessage) ||

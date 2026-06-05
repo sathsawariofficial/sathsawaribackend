@@ -314,3 +314,41 @@ func AdminBroadcastHandler(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(constants.Success))
 }
+
+func GetApprochRequestsHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetApprochRequestsHandler", sessionId)
+
+	approchType := ctx.Query(constants.Type_Key)
+	page := ctx.Query(constants.Page_Key)
+
+	err := ValidateApprochInfoReq(approchType, page)
+	if err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	approches, totalRows, err := GetApprochRequest(ctx, sessionId, approchType, utils.ToInt(page))
+	if err != nil {
+		logger.LogError(sessionId, err)
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+			Data: DriverDetailsResponse{
+				Details: []DriverWithVehicle{},
+			},
+		})
+		return
+	}
+
+	resp := createApprochInfoResp(approches, totalRows)
+
+	logger.LogInfo("Response returned from GetApprochRequestsHandler", sessionId)
+	logger.LogDebug2("Response returned from GetApprochRequestsHandler", sessionId, resp)
+
+	ctx.JSON(http.StatusOK, resp)
+}
