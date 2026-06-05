@@ -1,1 +1,0 @@
-curl -H "Authorization: Bearer masterKey" http://localhost:7700/tasks

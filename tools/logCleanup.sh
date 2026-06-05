@@ -3,7 +3,7 @@
 set -euo pipefail
 
 # Directory containing logs
-TARGET_DIR="/var/log/myapp"
+TARGET_DIR="/home/raotalha/Code/PersonalCode/sathsawaribackend"
 
 # Backup directory
 BACKUP_DIR="$TARGET_DIR/backups"
@@ -19,22 +19,21 @@ fi
 TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
 ARCHIVE="$BACKUP_DIR/logs_$TIMESTAMP.zip"
 
-# Find:
-#   *.log                 -> current logs
-#   YYYY-MM-DDTHH-MM-SS.xxx_Name -> old rotated logs
+# Only match rotated timestamped log files like:
+# 2026-06-05T09-11-08.237_SathSawari.log
 mapfile -d '' FILES < <(
     find "$TARGET_DIR" -maxdepth 1 -type f \
-    \( \
-        -name "*.log" \
-        -o -regex '.*/[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}T[0-9-]\+\.[0-9]\+_.*' \
-    \) \
+    -name "20??-??-??T*_*\.log" \
     -print0
 )
 
 if [[ ${#FILES[@]} -eq 0 ]]; then
-    echo "No log files found."
+    echo "No rotated log files found."
     exit 0
 fi
+
+echo "Files to archive:"
+printf '%s\n' "${FILES[@]}"
 
 echo "Creating archive: $ARCHIVE"
 
@@ -42,7 +41,7 @@ zip -j "$ARCHIVE" "${FILES[@]}"
 
 echo "Archive created successfully."
 
-echo "Deleting original files..."
+echo "Deleting archived files..."
 rm -f "${FILES[@]}"
 
 echo "Backup complete: $ARCHIVE"
