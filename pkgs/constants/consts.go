@@ -58,12 +58,6 @@ const (
 	Language_Key           = "lang"
 )
 
-// User Types
-const (
-	User_Driver    = 1
-	User_Passenger = 2
-)
-
 // ride status
 const (
 	Ride_Status_Active   = "active"
@@ -75,6 +69,20 @@ const (
 	Status_Active          = "active"
 	Status_InActive        = "inactive"
 	Status_PendingApproval = "pending"
+)
+
+// notification titles
+const (
+	NOTIFICATION_TITLE_RIDE_CREATION  = "Ride Created"
+	NOTIFICATION_TITLE_PIN_CREATION   = "Pin Created"
+	NOTIFICATION_TITLE_SMS_TO_SERVICE = "SathSawari sent an OTP"
+)
+
+// notification message
+const (
+	NOTIFICATION_MESSAGE_RIDE_CREATION  = "You have created a ride"
+	NOTIFICATION_MESSAGE_PIN_CREATION   = "Please remember your secure PIN “%s” for future operations in the app"
+	NOTIFICATION_MESSAGE_SMS_TO_SERVICE = "<#> Sathsawari verification code: %s. Do not share this code with anyone.\n%%s"
 )
 
 // genders

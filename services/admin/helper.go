@@ -170,3 +170,34 @@ func getAllDriversWithVehicles(orgCtx *gin.Context, page int) (drivers []postgre
 
 	return
 }
+
+func createAdminBroadcastRequest(req AdminBroadcastRequest) postgress.BroadcastNotificationRequests {
+	return postgress.BroadcastNotificationRequests{
+		ID:               utils.GenerateUUID(),
+		UserType:         req.UserType,
+		Title:            req.Title,
+		Message:          req.Message,
+		NotificationType: req.NotificationType,
+	}
+}
+
+func createAdminBroadcast(orgCtx *gin.Context, sessionId string, request AdminBroadcastRequest) error {
+	logger.LogInfo("Request received in createAdminBroadcast", sessionId)
+
+	broadcastReq := createAdminBroadcastRequest(request)
+	ctx, cancel := context.WithTimeout(
+		orgCtx,
+		time.Duration(configuration.ConfigurationData.Timeout)*time.Second,
+	)
+	defer cancel()
+
+	db := database.DatabaseConn.Postgres.WithContext(ctx)
+	err := db.Create(broadcastReq).Error
+	if err != nil {
+		logger.LogError(sessionId, err)
+		return err
+	}
+
+	logger.LogInfo("Response returned from createAdminBroadcast", sessionId)
+	return nil
+}

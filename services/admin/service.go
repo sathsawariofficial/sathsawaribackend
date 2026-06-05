@@ -124,3 +124,18 @@ func DeleteDriver(ctx *gin.Context, sessionId string) (err error) {
 
 	return
 }
+
+func CreateAdminBroadcastRequest(ctx *gin.Context, sessionId string, request AdminBroadcastRequest) (err error) {
+	logger.LogInfo("Request received in CreateAdminBroadcastRequest", sessionId)
+
+	err = createAdminBroadcast(ctx, sessionId, request)
+	if err != nil {
+		logger.LogError(sessionId, " create broadcast request: "+err.Error())
+		err = errors.New(constants.Unknown_Error)
+		return
+	}
+
+	logger.LogInfo("Response returned from CreateAdminBroadcastRequest", sessionId)
+
+	return
+}

@@ -5,21 +5,26 @@ import (
 )
 
 type Configuration struct {
-	RestPort           string         `json:"rest_port"`
-	SocketPort         string         `json:"socket_port"`
-	Envirnment         string         `json:"envirnment"`
-	RideCloseScheduler int            `json:"ride_close_scheduler"`
-	PageSize           int            `json:"page_size"`
-	Timeout            int            `json:"timeout"`
-	Database           DatabaseConfig `json:"database"`
-	Tracing            Tracing        `json:"tracing"`
-	Auth               Auth           `json:"auth"`
-	Alert              AlertConfig    `json:"alertConfig"`
-	General            General        `json:"general"`
+	RestPort   string         `json:"rest_port"`
+	SocketPort string         `json:"socket_port"`
+	Envirnment string         `json:"envirnment"`
+	PageSize   int            `json:"page_size"`
+	Timeout    int            `json:"timeout"`
+	Database   DatabaseConfig `json:"database"`
+	Tracing    Tracing        `json:"tracing"`
+	Auth       Auth           `json:"auth"`
+	Alert      AlertConfig    `json:"alertConfig"`
+	General    General        `json:"general"`
 }
 
 type General struct {
-	DocsPath string `json:"docs_path"`
+	DocsPath string  `json:"docs_path"`
+	Tickers  Tickers `json:"tickers"`
+}
+
+type Tickers struct {
+	RideCloseScheduler int `json:"ride_close_scheduler"`
+	BroadcastScheduler int `json:"broadcast_scheduler"`
 }
 
 type Auth struct {

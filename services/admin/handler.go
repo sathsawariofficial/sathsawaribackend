@@ -273,3 +273,44 @@ func DeleteDriverHandler(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(constants.Success))
 }
+
+func AdminBroadcastHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in AdminBroadcastHandler", sessionId)
+
+	var request AdminBroadcastRequest
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		logger.LogError(sessionId, "binding error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: constants.General_Error,
+		})
+		return
+	}
+
+	logger.LogDebug2("Request received in AdminBroadcastHandler", sessionId, request)
+
+	err := ValidateBoardcastRequest(&request)
+	if err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	err = CreateAdminBroadcastRequest(ctx, sessionId, request)
+	if err != nil {
+		logger.LogError(sessionId, "broadcast error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	logger.LogInfo("Response returned from AdminBroadcastHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(constants.Success))
+}

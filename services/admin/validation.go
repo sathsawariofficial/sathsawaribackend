@@ -35,3 +35,21 @@ func ValidatePage(page int) error {
 
 	return nil
 }
+
+func ValidateBoardcastRequest(request *AdminBroadcastRequest) error {
+	var errMessage string
+	if utils.IsStringEmptyWithKey(request.Title, "Title", &errMessage) ||
+		utils.IsStringEmptyWithKey(request.Message, "Message", &errMessage) {
+		return fmt.Errorf(constants.Missing_Data, errMessage)
+	}
+
+	if !constants.NewNotificationType(request.NotificationType) {
+		return fmt.Errorf(constants.Invalid_Data, "notification type")
+	}
+
+	if !constants.NewUserType(request.UserType) {
+		return fmt.Errorf(constants.Invalid_Data, "user type")
+	}
+
+	return nil
+}

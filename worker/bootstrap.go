@@ -1,22 +1,15 @@
 package worker
 
-import (
-	"rideshare/pkgs/configuration"
-	"time"
-)
-
 func StartWorkers() {
 	// it closes rides whose endtime has reached
-	go func() {
-		for {
-			CloseActiveRides()
-			<-time.After(time.Duration(configuration.ConfigurationData.RideCloseScheduler) * time.Second)
-		}
-	}()
+	go CloseActiveRidesScheduler()
 
 	// send notifications
 	go ProcessNotifications()
 
 	// start stats monitor
 	go StartResourceMonitor()
+
+	// broad cast notifications
+	go ProcessBroadcastNotifications()
 }

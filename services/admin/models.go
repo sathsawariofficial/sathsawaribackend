@@ -65,3 +65,10 @@ type RideDetailsResponse struct {
 	TotalPages int          `json:"totalPages"`
 	Rides      []RideDetail `json:"rides"`
 }
+
+type AdminBroadcastRequest struct {
+	UserType         int    `json:"userType"`
+	Title            string `json:"title"`
+	Message          string `json:"message"`
+	NotificationType string `json:"notificationType"`
+}

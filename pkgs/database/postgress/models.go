@@ -197,3 +197,14 @@ type MissingLocations struct {
 	UserLat  float64 `json:"lat"`
 	UserLng  float64 `json:"long"`
 }
+
+type BroadcastNotificationRequests struct {
+	ID               string    `json:"id" gorm:"primary_key"`
+	UserType         int       `json:"user_type" gorm:"not null"`
+	Title            string    `json:"title"`
+	Message          string    `json:"message"`
+	NotificationType string    `json:"notification_request"`
+	Data             string    `json:"data"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}

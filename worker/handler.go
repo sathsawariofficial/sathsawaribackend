@@ -7,7 +7,6 @@ import (
 	"rideshare/pkgs/configuration"
 	"rideshare/pkgs/constants"
 	"rideshare/pkgs/database"
-	"rideshare/pkgs/database/postgress"
 	"rideshare/pkgs/database/redis"
 	"rideshare/pkgs/logger"
 	"rideshare/pkgs/monitoring"
@@ -17,37 +16,39 @@ import (
 	"github.com/shirou/gopsutil/v4/process"
 )
 
-func CloseActiveRides() {
+func CloseActiveRidesScheduler() {
 	sessionId := constants.WROKER_SESSION
-	logger.LogInfo("Request received in CloseActiveRides", sessionId)
+	logger.LogInfo("Starting CloseActiveRidesScheduler", sessionId)
 
-	rides, err := getAllActiveRides()
-	if err != nil {
-		logger.LogError(sessionId, "failed to get ride error: "+err.Error())
-		return
-	}
-
-	now := time.Now().UTC()
-
-	for _, ride := range rides {
-		endTime, err := utils.ConvertStrToTime(ride.EstimatedEndDatetime)
-		if err != nil {
-			logger.LogError(sessionId, "invalid datetime for ride "+fmt.Sprint(ride.ID))
-			continue
+	defer func() {
+		if r := recover(); r != nil {
+			logger.LogError(sessionId, fmt.Errorf("panic recovered in scheduler: %v", r))
 		}
+	}()
 
-		if endTime.Before(now) || endTime.Equal(now) {
-			logger.LogDebug2("closing ride", sessionId, ride.ID)
+	ticker := time.NewTicker(
+		time.Duration(configuration.ConfigurationData.General.Tickers.RideCloseScheduler) * time.Second,
+	)
+	defer ticker.Stop()
 
-			database.DatabaseConn.Postgres.
-				Model(&postgress.Ride{}).
-				Where("id = ?", ride.ID).
-				Update("is_active", false)
+	// run once immediately on start
+	closeActiveRides()
+
+	for {
+		select {
+		case <-ticker.C:
+			closeActiveRides()
 		}
 	}
 }
 
 func ProcessNotifications() {
+	defer func() {
+		if r := recover(); r != nil {
+			logger.LogError(constants.WROKER_SESSION, fmt.Errorf("panic recovered: %v", r))
+		}
+	}()
+
 	redis.ProcessNotifications(database.DatabaseConn.RedisConn, func(data redis.NotificationRequest) {
 		var err error
 		if data.NotificationType != constants.NOTIFICATION_TYPE_SMS_TO_SERVICE {
@@ -64,6 +65,12 @@ func ProcessNotifications() {
 }
 
 func StartResourceMonitor() {
+	defer func() {
+		if r := recover(); r != nil {
+			logger.LogError(constants.WROKER_SESSION, fmt.Errorf("panic recovered: %v", r))
+		}
+	}()
+
 	cfg := configuration.ConfigurationData.Alert
 
 	pid := int32(os.Getpid())
@@ -178,6 +185,35 @@ func StartResourceMonitor() {
 			} else {
 				lastWrite = time.Now()
 			}
+		}
+	}
+}
+
+func ProcessBroadcastNotifications() {
+	sessionId := constants.WROKER_SESSION
+	logger.LogInfo("Starting ProcessBroadcastNotifications scheduler", sessionId)
+
+	defer func() {
+		if r := recover(); r != nil {
+			logger.LogError(sessionId, fmt.Errorf("panic recovered: %v", r))
+		}
+	}()
+
+	ticker := time.NewTicker(
+		time.Duration(configuration.ConfigurationData.General.Tickers.BroadcastScheduler) * time.Second,
+	)
+	defer ticker.Stop()
+
+	ginCtx := utils.GetWorkerGinContext()
+	const batchSize = 50
+
+	// run immediately on start
+	processBroadcastBatch(ginCtx, sessionId, batchSize)
+
+	for {
+		select {
+		case <-ticker.C:
+			processBroadcastBatch(ginCtx, sessionId, batchSize)
 		}
 	}
 }

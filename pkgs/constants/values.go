@@ -31,18 +31,35 @@ const (
 	NOTIFICATION_TYPE_RIDE_CREATED   = "ride_created"
 	NOTIFICATION_TYPE_PIN_CREATED    = "pin_created"
 	NOTIFICATION_TYPE_SMS_TO_SERVICE = "sms_to_service"
+	NOTIFICATION_TYPE_INFORMATION    = "information"
+	NOTIFICATION_TYPE_MARKETING      = "marketing"
 )
 
-// notification titles
+func NewNotificationType(notificationType string) bool {
+	switch notificationType {
+	case NOTIFICATION_TYPE_RIDE_CREATED,
+		NOTIFICATION_TYPE_PIN_CREATED,
+		NOTIFICATION_TYPE_SMS_TO_SERVICE,
+		NOTIFICATION_TYPE_INFORMATION,
+		NOTIFICATION_TYPE_MARKETING:
+		return true
+	default:
+		return false
+	}
+}
+
+// User Types
 const (
-	NOTIFICATION_TITLE_RIDE_CREATION  = "Ride Created"
-	NOTIFICATION_TITLE_PIN_CREATION   = "Pin Created"
-	NOTIFICATION_TITLE_SMS_TO_SERVICE = "SathSawari sent an OTP"
+	User_Driver    = 1
+	User_Passenger = 2
 )
 
-// notification message
-const (
-	NOTIFICATION_MESSAGE_RIDE_CREATION  = "You have created a ride"
-	NOTIFICATION_MESSAGE_PIN_CREATION   = "Please remember your secure PIN “%s” for future operations in the app"
-	NOTIFICATION_MESSAGE_SMS_TO_SERVICE = "<#> Sathsawari verification code: %s. Do not share this code with anyone.\n%%s"
-)
+func NewUserType(userType int) bool {
+	switch userType {
+	case User_Driver,
+		User_Passenger:
+		return true
+	default:
+		return false
+	}
+}
