@@ -212,51 +212,6 @@ func UpdateRideHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, driverRideResp)
 }
 
-// create approch
-func CreateApprochHandler(ctx *gin.Context) {
-	sessionId := xid.New().String()
-	logger.LogInfo("Request received in CreateApprochHandler", sessionId)
-
-	var request ApprochRequest
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		logger.LogError(sessionId, "binding error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: fmt.Sprintf(constants.Creation_Failed, "ride"),
-		})
-		return
-	}
-
-	logger.LogDebug2("Response received in CreateApprochHandler", sessionId, request)
-
-	err := ValidateApproch(sessionId, &request)
-	if err != nil {
-		logger.LogError(sessionId, "validation error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
-		return
-	}
-
-	approchId, err := SaveApprochDetails(ctx, sessionId, request)
-	if err != nil {
-		logger.LogError(sessionId, "ride creation error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
-		return
-	}
-
-	approchResp := saveContanctResp(approchId)
-
-	logger.LogInfo("Response returned from CreateApprochHandler", sessionId)
-	logger.LogDebug2("Response returned from CreateApprochHandler", sessionId, approchResp)
-
-	ctx.JSON(http.StatusOK, approchResp)
-}
-
 func BookSeatByDriverHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in BookSeatByDriverHandler", sessionId)

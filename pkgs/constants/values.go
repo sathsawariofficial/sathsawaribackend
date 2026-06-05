@@ -63,3 +63,18 @@ func NewUserType(userType int) bool {
 		return false
 	}
 }
+
+const (
+	Approch_Complain = "complain"
+	Approch_Cantact  = "contact"
+)
+
+func NewApprochType(approchType string) bool {
+	switch approchType {
+	case Approch_Complain,
+		Approch_Cantact:
+		return true
+	default:
+		return false
+	}
+}

@@ -98,16 +98,6 @@ func updateRideResp() utils.APIResponse {
 	}
 }
 
-func saveContanctResp(approchId string) utils.APIResponse {
-	rideResp := utils.APIResponse{
-		Code:    http.StatusOK,
-		Message: constants.Request_Received_Successfully,
-		Data:    approchId,
-	}
-
-	return rideResp
-}
-
 func getBookedSeatsResp(bookedSeats []postgress.RidePassenger) utils.APIResponse {
 	var seats []BookSeats
 

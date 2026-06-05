@@ -57,13 +57,6 @@ type UpdateRideRequest struct {
 	NumberOfSeats int     `json:"numberOfSeats"`
 }
 
-type ApprochRequest struct {
-	Name    string `json:"name"`
-	Number  string `json:"number"`
-	Email   string `json:"email"`
-	Message string `json:"message"`
-}
-
 type BookSeatRequest struct {
 	RideId        string `json:"rideId"`
 	PassengerId   string `json:"passengerId"`

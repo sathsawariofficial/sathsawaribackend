@@ -31,3 +31,13 @@ func getNotificationsResp(notifications []postgress.NotificationRequest, totalRo
 
 	return userNotificationResp
 }
+
+func createApprochResp(approchId string) utils.APIResponse {
+	rideResp := utils.APIResponse{
+		Code:    http.StatusOK,
+		Message: constants.Request_Received_Successfully,
+		Data:    approchId,
+	}
+
+	return rideResp
+}

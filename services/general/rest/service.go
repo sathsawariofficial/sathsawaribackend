@@ -42,3 +42,21 @@ func SaveSMSFCM(ctx *gin.Context, sessionId string, request SMSFCMRequest) (err 
 
 	return nil
 }
+
+func SaveApprochDetails(ctx *gin.Context, sessionId string, request ApprochRequest) (approchId string, err error) {
+	logger.LogInfo("Request received in SaveApprochDetails", sessionId)
+
+	// Save the approch info in the database
+	approch := mapContactData(request)
+	if err = database.DatabaseConn.Postgres.Create(&approch).Error; err != nil {
+		logger.LogError(sessionId, "failed to create contact error: "+err.Error())
+		err = fmt.Errorf(constants.Creation_Failed, "ride")
+		return
+	}
+	approchId = approch.ID
+
+	logger.LogInfo("Response returned from SaveApprochDetails", sessionId)
+	logger.LogDebug2("Response returned from SaveApprochDetails", sessionId, approchId)
+
+	return
+}

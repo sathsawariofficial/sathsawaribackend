@@ -21,3 +21,11 @@ type SMSFCMRequest struct {
 	App     string `json:"app"`
 	AppHash string `json:"appHash"`
 }
+
+type ApprochRequest struct {
+	Name    string `json:"name"`
+	Number  string `json:"number"`
+	Email   string `json:"email"`
+	Message string `json:"message"`
+	Type    string `json:"type"`
+}

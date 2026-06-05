@@ -14,3 +14,14 @@ func mapSMSFcmRequest(request SMSFCMRequest) *postgress.SMSFCM {
 		APPHash: utils.ChoiseMaker(request.AppHash, constants.DEFAULT_APP_HASH),
 	}
 }
+
+func mapContactData(request ApprochRequest) postgress.ApprochInfo {
+	return postgress.ApprochInfo{
+		ID:      utils.GenerateUUID(),
+		Name:    request.Name,
+		Number:  request.Number,
+		Email:   request.Email,
+		Type:    request.Type,
+		Message: request.Message,
+	}
+}

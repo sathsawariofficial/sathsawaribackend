@@ -162,6 +162,7 @@ type ApprochInfo struct {
 	Number    string    `json:"number"`
 	Email     string    `json:"email"`
 	Message   string    `json:"message"`
+	Type      string    `json:"type"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

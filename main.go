@@ -11,6 +11,7 @@ import (
 	"rideshare/pkgs/monitoring"
 	"rideshare/services/admin"
 	"rideshare/services/driver"
+	general "rideshare/services/general/rest"
 	general_rest "rideshare/services/general/rest"
 	"rideshare/services/general/socket"
 	"rideshare/services/ride"
@@ -53,6 +54,7 @@ func main() {
 			public.POST("/otp/resend", driver.ResendOTPHandler)
 			public.POST("/otp/verify", driver.VerifyOTPHandler)
 			public.GET("/account/delete", general_rest.GetDeletePage)
+			public.POST("/approach", general.CreateApprochHandler)
 
 			// TODO: this is a temp open api it will be moved to admin later
 			public.POST("/sms/partner", general_rest.SaveSMSFCMHandler)
@@ -73,7 +75,6 @@ func main() {
 			ridePublic := public.Group("/ride")
 			{
 				ridePublic.GET("/filtered", ride.GetFilteredRidesHandler)
-				ridePublic.POST("/approach", ride.CreateApprochHandler)
 			}
 
 			/*

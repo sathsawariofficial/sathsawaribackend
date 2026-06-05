@@ -59,16 +59,6 @@ func mapRideToRideTemplateData(request RideCreationRequest, rideId, driverId, ve
 	}
 }
 
-func mapContactData(request ApprochRequest) postgress.ApprochInfo {
-	return postgress.ApprochInfo{
-		ID:      utils.GenerateUUID(),
-		Name:    request.Name,
-		Number:  request.Number,
-		Email:   request.Email,
-		Message: request.Message,
-	}
-}
-
 func getVehicleById(orgCtx *gin.Context, vehicleId string) (driver postgress.Vehicle, err error) {
 	var cancel context.CancelFunc
 	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
