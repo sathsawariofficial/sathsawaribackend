@@ -412,16 +412,10 @@ func ChangePassword(ctx *gin.Context, sessionId, driverId string, request Change
 		return
 	}
 
-	encryptedOldPassword, err := utils.HashPassword(sessionId, request.OldPassword)
+	err = utils.ComparePassword(driver.Password, request.OldPassword)
 	if err != nil {
 		logger.LogError(sessionId, err)
-		err = fmt.Errorf(constants.Registeration_Failed, "vehicle")
-		return
-	}
-
-	if encryptedOldPassword != driver.Password {
 		err = fmt.Errorf(constants.Invalid_Data, "existing password")
-		logger.LogError(sessionId, err)
 		return
 	}
 
@@ -429,7 +423,7 @@ func ChangePassword(ctx *gin.Context, sessionId, driverId string, request Change
 	excryptedNewPassword, err := utils.HashPassword(sessionId, request.NewPassword)
 	if err != nil {
 		logger.LogError(sessionId, err)
-		err = fmt.Errorf(constants.Registeration_Failed, "vehicle")
+		err = fmt.Errorf(constants.Unable_To_Do_Job, "change password")
 		return
 	}
 
