@@ -192,7 +192,7 @@ func createAdminBroadcast(orgCtx *gin.Context, sessionId string, request AdminBr
 	defer cancel()
 
 	db := database.DatabaseConn.Postgres.WithContext(ctx)
-	err := db.Create(broadcastReq).Error
+	err := db.Create(&broadcastReq).Error
 	if err != nil {
 		logger.LogError(sessionId, err)
 		return err

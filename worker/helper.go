@@ -114,7 +114,6 @@ func saveNotification(notification redis.NotificationRequest) (err error) {
 }
 
 func processBroadcastBatch(ginCtx *gin.Context, sessionId string, batchSize int) {
-
 	var requests []postgress.BroadcastNotificationRequests
 
 	ctx, cancel := context.WithTimeout(
@@ -136,7 +135,6 @@ func processBroadcastBatch(ginCtx *gin.Context, sessionId string, batchSize int)
 	}
 
 	if len(requests) == 0 {
-		logger.LogInfo("No broadcast requests found", sessionId)
 		return
 	}
 

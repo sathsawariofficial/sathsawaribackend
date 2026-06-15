@@ -205,6 +205,7 @@ type BroadcastNotificationRequests struct {
 	Title            string    `json:"title"`
 	Message          string    `json:"message"`
 	NotificationType string    `json:"notification_request"`
+	Processed        bool      `json:"processed"`
 	Data             string    `json:"data"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`

@@ -38,7 +38,7 @@ func ValidatePage(page int) error {
 
 func ValidateApprochInfoReq(approchType, page string) error {
 	if utils.IsStringEmpty(approchType) && !constants.NewApprochType(approchType) {
-		return fmt.Errorf(constants.Invalid_Data, approchType)
+		return fmt.Errorf(constants.Invalid_Data, "approch type")
 	}
 
 	return ValidatePage(utils.ToInt(page))

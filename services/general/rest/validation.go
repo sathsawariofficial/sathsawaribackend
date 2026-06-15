@@ -54,7 +54,7 @@ func ValidateApproch(sessionId string, request *ApprochRequest) error {
 		return fmt.Errorf(constants.Invalid_Data, "Email")
 	}
 
-	if constants.NewApprochType(request.Type) {
+	if !constants.NewApprochType(request.Type) {
 		return fmt.Errorf(constants.Invalid_Data, "Approch type")
 	}
 
