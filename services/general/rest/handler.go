@@ -232,3 +232,85 @@ func CreateApprochHandler(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, approchResp)
 }
+
+func ResendOTPHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in ResendOTPHandler", sessionId)
+
+	mobileNumber := ctx.Query(constants.MOBILE_NUMBER_QUERY)
+	operation := ctx.Query(constants.OTP_OPERATION)
+
+	logger.LogDebug2("Response received in ResendOTPHandler", sessionId, mobileNumber)
+
+	err := ValidateSendOTP(mobileNumber, operation)
+	if err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	otp, err := ResendOTP(ctx, sessionId, mobileNumber, operation)
+	if err != nil {
+		logger.LogError(sessionId, "send otp error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	resetResp := sendOTPResp(otp)
+
+	logger.LogInfo("Response received in ResendOTPHandler", sessionId)
+	logger.LogDebug2("Response received in ResendOTPHandler", sessionId, resetResp)
+
+	ctx.JSON(http.StatusOK, resetResp)
+}
+
+// verify otp
+func VerifyOTPHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in VerifyOTPHandler", sessionId)
+
+	var request VerifyOTPRequest
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		logger.LogError(sessionId, "binding error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Registeration_Failed, "driver"),
+		})
+		return
+	}
+
+	logger.LogDebug2("Response received in VerifyOTPHandler", sessionId, request)
+
+	err := ValidateOTP(&request)
+	if err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	replyMessage, err := VerifyOTP(ctx, sessionId, request)
+	if err != nil {
+		logger.LogError(sessionId, "verify otp error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	resp := utils.GeneralSuccessResp(replyMessage)
+
+	logger.LogInfo("Response received in VerifyOTPHandler", sessionId)
+	logger.LogDebug2("Response received in VerifyOTPHandler", sessionId, resp)
+
+	ctx.JSON(http.StatusOK, resp)
+}

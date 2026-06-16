@@ -24,7 +24,7 @@ func RegisterDriver(ctx *gin.Context, sessionId string, request DriverRegistrati
 	// Save the driver in the database
 	var driver postgress.Driver
 
-	driver, err = getDriver(ctx, request.MobileNumber)
+	driver, err = utils.GetDriver(ctx, request.MobileNumber)
 	if err != nil {
 		logger.LogError(sessionId, "get driver error: "+err.Error())
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -45,7 +45,7 @@ func RegisterDriver(ctx *gin.Context, sessionId string, request DriverRegistrati
 		return
 	}
 
-	otp, err = sendOTP(ctx, sessionId, request.MobileNumber, constants.ACTIVATE_DRIVER_OPERATION)
+	otp, err = utils.SendOTP(ctx, sessionId, request.MobileNumber, constants.ACTIVATE_DRIVER_OPERATION)
 	if err != nil {
 		logger.LogError(sessionId, err)
 	}
@@ -118,7 +118,7 @@ func RegisterVehicle(ctx *gin.Context, sessionId string, request VehicleRegistra
 func LoginDriver(ctx *gin.Context, sessionId string, request DriverLoginRequest) (token, otp string, driver postgress.Driver, err error) {
 	logger.LogInfo("Request returned from LoginDriver", sessionId)
 
-	driver, err = getDriver(ctx, request.MobileNumber)
+	driver, err = utils.GetDriver(ctx, request.MobileNumber)
 	if err != nil {
 		logger.LogError(sessionId, err)
 		err = errors.New(constants.Login_Failed)
@@ -130,7 +130,7 @@ func LoginDriver(ctx *gin.Context, sessionId string, request DriverLoginRequest)
 		return
 	}
 	if driver.Status == constants.Status_PendingApproval {
-		otp, err = sendOTP(ctx, sessionId, request.MobileNumber, constants.ACTIVATE_DRIVER_OPERATION)
+		otp, err = utils.SendOTP(ctx, sessionId, request.MobileNumber, constants.ACTIVATE_DRIVER_OPERATION)
 		if err != nil {
 			logger.LogError(sessionId, err)
 			err = errors.New(constants.Login_Failed)
@@ -355,7 +355,7 @@ func DeleteProfile(ctx *gin.Context, sessionId, driverId, pin string) (err error
 func UpdateDriverData(ctx *gin.Context, sessionId string, request UpdateDriverRequest) (err error) {
 	logger.LogInfo("Request returned from UpdateDriverData", sessionId)
 
-	driver, err := getDriver(ctx, request.MobileNumber)
+	driver, err := utils.GetDriver(ctx, request.MobileNumber)
 	if err != nil {
 		logger.LogError(sessionId, "get driver error: "+err.Error())
 		err = errors.New(constants.Driver_Not_Found)
@@ -428,7 +428,7 @@ func ChangePassword(ctx *gin.Context, sessionId, driverId string, request Change
 	}
 
 	// send otp
-	otp, err = sendOTP(ctx, sessionId, driver.DriverMobile, constants.UPDATE_PASSWORD_OPERATION)
+	otp, err = utils.SendOTP(ctx, sessionId, driver.DriverMobile, constants.UPDATE_PASSWORD_OPERATION)
 	if err != nil {
 		logger.LogError(sessionId, "failed to send otp: "+err.Error())
 		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
@@ -452,7 +452,7 @@ func ForgotPassword(ctx *gin.Context, sessionId, mobileNumber string) (otp strin
 	logger.LogInfo("Request received in ForgotPassword", sessionId)
 
 	// make sure driver exist
-	driver, err := getDriver(ctx, mobileNumber)
+	driver, err := utils.GetDriver(ctx, mobileNumber)
 	if err != nil {
 		logger.LogError(sessionId, "get driver error: "+err.Error())
 		// NOTE: we dont want to let the people know weather a number actuly exist or not
@@ -466,7 +466,7 @@ func ForgotPassword(ctx *gin.Context, sessionId, mobileNumber string) (otp strin
 	}
 
 	// send otp
-	otp, err = sendOTP(ctx, sessionId, driver.DriverMobile, constants.FORGOT_PASSWORD_OPERATION)
+	otp, err = utils.SendOTP(ctx, sessionId, driver.DriverMobile, constants.FORGOT_PASSWORD_OPERATION)
 	if err != nil {
 		logger.LogError(sessionId, "failed to send otp: "+err.Error())
 		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
@@ -500,45 +500,6 @@ func GetVehicles(ctx *gin.Context, sessionId, driverId, status string) (vehicles
 	return
 }
 
-func ResendOTP(ctx *gin.Context, sessionId, mobileNumber, operation string) (otp string, err error) {
-	logger.LogInfo("Request received in ResendOTP", sessionId)
-
-	// make sure driver exist
-	driver, err := getDriver(ctx, mobileNumber)
-	if err != nil {
-		logger.LogError(sessionId, "get driver error: "+err.Error())
-		err = errors.New(constants.Unknown_Error)
-		return
-	}
-	if utils.IsStringEmpty(driver.ID) {
-		logger.LogError(sessionId, "driver not found error")
-		err = errors.New(constants.Unknown_Error)
-		return
-	}
-
-	key := fmt.Sprintf("%s:%s", driver.DriverMobile, operation)
-	otp, err = getOTP(ctx, sessionId, key)
-	if err != nil {
-		logger.LogError(sessionId, "failed to send otp: "+err.Error())
-		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
-		return
-	}
-	if !utils.IsStringEmpty(otp) {
-		// send otp
-		otp, err = sendOTP(ctx, sessionId, driver.DriverMobile, operation)
-		if err != nil {
-			logger.LogError(sessionId, "failed to send otp: "+err.Error())
-			err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
-			return
-		}
-	}
-
-	logger.LogInfo("Response returned from ResendOTP", sessionId)
-	logger.LogDebug2("Response returned from ResendOTP", sessionId, otp)
-
-	return
-}
-
 func ChangePin(ctx *gin.Context, sessionId, driverId string, request ChangePinRequest) (otp string, err error) {
 	logger.LogInfo("Request received in ChangePin", sessionId)
 
@@ -566,7 +527,7 @@ func ChangePin(ctx *gin.Context, sessionId, driverId string, request ChangePinRe
 	}
 
 	// send otp
-	otp, err = sendOTP(ctx, sessionId, driver.DriverMobile, constants.UPDATE_PIN_OPERATION)
+	otp, err = utils.SendOTP(ctx, sessionId, driver.DriverMobile, constants.UPDATE_PIN_OPERATION)
 	if err != nil {
 		logger.LogError(sessionId, "failed to send otp: "+err.Error())
 		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
@@ -590,7 +551,7 @@ func ForgotPin(ctx *gin.Context, sessionId, mobileNumber string) (otp string, er
 	logger.LogInfo("Request received in ForgotPin", sessionId)
 
 	// make sure driver exist
-	driver, err := getDriver(ctx, mobileNumber)
+	driver, err := utils.GetDriver(ctx, mobileNumber)
 	if err != nil {
 		logger.LogError(sessionId, "get driver error: "+err.Error())
 		// NOTE: we dont want to let the people know weather a number actuly exist or not
@@ -604,7 +565,7 @@ func ForgotPin(ctx *gin.Context, sessionId, mobileNumber string) (otp string, er
 	}
 
 	// send otp
-	otp, err = sendOTP(ctx, sessionId, driver.DriverMobile, constants.FORGOT_PIN_OPERATION)
+	otp, err = utils.SendOTP(ctx, sessionId, driver.DriverMobile, constants.FORGOT_PIN_OPERATION)
 	if err != nil {
 		logger.LogError(sessionId, "failed to send otp: "+err.Error())
 		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
@@ -615,135 +576,6 @@ func ForgotPin(ctx *gin.Context, sessionId, mobileNumber string) (otp string, er
 	logger.LogDebug2("Response returned from ForgotPin", sessionId, otp)
 
 	return
-}
-
-func VerifyOTP(ctx *gin.Context, sessionId string, request VerifyOTPRequest) (replyMessage string, err error) {
-	logger.LogInfo("Request received in VerifyOTP", sessionId)
-
-	key := fmt.Sprintf("%s:%s", request.MobileNumber, request.Operation)
-	sentOTP, err := getOTP(ctx, sessionId, key)
-	if err != nil {
-		logger.LogError(sessionId, "failed to get otp: "+err.Error())
-		err = fmt.Errorf(constants.Invalid_Data, "OTP")
-		return
-	}
-
-	if sentOTP != request.OTP {
-		err = fmt.Errorf(constants.Invalid_Data, "OTP")
-		logger.LogError(sessionId, err)
-		return
-	}
-
-	switch request.Operation {
-	case constants.FORGOT_PASSWORD_OPERATION:
-		err = updateForgottonPassword(ctx, sessionId, request.MobileNumber, request.Password, sentOTP)
-		if err != nil {
-			logger.LogError(sessionId, "update forgotton password error: "+err.Error())
-			err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
-			return
-		}
-		replyMessage = "Your password was resetted successfully"
-	case constants.UPDATE_PASSWORD_OPERATION:
-		err = updatePassword(ctx, sessionId, request.MobileNumber, sentOTP)
-		if err != nil {
-			logger.LogError(sessionId, "update password error: "+err.Error())
-			err = fmt.Errorf(constants.Update_Failed, "password")
-			return
-		}
-		replyMessage = "Your password was updated successfully"
-	case constants.FORGOT_PIN_OPERATION:
-		err = updateForgottonPassword(ctx, sessionId, request.MobileNumber, request.Password, sentOTP)
-		if err != nil {
-			logger.LogError(sessionId, "update forgotton pin error: "+err.Error())
-			err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
-			return
-		}
-		replyMessage = "Your pin was resetted successfully"
-	case constants.UPDATE_PIN_OPERATION:
-		err = updatePassword(ctx, sessionId, request.MobileNumber, sentOTP)
-		if err != nil {
-			logger.LogError(sessionId, "update pin error: "+err.Error())
-			err = fmt.Errorf(constants.Update_Failed, "password")
-			return
-		}
-		replyMessage = "Your pin was updated successfully"
-	case constants.ACTIVATE_DRIVER_OPERATION:
-		err = activateDriverByMobile(ctx, request.MobileNumber)
-		if err != nil {
-			logger.LogError(sessionId, "driver activation error: "+err.Error())
-			err = fmt.Errorf(constants.Unable_To_Do_Job, "activate the driver")
-			return
-		}
-		replyMessage = "Driver activated successfully"
-	case constants.ACTIVATE_VEHICLE_OPERATION:
-		var driver postgress.Driver
-		driver, err = getActiveDriver(ctx, sessionId, request.MobileNumber)
-		if err != nil {
-			logger.LogError(sessionId, "vehicle activation error: "+err.Error())
-			err = errors.New(constants.Driver_Not_Found)
-			return
-		}
-
-		err = activateVehicleByDriverId(ctx, driver.ID)
-		if err != nil {
-			logger.LogError(sessionId, "vehicle activation error: "+err.Error())
-			err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
-			return
-		}
-		replyMessage = "Vehicle activated successfully"
-	default:
-		logger.LogError(sessionId, "invalid operation error: "+err.Error())
-		err = fmt.Errorf(constants.Invalid_Data, "operation")
-		return
-	}
-
-	logger.LogInfo("Response returned from VerifyOTP", sessionId)
-
-	return
-}
-
-func updatePassword(ctx *gin.Context, sessionId, mobileNumber, otp string) (err error) {
-	logger.LogInfo("Request recevied in updatePassword", sessionId)
-
-	excryptedPassword, err := redis.GetRedisValue(database.DatabaseConn.RedisConn, otp)
-	if err != nil {
-		logger.LogError(sessionId, "otp not found error: "+err.Error())
-		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
-		return
-	}
-
-	err = updatePasswordByMobile(ctx, mobileNumber, excryptedPassword)
-	if err != nil {
-		logger.LogError(sessionId, "update password error: "+err.Error())
-		err = fmt.Errorf(constants.Unable_To_Do_Job, "update the password")
-		return
-	}
-
-	logger.LogInfo("Response returned from updatePassword", sessionId)
-
-	return nil
-}
-
-func updateForgottonPassword(ctx *gin.Context, sessionId, mobileNumber, password, otp string) (err error) {
-	logger.LogInfo("Request recevied in updateForgottonPassword", sessionId)
-
-	excryptedPassword, err := utils.HashPassword(sessionId, password)
-	if err != nil {
-		logger.LogError(sessionId, err)
-		err = fmt.Errorf(constants.Registeration_Failed, "vehicle")
-		return
-	}
-
-	err = updatePasswordByMobile(ctx, mobileNumber, excryptedPassword)
-	if err != nil {
-		logger.LogError(sessionId, "update forgotton password error: "+err.Error())
-		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
-		return
-	}
-
-	logger.LogInfo("Response returned from updateForgottonPassword", sessionId)
-
-	return nil
 }
 
 func updatePin(ctx *gin.Context, sessionId, mobileNumber, otp string) (err error) {

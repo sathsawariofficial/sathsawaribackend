@@ -60,3 +60,43 @@ func ValidateApproch(sessionId string, request *ApprochRequest) error {
 
 	return nil
 }
+
+func ValidateOTP(request *VerifyOTPRequest) error {
+	otpLen := len(request.OTP)
+
+	if !(otpLen >= constants.OTP_Min_Len && otpLen <= constants.OTP_Max_Len) {
+		return fmt.Errorf("length of the otp should be between %v and %v characters", constants.OTP_Min_Len, constants.OTP_Max_Len)
+	}
+
+	mobileLen := len(request.MobileNumber)
+
+	if !(mobileLen > constants.MobileNumber_Min_Len && mobileLen <= constants.MobileNumber_Max_Len) {
+		return fmt.Errorf("length of the mobile number should be between %v and %v characters", constants.MobileNumber_Min_Len, constants.MobileNumber_Max_Len)
+	}
+
+	if request.Operation == constants.FORGOT_PASSWORD_OPERATION {
+		passwordLen := len(request.Password)
+
+		if !(passwordLen >= constants.Password_Min_Len && passwordLen <= constants.Password_Max_Len) {
+			return fmt.Errorf("length of the password should be between %v and %v characters", constants.Password_Min_Len, constants.Password_Max_Len)
+		}
+	}
+
+	return nil
+}
+
+func ValidateSendOTP(mobileNumber, operation string) error {
+	mobileLen := len(mobileNumber)
+
+	if !(mobileLen > constants.MobileNumber_Min_Len && mobileLen <= constants.MobileNumber_Max_Len) {
+		return fmt.Errorf("length of the mobile number should be between %v and %v characters", constants.MobileNumber_Min_Len, constants.MobileNumber_Max_Len)
+	}
+
+	isValid := utils.VerifyOTPOperations(operation)
+	if !isValid {
+		err := fmt.Errorf(constants.Invalid_Data, "operation")
+		return err
+	}
+
+	return nil
+}

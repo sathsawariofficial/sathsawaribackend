@@ -8,7 +8,6 @@ import (
 	"rideshare/pkgs/constants"
 	"rideshare/pkgs/database"
 	"rideshare/pkgs/database/postgress"
-	"rideshare/pkgs/database/redis"
 	"rideshare/pkgs/logger"
 	"rideshare/pkgs/utils"
 	"time"
@@ -76,59 +75,6 @@ func mapFCMData(driverId, fcm string) postgress.DriverFCM {
 		DriverId: driverId,
 		FCM:      fcm,
 	}
-}
-
-func getOTP(ctx *gin.Context, sessionId, mobileNumber string) (otp string, err error) {
-	logger.LogInfo("Request received in getOTP", sessionId)
-
-	otp, err = redis.GetRedisValue(database.DatabaseConn.RedisConn, mobileNumber)
-	if err != nil {
-		logger.LogError(sessionId, "session deleted error: "+err.Error())
-		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
-		return
-	}
-
-	logger.LogInfo("Response returned from getOTP", sessionId)
-	logger.LogDebug2("Response returned from getOTP", sessionId, otp)
-
-	return
-}
-
-func sendOTP(ctx *gin.Context, sessionId, mobileNumber, operation string) (otp string, err error) {
-	logger.LogInfo("Request received in sendOTP", sessionId)
-
-	otp = utils.GenerateOTP()
-
-	message := fmt.Sprintf(constants.NOTIFICATION_MESSAGE_SMS_TO_SERVICE, otp, constants.DEFAULT_APP_HASH)
-
-	// messaging partner
-	utils.SendNotification(ctx, sessionId, constants.NOTIFICATION_TYPE_SMS_TO_SERVICE, "", constants.NOTIFICATION_TYPE_SMS_TO_SERVICE, message, map[string]string{
-		"mobileNumber": mobileNumber,
-		"message":      message,
-	})
-
-	key := fmt.Sprintf("%s:%s", mobileNumber, operation)
-	err = redis.SetRedisValueTTL(database.DatabaseConn.RedisConn, key, otp, time.Duration(configuration.ConfigurationData.Database.Redis.TTL)*time.Second)
-	if err != nil {
-		logger.LogError(sessionId, "session deleted error: "+err.Error())
-		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
-		return
-	}
-
-	logger.LogInfo("Response returned from sendOTP", sessionId)
-	logger.LogDebug2("Response returned from sendOTP", sessionId, otp)
-
-	return
-}
-
-func getDriver(orgCtx *gin.Context, mobile string) (driver postgress.Driver, err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	err = database.DatabaseConn.Postgres.WithContext(ctx).Where(`driver_mobile = ?`, mobile).Find(&driver).Error
-
-	return
 }
 
 func updateDeviceId(orgCtx *gin.Context, driverId, deviceId string) error {
@@ -465,61 +411,6 @@ func updatePinByMobile(orgCtx *gin.Context, mobileNumber, Pin string) (err error
 		return
 	}
 
-	return
-}
-
-func activateDriverByMobile(orgCtx *gin.Context, mobileNumber string) (err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	if err = database.DatabaseConn.Postgres.WithContext(ctx).Model(&postgress.Driver{}).Where("driver_mobile = ?", mobileNumber).
-		Updates(postgress.Driver{
-			Status: constants.Status_Active,
-		}).Error; err != nil {
-		return
-	}
-
-	return
-}
-
-func activateVehicleByDriverId(orgCtx *gin.Context, driverId string) (err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	if err = database.DatabaseConn.Postgres.WithContext(ctx).Model(&postgress.Vehicle{}).Where("driver_id = ?", driverId).
-		Updates(postgress.Vehicle{
-			Status: constants.Status_Active,
-		}).Error; err != nil {
-		return
-	}
-
-	return
-}
-
-func getActiveDriver(orgCtx *gin.Context, sessionId, mobileNumber string) (driver postgress.Driver, err error) {
-	logger.LogInfo("Request recevied in getActiveDriver", sessionId)
-	logger.LogDebug("Request recevied in getActiveDriver", sessionId, mobileNumber)
-
-	driver, err = getDriver(orgCtx, mobileNumber)
-	if err != nil {
-		logger.LogError(sessionId, "get driver error: "+err.Error())
-		err = errors.New(constants.Driver_Not_Found)
-		return
-	}
-	if utils.IsStringEmpty(driver.ID) {
-		logger.LogError(sessionId, "driver not found error")
-		err = errors.New(constants.Driver_Not_Found)
-		return
-	}
-	if driver.Status != constants.Status_Active {
-		logger.LogError(sessionId, "driver is not active error")
-		err = errors.New(constants.Driver_Not_Found)
-		return
-	}
-
-	logger.LogInfo("Response returned from getActiveDriver", sessionId)
 	return
 }
 

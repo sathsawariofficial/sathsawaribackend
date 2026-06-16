@@ -126,10 +126,3 @@ type ChangePinResponse struct {
 type ForgotPinResponse struct {
 	OTP string `json:"tempOTP"`
 }
-
-type VerifyOTPRequest struct {
-	MobileNumber string `json:"mobile"`
-	OTP          string `json:"otp"`
-	Password     string `json:"password"`
-	Operation    string `json:"operation"`
-}

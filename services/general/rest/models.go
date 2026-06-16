@@ -29,3 +29,14 @@ type ApprochRequest struct {
 	Message string `json:"message"`
 	Type    string `json:"type"`
 }
+
+type VerifyOTPRequest struct {
+	MobileNumber string `json:"mobile"`
+	OTP          string `json:"otp"`
+	Password     string `json:"password"`
+	Operation    string `json:"operation"`
+}
+
+type ForgotPasswordResponse struct {
+	OTP string `json:"tempOTP"`
+}

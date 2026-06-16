@@ -159,13 +159,3 @@ func forgotPinResp(otp string) utils.APIResponse {
 		},
 	}
 }
-
-func sendOTPResp(otp string) utils.APIResponse {
-	return utils.APIResponse{
-		Code:    http.StatusOK,
-		Message: constants.Success,
-		Data: ForgotPasswordResponse{
-			OTP: otp,
-		},
-	}
-}

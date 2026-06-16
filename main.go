@@ -52,8 +52,8 @@ func main() {
 		public := v1.Group("")
 		public.Use(middleware.Authentication(constants.OPEN_TOKEN))
 		{
-			public.POST("/otp/resend", driver.ResendOTPHandler)
-			public.POST("/otp/verify", driver.VerifyOTPHandler)
+			public.POST("/otp/resend", general.ResendOTPHandler)
+			public.POST("/otp/verify", general.VerifyOTPHandler)
 			public.GET("/account/delete", general_rest.GetDeletePage)
 			public.POST("/approach", general.CreateApprochHandler)
 
