@@ -1,9 +1,6 @@
 package passenger
 
-type BookSeatDemandRequest struct {
-	RideId        string `json:"rideId"`
-	NumberOfSeats int    `json:"numberOfSeats"`
-	Name          string `json:"name"`
-	Mobilenumber  string `json:"mobileNumber"`
-	Message       string `json:"message"`
+type BookSeatRequest struct {
+	RideId string `json:"rideId"`
+	Code   string `json:"code"`
 }

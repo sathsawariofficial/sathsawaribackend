@@ -640,3 +640,53 @@ func GetVehicleHandler(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, vehicleResp)
 }
+
+func BookSeatHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in BookSeatHandler", sessionId)
+
+	var request BookSeatRequest
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		logger.LogError(sessionId, "binding error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Unable_To_Do_Job, "book ride"),
+		})
+		return
+	}
+
+	logger.LogDebug2("Response received in BookSeatHandler", sessionId, request)
+
+	err := ValidateBookSeat(sessionId, request)
+	if err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	driverId := ctx.GetString(constants.User_KEY)
+
+	err = BookSeat(ctx, sessionId, driverId, request)
+	if err != nil {
+		logger.LogError(sessionId, "failed to book/unbook seat error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	action := "UnBooked"
+	if request.IsInc {
+		action = "Booked"
+	}
+	bookingResp := utils.GeneralSuccessResp(fmt.Sprintf(constants.Success_Info, fmt.Sprintf("%s the seat", action)))
+
+	logger.LogInfo("Response returned from GetBookSeatsHandler", sessionId)
+	logger.LogDebug2("Response returned from GetBookSeatsHandler", sessionId, bookingResp)
+
+	ctx.JSON(http.StatusOK, bookingResp)
+}

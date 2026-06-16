@@ -206,3 +206,11 @@ func ValidateForgotPin(mobileNumber string) error {
 
 	return nil
 }
+
+func ValidateBookSeat(sessionId string, request BookSeatRequest) error {
+	if !utils.PKValidation(request.RideId) {
+		return fmt.Errorf(constants.Invalid_Data, "ride id")
+	}
+
+	return nil
+}

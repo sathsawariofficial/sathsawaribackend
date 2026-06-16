@@ -15,6 +15,7 @@ import (
 	general "rideshare/services/general/rest"
 	general_rest "rideshare/services/general/rest"
 	"rideshare/services/general/socket"
+	"rideshare/services/passenger"
 	"rideshare/services/ride"
 	"rideshare/worker"
 	"strings"
@@ -79,13 +80,10 @@ func main() {
 				ridePublic.GET("/filtered", ride.GetFilteredRidesHandler)
 			}
 
-			/*
-				// NOTE: this feature is not needed atm
-				passengerPublic := public.Group("/passenger")
-				{
-					passengerPublic.POST("/seat/book", passenger.BookSeatDemandHandler)
-				}
-			*/
+			passengerPublic := public.Group("/passenger")
+			{
+				passengerPublic.POST("/seat/book", passenger.BookSeatHandler)
+			}
 		}
 
 		protected := v1.Group("")
@@ -113,6 +111,8 @@ func main() {
 				driverProtected.DELETE("/delete", driver.DeleteDriverProfileHandler)
 				driverProtected.POST("/password/reset", driver.ChangePasswordHandler)
 				driverProtected.POST("/pin/reset", driver.ChangePinHandler)
+				driverProtected.POST("/seat/book", driver.BookSeatHandler)
+
 				/*
 					// NOTE: this feature is not needed atm
 						driverProtected.POST("/book/ride", ride.BookSeatByDriverHandler)

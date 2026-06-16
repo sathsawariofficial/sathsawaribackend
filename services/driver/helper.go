@@ -8,6 +8,7 @@ import (
 	"rideshare/pkgs/constants"
 	"rideshare/pkgs/database"
 	"rideshare/pkgs/database/postgress"
+	"rideshare/pkgs/database/redis"
 	"rideshare/pkgs/logger"
 	"rideshare/pkgs/utils"
 	"time"
@@ -468,4 +469,90 @@ func validatePin(orgCtx *gin.Context, sessionId string, driver postgress.Driver,
 	logger.LogDebug("pin is valid", sessionId, driver.ID)
 
 	return true
+}
+
+func IncrementSeatsTaken(rideID, driverID string) error {
+	result := database.DatabaseConn.Postgres.Exec(`
+		UPDATE rides
+		SET seats_taken = seats_taken + 1
+		WHERE id = $1
+		  AND driver_id = $2
+		  AND is_active = true
+		  AND seats_taken < number_of_seats
+	`, rideID, driverID)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("ride not found or cannot book seat")
+	}
+
+	return nil
+}
+
+func DecrementSeatsTaken(rideID, driverID string) error {
+	result := database.DatabaseConn.Postgres.Exec(`
+		UPDATE rides
+		SET seats_taken = seats_taken - 1
+		WHERE id = $1
+		  AND driver_id = $2
+		  AND is_active = true
+		  AND seats_taken > 0
+	`, rideID, driverID)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("ride not found or cannot unbook seat")
+	}
+
+	return nil
+}
+
+func updatePin(ctx *gin.Context, sessionId, mobileNumber, otp string) (err error) {
+	logger.LogInfo("Request recevied in updatePin", sessionId)
+
+	excryptedPin, err := redis.GetRedisValue(database.DatabaseConn.RedisConn, otp)
+	if err != nil {
+		logger.LogError(sessionId, "otp not found error: "+err.Error())
+		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
+		return
+	}
+
+	err = updatePinByMobile(ctx, mobileNumber, excryptedPin)
+	if err != nil {
+		logger.LogError(sessionId, "update Pin error: "+err.Error())
+		err = fmt.Errorf(constants.Unable_To_Do_Job, "update the Pin")
+		return
+	}
+
+	logger.LogInfo("Response returned from updatePin", sessionId)
+
+	return nil
+}
+
+func updateForgottonPin(ctx *gin.Context, sessionId, mobileNumber, Pin, otp string) (err error) {
+	logger.LogInfo("Request recevied in updateForgottonPin", sessionId)
+
+	excryptedPin, err := utils.HashPassword(sessionId, Pin)
+	if err != nil {
+		logger.LogError(sessionId, err)
+		err = fmt.Errorf(constants.Registeration_Failed, "vehicle")
+		return
+	}
+
+	err = updatePinByMobile(ctx, mobileNumber, excryptedPin)
+	if err != nil {
+		logger.LogError(sessionId, "update forgotton Pin error: "+err.Error())
+		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
+		return
+	}
+
+	logger.LogInfo("Response returned from updateForgottonPin", sessionId)
+
+	return nil
 }

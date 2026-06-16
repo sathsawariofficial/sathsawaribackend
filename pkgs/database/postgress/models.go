@@ -73,6 +73,7 @@ type Ride struct {
 	RouteDetails         string    `json:"route_details" gorm:"not null"`
 	IsActive             bool      `json:"is_active" gorm:"not null"`
 	ParentRideId         string    `json:"parent_id"`
+	Code                 string    `json:"code"`
 	CreatedAt            time.Time `json:"created_at"`
 	UpdatedAt            time.Time `json:"updated_at"`
 }
@@ -110,6 +111,7 @@ type RideDetails struct {
 	StartLocation        string    `json:"start_location"`
 	EndLocation          string    `json:"end_location"`
 	Fare                 float64   `json:"fare"`
+	Code                 string    `json:"code"`
 	RouteDetails         string    `json:"route_details"`
 	IsActive             bool      `json:"is_active"`
 	CreatedAt            time.Time `json:"created_at"`

@@ -126,3 +126,8 @@ type ChangePinResponse struct {
 type ForgotPinResponse struct {
 	OTP string `json:"tempOTP"`
 }
+
+type BookSeatRequest struct {
+	RideId string `json:"rideId"`
+	IsInc  bool   `json:"isIncrement"`
+}

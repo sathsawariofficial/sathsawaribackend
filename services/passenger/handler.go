@@ -11,23 +11,23 @@ import (
 	"github.com/rs/xid"
 )
 
-func BookSeatDemandHandler(ctx *gin.Context) {
+func BookSeatHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
-	logger.LogInfo("Request received in BookSeatDemandHandler", sessionId)
+	logger.LogInfo("Request received in BookSeatHandler", sessionId)
 
-	var request BookSeatDemandRequest
+	var request BookSeatRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
 		logger.LogError(sessionId, "binding error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
-			Message: fmt.Sprintf(constants.Creation_Failed, "ride"),
+			Message: fmt.Sprintf(constants.Unable_To_Do_Job, "book ride"),
 		})
 		return
 	}
 
-	logger.LogDebug2("Response received in BookSeatDemandHandler", sessionId, request)
+	logger.LogDebug2("Response received in BookSeatHandler", sessionId, request)
 
-	err := ValidateBookSeatDemand(sessionId, request)
+	err := ValidateBookSeat(sessionId, request)
 	if err != nil {
 		logger.LogError(sessionId, "validation error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
@@ -37,7 +37,7 @@ func BookSeatDemandHandler(ctx *gin.Context) {
 		return
 	}
 
-	err = BookSeatDemand(ctx, sessionId, request)
+	err = BookSeat(ctx, sessionId, request)
 	if err != nil {
 		logger.LogError(sessionId, "failed to book seat error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{

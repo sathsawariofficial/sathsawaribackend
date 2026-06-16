@@ -578,46 +578,24 @@ func ForgotPin(ctx *gin.Context, sessionId, mobileNumber string) (otp string, er
 	return
 }
 
-func updatePin(ctx *gin.Context, sessionId, mobileNumber, otp string) (err error) {
-	logger.LogInfo("Request recevied in updatePin", sessionId)
+func BookSeat(ctx *gin.Context, sessionId, driverId string, request BookSeatRequest) (err error) {
+	logger.LogInfo("Request returned from BookSeat", sessionId)
 
-	excryptedPin, err := redis.GetRedisValue(database.DatabaseConn.RedisConn, otp)
-	if err != nil {
-		logger.LogError(sessionId, "otp not found error: "+err.Error())
-		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
-		return
+	if request.IsInc {
+		if err := IncrementSeatsTaken(request.RideId, driverId); err != nil {
+			logger.LogError(sessionId, "failed to book ride error: "+err.Error())
+			err = fmt.Errorf(constants.Failed_To_Do_Job, "book the seat")
+			return err
+		}
+	} else {
+		if err := DecrementSeatsTaken(request.RideId, driverId); err != nil {
+			logger.LogError(sessionId, "failed to unbook ride error: "+err.Error())
+			err = fmt.Errorf(constants.Failed_To_Do_Job, "unbook the seat")
+			return err
+		}
 	}
 
-	err = updatePinByMobile(ctx, mobileNumber, excryptedPin)
-	if err != nil {
-		logger.LogError(sessionId, "update Pin error: "+err.Error())
-		err = fmt.Errorf(constants.Unable_To_Do_Job, "update the Pin")
-		return
-	}
+	logger.LogInfo("Response returned from BookSeat", sessionId)
 
-	logger.LogInfo("Response returned from updatePin", sessionId)
-
-	return nil
-}
-
-func updateForgottonPin(ctx *gin.Context, sessionId, mobileNumber, Pin, otp string) (err error) {
-	logger.LogInfo("Request recevied in updateForgottonPin", sessionId)
-
-	excryptedPin, err := utils.HashPassword(sessionId, Pin)
-	if err != nil {
-		logger.LogError(sessionId, err)
-		err = fmt.Errorf(constants.Registeration_Failed, "vehicle")
-		return
-	}
-
-	err = updatePinByMobile(ctx, mobileNumber, excryptedPin)
-	if err != nil {
-		logger.LogError(sessionId, "update forgotton Pin error: "+err.Error())
-		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
-		return
-	}
-
-	logger.LogInfo("Response returned from updateForgottonPin", sessionId)
-
-	return nil
+	return
 }
