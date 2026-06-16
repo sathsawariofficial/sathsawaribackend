@@ -453,6 +453,21 @@ func updatePasswordByMobile(orgCtx *gin.Context, mobileNumber, password string) 
 	return
 }
 
+func updatePinByMobile(orgCtx *gin.Context, mobileNumber, Pin string) (err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	if err = database.DatabaseConn.Postgres.WithContext(ctx).Model(&postgress.Driver{}).Where("driver_mobile = ?", mobileNumber).
+		Updates(postgress.Driver{
+			Pin: Pin,
+		}).Error; err != nil {
+		return
+	}
+
+	return
+}
+
 func activateDriverByMobile(orgCtx *gin.Context, mobileNumber string) (err error) {
 	var cancel context.CancelFunc
 	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)

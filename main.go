@@ -70,6 +70,7 @@ func main() {
 				driverPublic.POST("/register", driver.RegisterDriverHandler)
 				driverPublic.POST("/login", driver.LoginDriverHandler)
 				driverPublic.GET("/password/forgot", driver.ForgotPasswordHandler)
+				driverPublic.GET("/password/pin", driver.ForgotPinHandler)
 				driverPublic.POST("/rate", driver.RateDriverHandler)
 			}
 
@@ -111,6 +112,7 @@ func main() {
 				driverProtected.PATCH("/status", driver.UpdateProfileStatusHandler)
 				driverProtected.DELETE("/delete", driver.DeleteDriverProfileHandler)
 				driverProtected.POST("/password/reset", driver.ChangePasswordHandler)
+				driverProtected.POST("/pin/reset", driver.ChangePinHandler)
 				/*
 					// NOTE: this feature is not needed atm
 						driverProtected.POST("/book/ride", ride.BookSeatByDriverHandler)

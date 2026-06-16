@@ -539,6 +539,84 @@ func ResendOTP(ctx *gin.Context, sessionId, mobileNumber, operation string) (otp
 	return
 }
 
+func ChangePin(ctx *gin.Context, sessionId, driverId string, request ChangePinRequest) (otp string, err error) {
+	logger.LogInfo("Request received in ChangePin", sessionId)
+
+	// make sure driver exist
+	driver, err := database.GetActiveDriverById(ctx, driverId)
+	if err != nil {
+		logger.LogError(sessionId, "get driver error: "+err.Error())
+		err = errors.New(constants.Driver_Not_Found)
+		return
+	}
+
+	err = utils.ComparePassword(driver.Pin, request.OldPin)
+	if err != nil {
+		logger.LogError(sessionId, err)
+		err = fmt.Errorf(constants.Invalid_Data, "existing Pin")
+		return
+	}
+
+	// save the Pin
+	excryptedNewPin, err := utils.HashPassword(sessionId, request.NewPin)
+	if err != nil {
+		logger.LogError(sessionId, err)
+		err = fmt.Errorf(constants.Unable_To_Do_Job, "change Pin")
+		return
+	}
+
+	// send otp
+	otp, err = sendOTP(ctx, sessionId, driver.DriverMobile, constants.UPDATE_PIN_OPERATION)
+	if err != nil {
+		logger.LogError(sessionId, "failed to send otp: "+err.Error())
+		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
+		return
+	}
+
+	err = redis.SetRedisValueTTL(database.DatabaseConn.RedisConn, otp, excryptedNewPin, time.Duration(configuration.ConfigurationData.Database.Redis.TTL)*time.Second)
+	if err != nil {
+		logger.LogError(sessionId, "pasword not found in cache error: "+err.Error())
+		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
+		return
+	}
+
+	logger.LogInfo("Response returned from ChangePin", sessionId)
+	logger.LogDebug2("Response returned from ChangePin", sessionId, otp)
+
+	return
+}
+
+func ForgotPin(ctx *gin.Context, sessionId, mobileNumber string) (otp string, err error) {
+	logger.LogInfo("Request received in ForgotPin", sessionId)
+
+	// make sure driver exist
+	driver, err := getDriver(ctx, mobileNumber)
+	if err != nil {
+		logger.LogError(sessionId, "get driver error: "+err.Error())
+		// NOTE: we dont want to let the people know weather a number actuly exist or not
+		err = nil
+		return
+	}
+	if utils.IsStringEmpty(driver.ID) {
+		logger.LogError(sessionId, "driver not found error")
+		err = errors.New(constants.Unknown_Error)
+		return
+	}
+
+	// send otp
+	otp, err = sendOTP(ctx, sessionId, driver.DriverMobile, constants.FORGOT_PIN_OPERATION)
+	if err != nil {
+		logger.LogError(sessionId, "failed to send otp: "+err.Error())
+		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
+		return
+	}
+
+	logger.LogInfo("Response returned from ForgotPin", sessionId)
+	logger.LogDebug2("Response returned from ForgotPin", sessionId, otp)
+
+	return
+}
+
 func VerifyOTP(ctx *gin.Context, sessionId string, request VerifyOTPRequest) (replyMessage string, err error) {
 	logger.LogInfo("Request received in VerifyOTP", sessionId)
 
@@ -573,6 +651,22 @@ func VerifyOTP(ctx *gin.Context, sessionId string, request VerifyOTPRequest) (re
 			return
 		}
 		replyMessage = "Your password was updated successfully"
+	case constants.FORGOT_PIN_OPERATION:
+		err = updateForgottonPassword(ctx, sessionId, request.MobileNumber, request.Password, sentOTP)
+		if err != nil {
+			logger.LogError(sessionId, "update forgotton pin error: "+err.Error())
+			err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
+			return
+		}
+		replyMessage = "Your pin was resetted successfully"
+	case constants.UPDATE_PIN_OPERATION:
+		err = updatePassword(ctx, sessionId, request.MobileNumber, sentOTP)
+		if err != nil {
+			logger.LogError(sessionId, "update pin error: "+err.Error())
+			err = fmt.Errorf(constants.Update_Failed, "password")
+			return
+		}
+		replyMessage = "Your pin was updated successfully"
 	case constants.ACTIVATE_DRIVER_OPERATION:
 		err = activateDriverByMobile(ctx, request.MobileNumber)
 		if err != nil {
@@ -648,6 +742,50 @@ func updateForgottonPassword(ctx *gin.Context, sessionId, mobileNumber, password
 	}
 
 	logger.LogInfo("Response returned from updateForgottonPassword", sessionId)
+
+	return nil
+}
+
+func updatePin(ctx *gin.Context, sessionId, mobileNumber, otp string) (err error) {
+	logger.LogInfo("Request recevied in updatePin", sessionId)
+
+	excryptedPin, err := redis.GetRedisValue(database.DatabaseConn.RedisConn, otp)
+	if err != nil {
+		logger.LogError(sessionId, "otp not found error: "+err.Error())
+		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
+		return
+	}
+
+	err = updatePinByMobile(ctx, mobileNumber, excryptedPin)
+	if err != nil {
+		logger.LogError(sessionId, "update Pin error: "+err.Error())
+		err = fmt.Errorf(constants.Unable_To_Do_Job, "update the Pin")
+		return
+	}
+
+	logger.LogInfo("Response returned from updatePin", sessionId)
+
+	return nil
+}
+
+func updateForgottonPin(ctx *gin.Context, sessionId, mobileNumber, Pin, otp string) (err error) {
+	logger.LogInfo("Request recevied in updateForgottonPin", sessionId)
+
+	excryptedPin, err := utils.HashPassword(sessionId, Pin)
+	if err != nil {
+		logger.LogError(sessionId, err)
+		err = fmt.Errorf(constants.Registeration_Failed, "vehicle")
+		return
+	}
+
+	err = updatePinByMobile(ctx, mobileNumber, excryptedPin)
+	if err != nil {
+		logger.LogError(sessionId, "update forgotton Pin error: "+err.Error())
+		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
+		return
+	}
+
+	logger.LogInfo("Response returned from updateForgottonPin", sessionId)
 
 	return nil
 }

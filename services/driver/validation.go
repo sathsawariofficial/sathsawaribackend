@@ -181,6 +181,32 @@ func ValidateForgotPassword(mobileNumber string) error {
 	return nil
 }
 
+func ValidateChangePin(driverId string, request *ChangePinRequest) error {
+	if !utils.PKValidation(driverId) {
+		return fmt.Errorf(constants.Invalid_Data, "driver id")
+	}
+
+	if err := ValidatePin(request.OldPin); err != nil {
+		return err
+	}
+
+	if err := ValidatePin(request.NewPin); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func ValidateForgotPin(mobileNumber string) error {
+	mobileLen := len(mobileNumber)
+
+	if !(mobileLen > constants.MobileNumber_Min_Len && mobileLen <= constants.MobileNumber_Max_Len) {
+		return fmt.Errorf("length of the mobile number should be between %v and %v characters", constants.MobileNumber_Min_Len, constants.MobileNumber_Max_Len)
+	}
+
+	return nil
+}
+
 func ValidateSendOTP(mobileNumber, operation string) error {
 	mobileLen := len(mobileNumber)
 

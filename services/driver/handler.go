@@ -511,6 +511,89 @@ func ForgotPasswordHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, resetResp)
 }
 
+// reset's drivers Pin
+func ChangePinHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in ChangePinHandler", sessionId)
+
+	var request ChangePinRequest
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		logger.LogError(sessionId, "binding error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Unable_To_Do_Job, "change Pin"),
+		})
+		return
+	}
+
+	logger.LogDebug2("Response received in ChangePinHandler", sessionId, request)
+
+	driverId := ctx.GetString(constants.User_KEY)
+	err := ValidateChangePin(driverId, &request)
+	if err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	otp, err := ChangePin(ctx, sessionId, driverId, request)
+	if err != nil {
+		logger.LogError(sessionId, "reset pin error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	resetResp := changePinResp(otp)
+
+	logger.LogInfo("Response received in ChangePinHandler", sessionId)
+	logger.LogDebug2("Response received in ChangePinHandler", sessionId, resetResp)
+
+	ctx.JSON(http.StatusOK, resetResp)
+}
+
+// recover driver's Pin
+func ForgotPinHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in ForgotPinHandler", sessionId)
+
+	mobileNumber := utils.HandleMobileNumberInQuery(ctx.Query(constants.MOBILE_NUMBER_QUERY))
+
+	logger.LogDebug2("Response received in ForgotPinHandler", sessionId, mobileNumber)
+
+	err := ValidateForgotPin(mobileNumber)
+	if err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	otp, err := ForgotPin(ctx, sessionId, mobileNumber)
+	if err != nil {
+		logger.LogError(sessionId, "forgot pin error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	resetResp := forgotPinResp(otp)
+
+	logger.LogInfo("Response received in ChangePinHandler", sessionId)
+	logger.LogDebug2("Response received in ChangePinHandler", sessionId, resetResp)
+
+	ctx.JSON(http.StatusOK, resetResp)
+}
+
 func GetVehicleHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in GetVehicleHandler", sessionId)

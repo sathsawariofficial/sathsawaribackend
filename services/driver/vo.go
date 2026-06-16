@@ -140,6 +140,26 @@ func forgotPasswordResp(otp string) utils.APIResponse {
 	}
 }
 
+func changePinResp(otp string) utils.APIResponse {
+	return utils.APIResponse{
+		Code:    http.StatusOK,
+		Message: constants.SENT_OTP_Successfully,
+		Data: ChangePinResponse{
+			OTP: otp,
+		},
+	}
+}
+
+func forgotPinResp(otp string) utils.APIResponse {
+	return utils.APIResponse{
+		Code:    http.StatusOK,
+		Message: constants.SENT_OTP_Successfully,
+		Data: ForgotPinResponse{
+			OTP: otp,
+		},
+	}
+}
+
 func sendOTPResp(otp string) utils.APIResponse {
 	return utils.APIResponse{
 		Code:    http.StatusOK,

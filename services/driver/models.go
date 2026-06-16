@@ -114,6 +114,19 @@ type ForgotPasswordResponse struct {
 	OTP string `json:"tempOTP"`
 }
 
+type ChangePinRequest struct {
+	OldPin string `json:"oldPin"`
+	NewPin string `json:"newPin"`
+}
+
+type ChangePinResponse struct {
+	OTP string `json:"tempOTP"`
+}
+
+type ForgotPinResponse struct {
+	OTP string `json:"tempOTP"`
+}
+
 type VerifyOTPRequest struct {
 	MobileNumber string `json:"mobile"`
 	OTP          string `json:"otp"`
