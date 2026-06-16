@@ -110,6 +110,65 @@ func updatePassword(ctx *gin.Context, sessionId, mobileNumber, otp string) (err 
 	return nil
 }
 
+func updateForgottonPin(ctx *gin.Context, sessionId, mobileNumber, Pin, otp string) (err error) {
+	logger.LogInfo("Request recevied in updateForgottonPin", sessionId)
+
+	excryptedPin, err := utils.HashPassword(sessionId, Pin)
+	if err != nil {
+		logger.LogError(sessionId, err)
+		err = fmt.Errorf(constants.Registeration_Failed, "vehicle")
+		return
+	}
+
+	err = updatePinByMobile(ctx, mobileNumber, excryptedPin)
+	if err != nil {
+		logger.LogError(sessionId, "update forgotton Pin error: "+err.Error())
+		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
+		return
+	}
+
+	logger.LogInfo("Response returned from updateForgottonPin", sessionId)
+
+	return nil
+}
+
+func updatePinByMobile(orgCtx *gin.Context, mobileNumber, Pin string) (err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	if err = database.DatabaseConn.Postgres.WithContext(ctx).Model(&postgress.Driver{}).Where("driver_mobile = ?", mobileNumber).
+		Updates(postgress.Driver{
+			Pin: Pin,
+		}).Error; err != nil {
+		return
+	}
+
+	return
+}
+
+func updatePin(ctx *gin.Context, sessionId, mobileNumber, otp string) (err error) {
+	logger.LogInfo("Request recevied in updatePin", sessionId)
+
+	excryptedPin, err := redis.GetRedisValue(database.DatabaseConn.RedisConn, otp)
+	if err != nil {
+		logger.LogError(sessionId, "otp not found error: "+err.Error())
+		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
+		return
+	}
+
+	err = updatePinByMobile(ctx, mobileNumber, excryptedPin)
+	if err != nil {
+		logger.LogError(sessionId, "update Pin error: "+err.Error())
+		err = fmt.Errorf(constants.Unable_To_Do_Job, "update the Pin")
+		return
+	}
+
+	logger.LogInfo("Response returned from updatePin", sessionId)
+
+	return nil
+}
+
 func activateDriverByMobile(orgCtx *gin.Context, mobileNumber string) (err error) {
 	var cancel context.CancelFunc
 	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)

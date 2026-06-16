@@ -34,6 +34,7 @@ type VerifyOTPRequest struct {
 	MobileNumber string `json:"mobile"`
 	OTP          string `json:"otp"`
 	Password     string `json:"password"`
+	Pin          string `json:"pin"`
 	Operation    string `json:"operation"`
 }
 

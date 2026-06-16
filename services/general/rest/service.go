@@ -136,7 +136,7 @@ func VerifyOTP(ctx *gin.Context, sessionId string, request VerifyOTPRequest) (re
 		}
 		replyMessage = "Your password was updated successfully"
 	case constants.FORGOT_PIN_OPERATION:
-		err = updateForgottonPassword(ctx, sessionId, request.MobileNumber, request.Password, sentOTP)
+		err = updateForgottonPin(ctx, sessionId, request.MobileNumber, request.Pin, sentOTP)
 		if err != nil {
 			logger.LogError(sessionId, "update forgotton pin error: "+err.Error())
 			err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
@@ -144,10 +144,10 @@ func VerifyOTP(ctx *gin.Context, sessionId string, request VerifyOTPRequest) (re
 		}
 		replyMessage = "Your pin was resetted successfully"
 	case constants.UPDATE_PIN_OPERATION:
-		err = updatePassword(ctx, sessionId, request.MobileNumber, sentOTP)
+		err = updatePin(ctx, sessionId, request.MobileNumber, sentOTP)
 		if err != nil {
 			logger.LogError(sessionId, "update pin error: "+err.Error())
-			err = fmt.Errorf(constants.Update_Failed, "password")
+			err = fmt.Errorf(constants.Update_Failed, "pin")
 			return
 		}
 		replyMessage = "Your pin was updated successfully"

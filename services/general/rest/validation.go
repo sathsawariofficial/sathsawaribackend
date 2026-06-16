@@ -81,6 +81,13 @@ func ValidateOTP(request *VerifyOTPRequest) error {
 			return fmt.Errorf("length of the password should be between %v and %v characters", constants.Password_Min_Len, constants.Password_Max_Len)
 		}
 	}
+	if request.Operation == constants.FORGOT_PIN_OPERATION {
+		pinLen := len(request.Pin)
+
+		if pinLen != constants.Pin_Len {
+			return fmt.Errorf("length of the pin should be %v", constants.Pin_Len)
+		}
+	}
 
 	return nil
 }
