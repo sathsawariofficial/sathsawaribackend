@@ -178,6 +178,7 @@ func sendDriverBroadcast(ginCtx *gin.Context, sessionId string, req postgress.Br
 			WithContext(ctx).
 			Limit(driverBatchSize).
 			Offset(offset).
+			Where(`status = ?`, constants.Status_Active).
 			Find(&drivers).Error
 
 		cancel()

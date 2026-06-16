@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"rideshare/pkgs/configuration"
 	"rideshare/pkgs/constants"
+	httpcall "rideshare/pkgs/externalCall/http"
 	"rideshare/pkgs/logger"
 	"rideshare/pkgs/middleware"
 	"rideshare/pkgs/monitoring"
@@ -185,4 +186,5 @@ func startSocketServer() {
 
 func setup() {
 	monitoring.NewStatsStore()
+	httpcall.NewClient()
 }

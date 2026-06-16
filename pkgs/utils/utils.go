@@ -11,6 +11,7 @@ import (
 	"rideshare/pkgs/constants"
 	"rideshare/pkgs/database"
 	"rideshare/pkgs/database/redis"
+	httpcall "rideshare/pkgs/externalCall/http"
 	"rideshare/pkgs/logger"
 	"strconv"
 	"strings"
@@ -144,6 +145,12 @@ func HandleMobileNumberInQuery(mobile_number string) string {
 	return mobileNumber
 }
 
+func CleanMobileNumber(mobile_number string) string {
+	mobileNumber := strings.TrimPrefix(mobile_number, "+")
+
+	return mobileNumber
+}
+
 func InSlice(arr []int, target int) bool {
 	for _, v := range arr {
 		if v == target {
@@ -181,7 +188,9 @@ func SendNotification(orgCtx *gin.Context, sessionId, notificationType, driverId
 
 	switch notificationType {
 	case constants.NOTIFICATION_TYPE_RIDE_CREATED,
-		constants.NOTIFICATION_TYPE_PIN_CREATED:
+		constants.NOTIFICATION_TYPE_PIN_CREATED,
+		constants.NOTIFICATION_TYPE_INFORMATION,
+		constants.NOTIFICATION_TYPE_MARKETING:
 		driverFCM, err := database.GetDriverFCM(orgCtx, driverId)
 		if err != nil {
 			logger.LogError(sessionId, err)
@@ -189,12 +198,22 @@ func SendNotification(orgCtx *gin.Context, sessionId, notificationType, driverId
 		}
 		fcm = driverFCM.FCM
 	case constants.NOTIFICATION_TYPE_SMS_TO_SERVICE:
-		smsFCM, err := database.GetSMSFCM(orgCtx)
-		if err != nil {
-			logger.LogError(sessionId, err)
+		if configuration.ConfigurationData.Integerations.SMS.LocalSMSService {
+			smsFCM, err := database.GetSMSFCM(orgCtx)
+			if err != nil {
+				logger.LogError(sessionId, err)
+				return
+			}
+			fcm = smsFCM.FCM
+		} else {
+			driver, err := database.GetDriverById(orgCtx, driverId)
+			if err != nil {
+				logger.LogError(sessionId, err)
+				return
+			}
+			SendOTPSMS(orgCtx, sessionId, driver.DriverMobile, message)
 			return
 		}
-		fcm = smsFCM.FCM
 	default:
 		logger.LogWarning(sessionId, fmt.Sprintf("unhandled notification type: %s", notificationType))
 		return
@@ -209,6 +228,49 @@ func SendNotification(orgCtx *gin.Context, sessionId, notificationType, driverId
 		NotificationType: notificationType,
 		Data:             data,
 	})
+}
+
+func SendOTPSMS(orgCtx *gin.Context, sessionId, receiverMobile, message string) {
+	logger.LogInfo("Request received in SendOTPSMS", sessionId)
+	logger.LogDebug("Request received in SendOTPSMS", sessionId, fmt.Sprintf("receiver mobile: %s, message: %s", receiverMobile, message))
+
+	request := map[string]string{
+		"key":      configuration.ConfigurationData.Integerations.SMS.APIKey,
+		"receiver": CleanMobileNumber(receiverMobile),
+		"sender":   configuration.ConfigurationData.Integerations.SMS.Mask,
+		"otpcode":  message,
+	}
+
+	logger.LogDebug("SendOTPSMS", sessionId, request)
+
+	url, err := httpcall.AddQueryParams(configuration.ConfigurationData.Integerations.SMS.URL, request)
+	if err != nil {
+		logger.LogError(sessionId, err)
+		return
+	}
+
+	resp, err := httpcall.MakeRequest(orgCtx, httpcall.RequestOptions{
+		Method:    http.MethodPost,
+		Path:      url,
+		Body:      nil,
+		Headers:   map[string]string{},
+		SessionID: sessionId,
+	})
+	if err != nil {
+		logger.LogError(sessionId, err)
+		return
+	}
+	logger.LogDebug("response", sessionId, string(resp))
+
+	var response SMSResponse
+	err = json.Unmarshal(resp, &response)
+	if err != nil {
+		logger.LogError(sessionId, err)
+		return
+	}
+
+	logger.LogInfo("Response returned from SendOTPSMS", sessionId)
+	logger.LogDebug("Response returned from SendOTPSMS", sessionId, response)
 }
 
 func GetPageNumber(ctx *gin.Context) (page int, err error) {

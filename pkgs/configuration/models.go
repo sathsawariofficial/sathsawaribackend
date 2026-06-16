@@ -5,16 +5,28 @@ import (
 )
 
 type Configuration struct {
-	RestPort   string         `json:"rest_port"`
-	SocketPort string         `json:"socket_port"`
-	Envirnment string         `json:"envirnment"`
-	PageSize   int            `json:"page_size"`
-	Timeout    int            `json:"timeout"`
-	Database   DatabaseConfig `json:"database"`
-	Tracing    Tracing        `json:"tracing"`
-	Auth       Auth           `json:"auth"`
-	Alert      AlertConfig    `json:"alertConfig"`
-	General    General        `json:"general"`
+	RestPort      string         `json:"rest_port"`
+	SocketPort    string         `json:"socket_port"`
+	Envirnment    string         `json:"envirnment"`
+	PageSize      int            `json:"page_size"`
+	Timeout       int            `json:"timeout"`
+	Database      DatabaseConfig `json:"database"`
+	Tracing       Tracing        `json:"tracing"`
+	Auth          Auth           `json:"auth"`
+	Alert         AlertConfig    `json:"alertConfig"`
+	Integerations Integerations  `json:"integerations"`
+	General       General        `json:"general"`
+}
+
+type Integerations struct {
+	SMS SMS `json:"sms"`
+}
+
+type SMS struct {
+	LocalSMSService bool   `json:"local_sms_service"`
+	URL             string `json:"url"`
+	APIKey          string `json:"apiKey"`
+	Mask            string `json:"mask"`
 }
 
 type General struct {

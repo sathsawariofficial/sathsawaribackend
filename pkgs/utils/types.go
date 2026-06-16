@@ -126,3 +126,13 @@ type Location struct {
 	Lng      float64 `json:"lng"`
 	Category string  `json:"category"`
 }
+
+type SMSResponse struct {
+	Response SMSResponseDetails `json:"response"`
+}
+
+type SMSResponseDetails struct {
+	Errorno     string `json:"errorno"`
+	Status      string `json:"status"`
+	Description string `json:"description"`
+}
