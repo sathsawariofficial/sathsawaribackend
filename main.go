@@ -70,7 +70,7 @@ func main() {
 				driverPublic.POST("/register", driver.RegisterDriverHandler)
 				driverPublic.POST("/login", driver.LoginDriverHandler)
 				driverPublic.GET("/password/forgot", driver.ForgotPasswordHandler)
-				driverPublic.GET("/password/pin", driver.ForgotPinHandler)
+				driverPublic.GET("/pin/forgot", driver.ForgotPinHandler)
 				driverPublic.POST("/rate", driver.RateDriverHandler)
 			}
 
