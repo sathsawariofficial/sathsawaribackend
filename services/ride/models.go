@@ -47,6 +47,7 @@ type RideDetails struct {
 	SeatsTaken           int     `json:"seatsTaken"`
 	StartLocation        string  `json:"startLocation"`
 	EndLocation          string  `json:"endLocation"`
+	Code                 string  `json:"code"`
 	Fare                 float64 `json:"fare"`
 	RouteDetails         string  `json:"routeDetails"`
 	IsActive             bool    `json:"isActive"`

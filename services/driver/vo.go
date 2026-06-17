@@ -159,3 +159,24 @@ func forgotPinResp(otp string) utils.APIResponse {
 		},
 	}
 }
+
+func getBookedSeatsResp(bookings []postgress.RideBooking) utils.APIResponse {
+	var bookedSeats []BookedSeat
+
+	for _, val := range bookings {
+		bookedSeats = append(bookedSeats, BookedSeat{
+			ID:           val.ID,
+			MobileNumber: val.MobileNumber,
+			Name:         val.Name,
+			Seats:        val.Seats,
+		})
+	}
+
+	return utils.APIResponse{
+		Code:    http.StatusOK,
+		Message: constants.Success,
+		Data: &BookedSeatsResponse{
+			Bookings: bookedSeats,
+		},
+	}
+}

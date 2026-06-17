@@ -581,14 +581,14 @@ func ForgotPin(ctx *gin.Context, sessionId, mobileNumber string) (otp string, er
 func BookSeat(ctx *gin.Context, sessionId, driverId string, request BookSeatRequest) (err error) {
 	logger.LogInfo("Request returned from BookSeat", sessionId)
 
-	if request.IsInc {
-		if err := IncrementSeatsTaken(request.RideId, driverId); err != nil {
+	if request.IsBook {
+		if err := bookRide(ctx, sessionId, driverId, request); err != nil {
 			logger.LogError(sessionId, "failed to book ride error: "+err.Error())
 			err = fmt.Errorf(constants.Failed_To_Do_Job, "book the seat")
 			return err
 		}
 	} else {
-		if err := DecrementSeatsTaken(request.RideId, driverId); err != nil {
+		if err := unBookRide(ctx, sessionId, driverId, request); err != nil {
 			logger.LogError(sessionId, "failed to unbook ride error: "+err.Error())
 			err = fmt.Errorf(constants.Failed_To_Do_Job, "unbook the seat")
 			return err
@@ -596,6 +596,20 @@ func BookSeat(ctx *gin.Context, sessionId, driverId string, request BookSeatRequ
 	}
 
 	logger.LogInfo("Response returned from BookSeat", sessionId)
+
+	return
+}
+
+func GetBookedSeat(ctx *gin.Context, sessionId, rideId string) (bookings []postgress.RideBooking, err error) {
+	logger.LogInfo("Request returned from GetBookedSeat", sessionId)
+
+	if bookings, err = getBookedSeatsByRideID(ctx, rideId); err != nil {
+		logger.LogError(sessionId, "failed to book ride error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the bookings")
+		return
+	}
+
+	logger.LogInfo("Response returned from GetBookedSeat", sessionId)
 
 	return
 }

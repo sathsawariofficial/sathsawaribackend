@@ -112,6 +112,7 @@ func main() {
 				driverProtected.POST("/password/reset", driver.ChangePasswordHandler)
 				driverProtected.POST("/pin/reset", driver.ChangePinHandler)
 				driverProtected.POST("/seat/book", driver.BookSeatHandler)
+				driverProtected.GET("/bookings", driver.GetBookSeatHandler)
 
 				/*
 					// NOTE: this feature is not needed atm

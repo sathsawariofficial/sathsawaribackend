@@ -75,6 +75,19 @@ func ChoiseMaker(option1, option2 string) string {
 	return result
 }
 
+func IsValidMobileNumber(mobile string) error {
+	mobileLen := len(mobile)
+
+	if !(mobileLen >= constants.MobileNumber_Min_Len && mobileLen <= constants.MobileNumber_Max_Len) {
+		return fmt.Errorf("length of the mobile number should be between %v and %v characters", constants.MobileNumber_Min_Len, constants.MobileNumber_Max_Len)
+	}
+	if !constants.Mobile_Regex.MatchString(mobile) {
+		return fmt.Errorf("invalid mobile number %v", mobile)
+	}
+
+	return nil
+}
+
 func IsValidPassword(password string) bool {
 	passLen := len(password)
 

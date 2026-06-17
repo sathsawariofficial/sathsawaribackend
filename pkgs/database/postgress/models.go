@@ -78,6 +78,16 @@ type Ride struct {
 	UpdatedAt            time.Time `json:"updated_at"`
 }
 
+type RideBooking struct {
+	ID           string    `json:"id" gorm:"primary_key"`
+	RideID       string    `json:"ride_id" gorm:"not null"`
+	Name         string    `json:"name" gorm:"not null"`
+	MobileNumber string    `json:"mobileNumber" gorm:"not null"`
+	Seats        int       `json:"seats" gorm:"not null"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
 type RideTemplate struct {
 	ID                   string    `json:"id" gorm:"primary_key"`
 	RideID               string    `json:"ride_id" gorm:"not null"`
@@ -167,19 +177,6 @@ type ApprochInfo struct {
 	Type      string    `json:"type"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
-}
-
-type BookSeatDemand struct {
-	ID            string    `json:"id" gorm:"primary_key"`
-	RideId        string    `json:"ride_id" gorm:"not null"`
-	Name          string    `json:"name" gorm:"not null"`
-	Mobilenumber  string    `json:"mobile_number"`
-	NumberOfSeats int       `json:"number_of_seats"`
-	Message       string    `json:"message"`
-	IsHandled     bool      `json:"is_handled"`
-	IsApproved    bool      `json:"is_approved"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 type NotificationRequest struct {

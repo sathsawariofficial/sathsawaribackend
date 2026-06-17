@@ -128,6 +128,21 @@ type ForgotPinResponse struct {
 }
 
 type BookSeatRequest struct {
-	RideId string `json:"rideId"`
-	IsInc  bool   `json:"isIncrement"`
+	RideId       string `json:"rideId"`
+	Name         string `json:"name"`
+	MobileNumber string `json:"mobileNumber"`
+	Code         string `json:"code"`
+	Seats        int    `json:"seats"`
+	IsBook       bool   `json:"isBook"`
+}
+
+type BookedSeat struct {
+	ID           string `json:"id"`
+	MobileNumber string `json:"mobileNumber"`
+	Name         string `json:"name"`
+	Seats        int    `json:"seats"`
+}
+
+type BookedSeatsResponse struct {
+	Bookings []BookedSeat `json:"bookings"`
 }

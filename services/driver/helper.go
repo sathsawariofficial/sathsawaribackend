@@ -471,46 +471,118 @@ func validatePin(orgCtx *gin.Context, sessionId string, driver postgress.Driver,
 	return true
 }
 
-func IncrementSeatsTaken(rideID, driverID string) error {
-	result := database.DatabaseConn.Postgres.Exec(`
+func bookRide(orgCtx *gin.Context, sessionId, driverID string, request BookSeatRequest) error {
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	tx := database.DatabaseConn.Postgres.WithContext(ctx).Begin()
+
+	result := tx.Exec(`
 		UPDATE rides
-		SET seats_taken = seats_taken + 1
-		WHERE id = $1
-		  AND driver_id = $2
+		SET seats_taken = seats_taken + $1
+		WHERE id = $2
+		  AND driver_id = $3
 		  AND is_active = true
-		  AND seats_taken < number_of_seats
-	`, rideID, driverID)
+		  AND seats_taken + $1 <= number_of_seats
+	`, request.Seats, request.RideId, driverID)
 
 	if result.Error != nil {
+		tx.Rollback()
 		return result.Error
 	}
 
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("ride not found or cannot book seat")
+		tx.Rollback()
+		return fmt.Errorf("ride not found or insufficient seats available")
 	}
 
-	return nil
+	if err := tx.Create(&postgress.RideBooking{
+		ID:           utils.GenerateUUID(),
+		RideID:       request.RideId,
+		MobileNumber: request.MobileNumber,
+		Name:         request.Name,
+		Seats:        request.Seats,
+	}).Error; err != nil {
+		logger.LogError(sessionId, err)
+		tx.Rollback()
+		return fmt.Errorf(constants.Registeration_Failed, "driver")
+	}
+
+	return tx.Commit().Error
 }
 
-func DecrementSeatsTaken(rideID, driverID string) error {
-	result := database.DatabaseConn.Postgres.Exec(`
-		UPDATE rides
-		SET seats_taken = seats_taken - 1
-		WHERE id = $1
-		  AND driver_id = $2
-		  AND is_active = true
-		  AND seats_taken > 0
-	`, rideID, driverID)
+func unBookRide(orgCtx *gin.Context, sessionId, driverID string, request BookSeatRequest) error {
+	ctx, cancel := context.WithTimeout(
+		orgCtx,
+		time.Duration(configuration.ConfigurationData.Timeout)*time.Second,
+	)
+	defer cancel()
+
+	tx := database.DatabaseConn.Postgres.WithContext(ctx).Begin()
+
+	var booking postgress.RideBooking
+
+	err := tx.Where(
+		"ride_id = ? AND mobile_number = ?",
+		request.RideId,
+		request.MobileNumber,
+	).First(&booking).Error
+
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("booking not found")
+	}
+
+	result := tx.Delete(&booking)
 
 	if result.Error != nil {
+		tx.Rollback()
+		return result.Error
+	}
+
+	result = tx.Exec(`
+		UPDATE rides
+		SET seats_taken = seats_taken - $1
+		WHERE id = $2
+		  AND driver_id = $3
+		  AND is_active = true
+		  AND seats_taken >= $1
+	`, booking.Seats, request.RideId, driverID)
+
+	if result.Error != nil {
+		tx.Rollback()
 		return result.Error
 	}
 
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("ride not found or cannot unbook seat")
+		tx.Rollback()
+		return fmt.Errorf("ride not found or cannot unbook seats")
 	}
 
-	return nil
+	return tx.Commit().Error
+}
+
+func getBookedSeatsByRideID(orgCtx *gin.Context, rideID string) ([]postgress.RideBooking, error) {
+	ctx, cancel := context.WithTimeout(
+		orgCtx,
+		time.Duration(configuration.ConfigurationData.Timeout)*time.Second,
+	)
+	defer cancel()
+
+	var bookings []postgress.RideBooking
+
+	err := database.DatabaseConn.Postgres.
+		WithContext(ctx).
+		Model(&postgress.RideBooking{}).
+		Where("ride_id = ?", rideID).
+		Order("name ASC").
+		Find(&bookings).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return bookings, nil
 }
 
 func updatePin(ctx *gin.Context, sessionId, mobileNumber, otp string) (err error) {

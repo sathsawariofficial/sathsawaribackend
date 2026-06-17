@@ -680,10 +680,43 @@ func BookSeatHandler(ctx *gin.Context) {
 	}
 
 	action := "UnBooked"
-	if request.IsInc {
+	if request.IsBook {
 		action = "Booked"
 	}
 	bookingResp := utils.GeneralSuccessResp(fmt.Sprintf(constants.Success_Info, fmt.Sprintf("%s the seat", action)))
+
+	logger.LogInfo("Response returned from GetBookSeatsHandler", sessionId)
+	logger.LogDebug2("Response returned from GetBookSeatsHandler", sessionId, bookingResp)
+
+	ctx.JSON(http.StatusOK, bookingResp)
+}
+
+func GetBookSeatHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetBookSeatHandler", sessionId)
+
+	rideId := ctx.Query(constants.Ride_Key)
+	err := ValidateGetBookSeat(sessionId, rideId)
+	if err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	bookings, err := GetBookedSeat(ctx, sessionId, rideId)
+	if err != nil {
+		logger.LogError(sessionId, "failed to book/unbook seat error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	bookingResp := getBookedSeatsResp(bookings)
 
 	logger.LogInfo("Response returned from GetBookSeatsHandler", sessionId)
 	logger.LogDebug2("Response returned from GetBookSeatsHandler", sessionId, bookingResp)

@@ -11,7 +11,7 @@ import (
 func BookSeat(ctx *gin.Context, sessionId string, request BookSeatRequest) (err error) {
 	logger.LogInfo("Request returned from BookSeat", sessionId)
 
-	if err := IncrementSeatsTaken(request.RideId, request.Code); err != nil {
+	if err := bookRide(ctx, sessionId, request); err != nil {
 		logger.LogError(sessionId, "failed to book ride error: "+err.Error())
 		err = fmt.Errorf(constants.Failed_To_Do_Job, "book the seat")
 		return err

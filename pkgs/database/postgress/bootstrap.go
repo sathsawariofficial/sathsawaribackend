@@ -57,6 +57,7 @@ func NewPortgress() (db *gorm.DB, err error) {
 		&MissingLocations{},
 		&DriverDevice{},
 		&BroadcastNotificationRequests{},
+		&RideBooking{},
 	)
 
 	if err != nil {

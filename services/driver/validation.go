@@ -7,13 +7,9 @@ import (
 )
 
 func ValidateDriverRegistration(request *DriverRegistrationRequest) error {
-	mobileLen := len(request.MobileNumber)
 	nameLen := len(request.Name)
 	passwordLen := len(request.Password)
 
-	if !(mobileLen >= constants.MobileNumber_Min_Len && mobileLen <= constants.MobileNumber_Max_Len) {
-		return fmt.Errorf("length of the mobile number should be between %v and %v characters", constants.MobileNumber_Min_Len, constants.MobileNumber_Max_Len)
-	}
 	if !(nameLen >= constants.Name_Min_Len && nameLen <= constants.Name_Max_Len) {
 		return fmt.Errorf("length of the name should be between %v and %v characters", constants.Name_Min_Len, constants.Name_Max_Len)
 	}
@@ -25,8 +21,8 @@ func ValidateDriverRegistration(request *DriverRegistrationRequest) error {
 		return fmt.Errorf(constants.Invalid_Data, "gender")
 	}
 
-	if !constants.Mobile_Regex.MatchString(request.MobileNumber) {
-		return fmt.Errorf("invalid mobile number %v", request.MobileNumber)
+	if err := utils.IsValidMobileNumber(request.MobileNumber); err != nil {
+		return err
 	}
 	if !utils.IsValidPassword(request.Password) {
 		return fmt.Errorf("invalid password, should contain atleast one uppercase, lowercase letter, number and special character and length between %d and %d", constants.Password_Min_Len, constants.Password_Max_Len)
@@ -209,6 +205,28 @@ func ValidateForgotPin(mobileNumber string) error {
 
 func ValidateBookSeat(sessionId string, request BookSeatRequest) error {
 	if !utils.PKValidation(request.RideId) {
+		return fmt.Errorf(constants.Invalid_Data, "ride id")
+	}
+
+	if request.IsBook {
+		nameLen := len(request.Name)
+		if !(nameLen >= constants.Name_Min_Len && nameLen <= constants.Name_Max_Len) {
+			return fmt.Errorf("length of the name should be between %v and %v characters", constants.Name_Min_Len, constants.Name_Max_Len)
+		}
+		if request.Seats == 0 {
+			return fmt.Errorf(constants.Missing_Data, "seats")
+		}
+	}
+
+	if err := utils.IsValidMobileNumber(request.MobileNumber); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func ValidateGetBookSeat(sessionId, rideId string) error {
+	if !utils.PKValidation(rideId) {
 		return fmt.Errorf(constants.Invalid_Data, "ride id")
 	}
 
