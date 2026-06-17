@@ -15,14 +15,33 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lib/pq"
+	"gorm.io/gorm"
 )
 
-func mapRideData(request RideCreationRequest, parentId, driverId, vehicleId string) postgress.Ride {
+func mapRideData(
+	request RideCreationRequest,
+	parentId,
+	driverId,
+	vehicleId string,
+) postgress.Ride {
+
 	var parentRideId string
 
 	if !utils.IsStringEmpty(parentId) {
 		parentRideId = parentId
 	}
+
+	// normalize route points
+	normalizedRoutePoints := make([]string, 0, len(request.RoutePoints))
+	normalizedRoutePoints = append(normalizedRoutePoints, strings.ToLower(request.StartLocation))
+	for _, loc := range request.RoutePoints {
+		loc = strings.ToLower(strings.TrimSpace(loc))
+		if loc != "" {
+			normalizedRoutePoints = append(normalizedRoutePoints, loc)
+		}
+	}
+	normalizedRoutePoints = append(normalizedRoutePoints, strings.ToLower(request.EndLocation))
 
 	return postgress.Ride{
 		ID:                   utils.GenerateUUID(),
@@ -32,13 +51,18 @@ func mapRideData(request RideCreationRequest, parentId, driverId, vehicleId stri
 		EstimatedEndDatetime: request.EstimatedEndDatetime,
 		NumberOfSeats:        request.NumberOfSeats,
 		SeatsTaken:           0,
-		StartLocation:        request.StartLocation,
-		EndLocation:          request.EndLocation,
-		Fare:                 request.Fare,
-		Code:                 utils.GenerateOTP(),
-		RouteDetails:         request.RouteDetails,
-		ParentRideId:         parentRideId,
-		IsActive:             true,
+
+		StartLocation: strings.ToLower(strings.TrimSpace(request.StartLocation)),
+		EndLocation:   strings.ToLower(strings.TrimSpace(request.EndLocation)),
+
+		RoutePoints: pq.StringArray(normalizedRoutePoints),
+
+		Fare:         request.Fare,
+		Code:         utils.GenerateOTP(),
+		RouteDetails: request.RouteDetails,
+
+		ParentRideId: parentRideId,
+		IsActive:     true,
 	}
 }
 
@@ -75,47 +99,6 @@ func getRideById(orgCtx *gin.Context, rideId string) (ride postgress.Ride, err e
 	defer cancel()
 
 	err = database.DatabaseConn.Postgres.WithContext(ctx).Where(`id = ?`, rideId).Where(`is_active = ?`, true).Find(&ride).Error
-	return
-}
-
-func getAllActiveRides(orgCtx *gin.Context, page int) (rides []postgress.RideDetails, totalRows int64, err error) {
-	pageSize := configuration.ConfigurationData.PageSize
-	offset := (page - 1) * pageSize
-
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	query := database.DatabaseConn.Postgres.WithContext(ctx).Table("rides").
-		Select(`
-			rides.id,
-			rides.driver_id,
-			drivers.driver_name,
-			drivers.driver_mobile,
-			vehicles.vehicle_number,
-			vehicles.vehicle_info,
-			rides.start_datetime,
-			rides.estimated_end_datetime,
-			rides.number_of_seats,
-			rides.seats_taken,
-			rides.start_location,
-			rides.end_location,
-			rides.fare,
-			rides.route_details,
-			rides.is_active,
-			rides.created_at,
-			rides.updated_at
-		`).
-		Joins("JOIN drivers ON rides.driver_id = drivers.id").
-		Joins("JOIN vehicles ON rides.vehicle_id = vehicles.id").
-		Where("rides.estimated_end_datetime >= ?", utils.GetCurrentTime()).
-		Where(`rides.is_active = ?`, true).
-		Limit(pageSize).
-		Offset(offset)
-
-	err = query.Order("created_at desc").Find(&rides).Error
-	err = query.Count(&totalRows).Error
-
 	return
 }
 
@@ -203,20 +186,30 @@ func getAllRidesByDriver(orgCtx *gin.Context, page int, driverId, startTime, end
 	return
 }
 
-func getFilteredRides(orgCtx *gin.Context, page int, startTime, endTime, startLoc, endLoc string) (rides []postgress.RideDetails, totalRows int64, err error) {
+func getFilteredRides(
+	orgCtx *gin.Context,
+	page int,
+	startTime,
+	endTime,
+	searchLoc string,
+) (
+	rides []postgress.RideDetails,
+	totalRows int64,
+	err error,
+) {
 	pageSize := configuration.ConfigurationData.PageSize
 	offset := (page - 1) * pageSize
 
-	// Only apply date filters if both startTime and endTime are provided
 	dateCondition := ""
+
 	if startTime != "" && endTime != "" {
 		dateCondition = "rides.start_datetime >= ? AND rides.estimated_end_datetime <= ?"
 	} else if startTime != "" {
 		dateCondition = "rides.start_datetime >= ?"
-		endTime = "" // Don't bind the endTime in the query
+		endTime = ""
 	} else if endTime != "" {
 		dateCondition = "rides.estimated_end_datetime <= ?"
-		startTime = "" // Don't bind the startTime in the query
+		startTime = ""
 	}
 
 	if startTime == "" && endTime == "" {
@@ -229,45 +222,52 @@ func getFilteredRides(orgCtx *gin.Context, page int, startTime, endTime, startLo
 		dateCondition = "rides.start_datetime >= ? AND rides.start_datetime <= ?"
 	}
 
-	// Default each location parameter to a wildcard if it's empty
-	if startLoc == "" {
-		startLoc = "%"
-	}
-	if endLoc == "" {
-		endLoc = "%"
-	}
-
 	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	ctx, cancel := context.WithTimeout(
+		orgCtx,
+		time.Duration(configuration.ConfigurationData.Timeout)*time.Second,
+	)
 	defer cancel()
 
-	query := database.DatabaseConn.Postgres.WithContext(ctx).Table("rides").
+	query := database.DatabaseConn.Postgres.
+		WithContext(ctx).
+		Table("rides").
 		Select(`
-		rides.id,
-		rides.driver_id,
-		drivers.driver_name,
-		drivers.driver_mobile,
-		drivers.rating,
-		vehicles.vehicle_number,
-		vehicles.vehicle_info,
-		rides.start_datetime,
-		rides.estimated_end_datetime,
-		rides.number_of_seats,
-		rides.seats_taken,
-		rides.start_location,
-		rides.end_location,
-		rides.fare,
-		rides.route_details,
-		rides.is_active,
-		rides.created_at,
-		rides.updated_at
-	`).
+			rides.id,
+			rides.driver_id,
+			drivers.driver_name,
+			drivers.driver_mobile,
+			drivers.rating,
+			vehicles.vehicle_number,
+			vehicles.vehicle_info,
+			rides.start_datetime,
+			rides.estimated_end_datetime,
+			rides.number_of_seats,
+			rides.seats_taken,
+			rides.start_location,
+			rides.end_location,
+			rides.route_points AS route_points,
+			rides.fare,
+			rides.route_details,
+			rides.is_active,
+			rides.created_at,
+			rides.updated_at
+		`).
 		Joins("JOIN drivers ON rides.driver_id = drivers.id").
 		Joins("JOIN vehicles ON rides.vehicle_id = vehicles.id").
-		Where("rides.start_location ILIKE ? AND rides.end_location ILIKE ?", "%"+startLoc+"%", "%"+endLoc+"%").
 		Where("rides.is_active = ?", true)
 
-	// Add the date condition to the query if present
+	// Route search using GIN index
+	if strings.TrimSpace(searchLoc) != "" {
+		searchLoc = strings.ToLower(strings.TrimSpace(searchLoc))
+
+		query = query.Where(
+			"rides.route_points @> ?",
+			pq.Array([]string{searchLoc}),
+		)
+	}
+
+	// Date filtering
 	if dateCondition != "" {
 		if startTime != "" && endTime != "" {
 			query = query.Where(dateCondition, startTime, endTime)
@@ -278,19 +278,27 @@ func getFilteredRides(orgCtx *gin.Context, page int, startTime, endTime, startLo
 		}
 	}
 
-	countQuery := query
-	query = query.Limit(pageSize).Offset(offset)
+	countQuery := query.Session(&gorm.Session{})
 
-	// Select the fields you need from the joined tables (Ride, Driver, and Vehicle)
-	err = query.Order("rides.start_datetime ASC").Find(&rides).Error
+	query = query.
+		Limit(pageSize).
+		Offset(offset).
+		Order("rides.start_datetime ASC")
+
+	err = query.Find(&rides).Error
+	if err != nil {
+		return
+	}
+
 	err = countQuery.Count(&totalRows).Error
 
 	return
 }
 
-func getQueryParams(ctx *gin.Context) (startTime, endTime, startLoc, endLoc string) {
+func getQueryParams(ctx *gin.Context) (startTime, endTime, searchLoc, startLoc, endLoc string) {
 	startTime = ctx.DefaultQuery(constants.Start_Time_Key, "")
 	endTime = ctx.DefaultQuery(constants.Extimated_End_Time_Key, "")
+	searchLoc = ctx.DefaultQuery(constants.Search_Loc_Key, "")
 	startLoc = ctx.DefaultQuery(constants.Start_Loc_Key, "")
 	endLoc = ctx.DefaultQuery(constants.End_Loc_Key, "")
 

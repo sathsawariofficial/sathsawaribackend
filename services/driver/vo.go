@@ -172,9 +172,14 @@ func getBookedSeatsResp(bookings []postgress.RideBooking) utils.APIResponse {
 		})
 	}
 
+	msg := constants.Success
+	if len(bookedSeats) == 0 {
+		msg = "No Seat has been booked yet."
+	}
+
 	return utils.APIResponse{
 		Code:    http.StatusOK,
-		Message: constants.Success,
+		Message: msg,
 		Data: &BookedSeatsResponse{
 			Bookings: bookedSeats,
 		},

@@ -51,6 +51,7 @@ const (
 	Extimated_End_Time_Key = "estimated_end_time"
 	Start_Loc_Key          = "start_location"
 	End_Loc_Key            = "end_location"
+	Search_Loc_Key         = "search"
 	Status_Key             = "status"
 	Ride_Key               = "ride_id"
 	Seat_Key               = "seat_id"
@@ -124,6 +125,8 @@ const (
 	Number_Of_Seats_Max_Value = 80
 	RouteDetails_Min_Len      = 1
 	RouteDetails_Max_Len      = 200
+	RoutePoints_Min_Len       = 1
+	RoutePoints_Max_Len       = 5
 	Fare_Min_Len              = 0
 	Fare_Max_Len              = 100000
 	Rating_Min_Value          = 1

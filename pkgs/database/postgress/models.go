@@ -1,6 +1,10 @@
 package postgress
 
-import "time"
+import (
+	"time"
+
+	"github.com/lib/pq"
+)
 
 type Admin struct {
 	ID        string    `json:"id" gorm:"primary_key"`
@@ -60,22 +64,23 @@ type Vehicle struct {
 }
 
 type Ride struct {
-	ID                   string    `json:"id" gorm:"primary_key"`
-	DriverID             string    `json:"driver_id" gorm:"not null"`
-	VehicleID            string    `json:"vehicle_id" gorm:"not null"`
-	StartDatetime        string    `json:"start_datetime" gorm:"not null"`
-	EstimatedEndDatetime string    `json:"estimated_end_datetime" gorm:"not null"`
-	NumberOfSeats        int       `json:"number_of_seats" gorm:"not null"`
-	SeatsTaken           int       `json:"seats_taken" gorm:"not null;default:0"`
-	StartLocation        string    `json:"start_location" gorm:"not null"`
-	EndLocation          string    `json:"end_location" gorm:"not null"`
-	Fare                 float64   `json:"fare" gorm:"not null"`
-	RouteDetails         string    `json:"route_details" gorm:"not null"`
-	IsActive             bool      `json:"is_active" gorm:"not null"`
-	ParentRideId         string    `json:"parent_id"`
-	Code                 string    `json:"code"`
-	CreatedAt            time.Time `json:"created_at"`
-	UpdatedAt            time.Time `json:"updated_at"`
+	ID                   string         `json:"id" gorm:"primary_key"`
+	DriverID             string         `json:"driver_id" gorm:"not null"`
+	VehicleID            string         `json:"vehicle_id" gorm:"not null"`
+	StartDatetime        string         `json:"start_datetime" gorm:"not null"`
+	EstimatedEndDatetime string         `json:"estimated_end_datetime" gorm:"not null"`
+	NumberOfSeats        int            `json:"number_of_seats" gorm:"not null"`
+	SeatsTaken           int            `json:"seats_taken" gorm:"not null;default:0"`
+	StartLocation        string         `json:"start_location" gorm:"not null"`
+	EndLocation          string         `json:"end_location" gorm:"not null"`
+	RoutePoints          pq.StringArray `json:"route_points" gorm:"type:text[]"`
+	Fare                 float64        `json:"fare" gorm:"not null"`
+	RouteDetails         string         `json:"route_details" gorm:"not null"`
+	IsActive             bool           `json:"is_active" gorm:"not null"`
+	ParentRideId         string         `json:"parent_id"`
+	Code                 string         `json:"code"`
+	CreatedAt            time.Time      `json:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at"`
 }
 
 type RideBooking struct {
@@ -107,25 +112,26 @@ type RideTemplate struct {
 }
 
 type RideDetails struct {
-	ID                   string    `json:"id"`
-	DriverID             string    `json:"driver_id"`
-	DriverName           string    `json:"driver_name"`
-	DriverMobile         string    `json:"driver_mobile"`
-	Rating               string    `json:"rating"`
-	VehicleNumber        string    `json:"vehicle_number"`
-	VehicleInfo          string    `json:"vehicle_info"`
-	StartDatetime        string    `json:"start_datetime"`
-	EstimatedEndDatetime string    `json:"estimated_end_datetime"`
-	NumberOfSeats        int       `json:"number_of_seats"`
-	SeatsTaken           int       `json:"seats_taken"`
-	StartLocation        string    `json:"start_location"`
-	EndLocation          string    `json:"end_location"`
-	Fare                 float64   `json:"fare"`
-	Code                 string    `json:"code"`
-	RouteDetails         string    `json:"route_details"`
-	IsActive             bool      `json:"is_active"`
-	CreatedAt            time.Time `json:"created_at"`
-	UpdatedAt            time.Time `json:"updated_at"`
+	ID                   string         `json:"id"`
+	DriverID             string         `json:"driver_id"`
+	DriverName           string         `json:"driver_name"`
+	DriverMobile         string         `json:"driver_mobile"`
+	Rating               string         `json:"rating"`
+	VehicleNumber        string         `json:"vehicle_number"`
+	VehicleInfo          string         `json:"vehicle_info"`
+	StartDatetime        string         `json:"start_datetime"`
+	EstimatedEndDatetime string         `json:"estimated_end_datetime"`
+	NumberOfSeats        int            `json:"number_of_seats"`
+	SeatsTaken           int            `json:"seats_taken"`
+	StartLocation        string         `json:"start_location"`
+	EndLocation          string         `json:"end_location"`
+	RoutePoints          pq.StringArray `json:"route_points" gorm:"column:route_points"`
+	Fare                 float64        `json:"fare"`
+	Code                 string         `json:"code"`
+	RouteDetails         string         `json:"route_details"`
+	IsActive             bool           `json:"is_active"`
+	CreatedAt            time.Time      `json:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at"`
 }
 
 type RidePassenger struct {

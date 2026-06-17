@@ -74,9 +74,9 @@ func GetFilteredRidesHandler(ctx *gin.Context) {
 		return
 	}
 
-	startTime, endTime, startLoc, endLoc := getQueryParams(ctx)
+	startTime, endTime, searchLoc, _, _ := getQueryParams(ctx)
 
-	err = ValidateFilteredRides(page, startTime, endTime, startLoc, endLoc)
+	err = ValidateFilteredRides(page, startTime, endTime, searchLoc)
 	if err != nil {
 		logger.LogError(sessionId, "validation error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
@@ -86,7 +86,7 @@ func GetFilteredRidesHandler(ctx *gin.Context) {
 		return
 	}
 
-	rides, totalRows, err := GetFilteredRides(ctx, sessionId, page, startTime, endTime, startLoc, endLoc)
+	rides, totalRows, err := GetFilteredRides(ctx, sessionId, page, startTime, endTime, searchLoc)
 	if err != nil {
 		logger.LogError(sessionId, "get filtered rides error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
@@ -121,7 +121,7 @@ func DriverRideHandler(ctx *gin.Context) {
 	rideStatus, _ := ctx.GetQuery(constants.Status_Key)
 	driverId := ctx.GetString(constants.User_KEY)
 
-	startTime, endTime, startLoc, endLoc := getQueryParams(ctx)
+	startTime, endTime, _, startLoc, endLoc := getQueryParams(ctx)
 
 	err := ValidateDriverRide(driverId, rideStatus)
 	if err != nil {

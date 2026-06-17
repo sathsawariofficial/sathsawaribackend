@@ -68,5 +68,11 @@ func NewPortgress() (db *gorm.DB, err error) {
 		logger.LogFatal(constants.DEFAULT_SESSION, "failed to connect to postgres")
 	}
 
+	db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_rides_route_points
+		ON rides
+		USING GIN(route_points)
+	`)
+
 	return
 }

@@ -152,10 +152,10 @@ func handleRecurring(ctx *gin.Context, sessionId, rideId, vehicleId string, requ
 	return
 }
 
-func GetFilteredRides(ctx *gin.Context, sessionId string, page int, startTime, endTime, startLoc, endLoc string) (rides []postgress.RideDetails, totalRows int64, err error) {
+func GetFilteredRides(ctx *gin.Context, sessionId string, page int, startTime, endTime, searchLoc string) (rides []postgress.RideDetails, totalRows int64, err error) {
 	logger.LogInfo("Request received in GetFilteredRides", sessionId)
 
-	rides, totalRows, err = getFilteredRides(ctx, page, startTime, endTime, startLoc, endLoc)
+	rides, totalRows, err = getFilteredRides(ctx, page, startTime, endTime, searchLoc)
 	if err != nil {
 		logger.LogError(sessionId, " get filtered rides error: "+err.Error())
 		err = errors.New(constants.Unknown_Error)

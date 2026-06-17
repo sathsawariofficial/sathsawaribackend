@@ -1,20 +1,21 @@
 package ride
 
 type RideCreationRequest struct {
-	VehicleId            string  `json:"vehicleId"`
-	StartDatetime        string  `json:"startDatetime"`
-	EstimatedEndDatetime string  `json:"estimatedEndDatetime"`
-	NumberOfSeats        int     `json:"numberOfSeats"`
-	StartLocation        string  `json:"startLocation"`
-	EndLocation          string  `json:"endLocation"`
-	Fare                 float64 `json:"fare"`
-	RouteDetails         string  `json:"routeDetails"`
-	IsRecurring          bool    `json:"isRecurring"`
-	MakeTemplate         bool    `json:"makeTemplate"`
-	Frequency            int     `json:"frequency"`  // for how long will this happen
-	Period               int     `json:"period"`     // whats the period like daily, weekly, monthly
-	DaysOfWeek           []int   `json:"daysOfWeek"` // if monthly or weekly than for how many days of the week
-	EXTDriverId          string  `json:"-"`
+	VehicleId            string   `json:"vehicleId"`
+	StartDatetime        string   `json:"startDatetime"`
+	EstimatedEndDatetime string   `json:"estimatedEndDatetime"`
+	NumberOfSeats        int      `json:"numberOfSeats"`
+	StartLocation        string   `json:"startLocation"`
+	EndLocation          string   `json:"endLocation"`
+	RoutePoints          []string `json:"routePoints"`
+	Fare                 float64  `json:"fare"`
+	RouteDetails         string   `json:"routeDetails"`
+	IsRecurring          bool     `json:"isRecurring"`
+	MakeTemplate         bool     `json:"makeTemplate"`
+	Frequency            int      `json:"frequency"`  // for how long will this happen
+	Period               int      `json:"period"`     // whats the period like daily, weekly, monthly
+	DaysOfWeek           []int    `json:"daysOfWeek"` // if monthly or weekly than for how many days of the week
+	EXTDriverId          string   `json:"-"`
 }
 
 type RideResponse struct {
@@ -34,23 +35,24 @@ type DriverRideResponse struct {
 }
 
 type RideDetails struct {
-	ID                   string  `json:"id"`
-	DriverID             string  `json:"driverId"`
-	DriverName           string  `json:"driverName"`
-	DriverMobile         string  `json:"driverMobile"`
-	Rating               string  `json:"rating"`
-	VehicleNumber        string  `json:"vehicleNumber"`
-	VehicleInfo          string  `json:"vehicleInfo"`
-	StartDatetime        string  `json:"startDatetime"`
-	EstimatedEndDatetime string  `json:"estimatedEndDatetime"`
-	NumberOfSeats        int     `json:"numberOfSeats"`
-	SeatsTaken           int     `json:"seatsTaken"`
-	StartLocation        string  `json:"startLocation"`
-	EndLocation          string  `json:"endLocation"`
-	Code                 string  `json:"code"`
-	Fare                 float64 `json:"fare"`
-	RouteDetails         string  `json:"routeDetails"`
-	IsActive             bool    `json:"isActive"`
+	ID                   string   `json:"id"`
+	DriverID             string   `json:"driverId"`
+	DriverName           string   `json:"driverName"`
+	DriverMobile         string   `json:"driverMobile"`
+	Rating               string   `json:"rating"`
+	VehicleNumber        string   `json:"vehicleNumber"`
+	VehicleInfo          string   `json:"vehicleInfo"`
+	StartDatetime        string   `json:"startDatetime"`
+	EstimatedEndDatetime string   `json:"estimatedEndDatetime"`
+	NumberOfSeats        int      `json:"numberOfSeats"`
+	SeatsTaken           int      `json:"seatsTaken"`
+	StartLocation        string   `json:"startLocation"`
+	EndLocation          string   `json:"endLocation"`
+	RoutePoints          []string `json:"routePoints"`
+	Code                 string   `json:"code"`
+	Fare                 float64  `json:"fare"`
+	RouteDetails         string   `json:"routeDetails"`
+	IsActive             bool     `json:"isActive"`
 }
 
 type UpdateRideRequest struct {

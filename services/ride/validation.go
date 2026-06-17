@@ -34,6 +34,7 @@ func ValidateRideCreation(sessionId, driverId string, request *RideCreationReque
 	startLocationLen := len(request.StartLocation)
 	endLocationLen := len(request.EndLocation)
 	routeDetailsLen := len(request.RouteDetails)
+	routePointsLen := len(request.RoutePoints)
 
 	if request.NumberOfSeats < constants.Number_Of_Seats_Min_Value || request.NumberOfSeats > constants.Number_Of_Seats_Max_Value {
 		return fmt.Errorf("value of the number of seats should be between %v and %v", constants.Number_Of_Seats_Min_Value, constants.Number_Of_Seats_Max_Value)
@@ -56,6 +57,9 @@ func ValidateRideCreation(sessionId, driverId string, request *RideCreationReque
 	}
 	if routeDetailsLen < constants.RouteDetails_Min_Len || routeDetailsLen > constants.RouteDetails_Max_Len {
 		return fmt.Errorf("length of the route details should be between %v and %v characters", constants.RouteDetails_Min_Len, constants.RouteDetails_Max_Len)
+	}
+	if routePointsLen < constants.RoutePoints_Min_Len || routePointsLen > constants.RoutePoints_Max_Len {
+		return fmt.Errorf("length of the route points should be between %v and %v characters", constants.RoutePoints_Min_Len, constants.RoutePoints_Max_Len)
 	}
 
 	// Parse with local timezone (important for consistency)
@@ -142,7 +146,7 @@ func ValidateRideCreation(sessionId, driverId string, request *RideCreationReque
 	return nil
 }
 
-func ValidateFilteredRides(page int, startTime, endTime, startLoc, endLoc string) error {
+func ValidateFilteredRides(page int, startTime, endTime, searchLoc string) error {
 	if page != 0 {
 		if page < constants.Page_Min_Value || page > constants.Page_Max_Value {
 			return fmt.Errorf("value of the page number should be between %v and %v", constants.Page_Min_Value, constants.Page_Max_Value)
@@ -158,14 +162,9 @@ func ValidateFilteredRides(page int, startTime, endTime, startLoc, endLoc string
 			return fmt.Errorf("length of the end time should be between %v and %v characters", constants.General_Min_Len, constants.General_Max_Len)
 		}
 	}
-	if !utils.IsStringEmpty(startLoc) {
-		if len(startLoc) < constants.General_Min_Len || len(startLoc) > constants.General_Max_Len {
+	if !utils.IsStringEmpty(searchLoc) {
+		if len(searchLoc) < constants.General_Min_Len || len(searchLoc) > constants.General_Max_Len {
 			return fmt.Errorf("length of the start location should be between %v and %v characters", constants.General_Min_Len, constants.General_Max_Len)
-		}
-	}
-	if !utils.IsStringEmpty(endLoc) {
-		if len(endLoc) < constants.General_Min_Len || len(endLoc) > constants.General_Max_Len {
-			return fmt.Errorf("length of the end location should be between %v and %v characters", constants.General_Min_Len, constants.General_Max_Len)
 		}
 	}
 
