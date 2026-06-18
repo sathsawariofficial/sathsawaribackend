@@ -257,7 +257,7 @@ func SendOTPSMS(orgCtx *gin.Context, sessionId, receiverMobile, message string) 
 
 	defer func() {
 		if err != nil {
-			message := fmt.Sprintf(constants.NOTIFICATION_TYPE_BACKUP_SMS_TO_SERVICE, message, constants.DEFAULT_APP_HASH)
+			message := fmt.Sprintf(constants.NOTIFICATION_MESSAGE_SMS_TO_SERVICE, message, constants.DEFAULT_APP_HASH)
 
 			// messaging partner
 			SendNotification(orgCtx, sessionId, constants.NOTIFICATION_TYPE_BACKUP_SMS_TO_SERVICE, "", constants.NOTIFICATION_TYPE_SMS_TO_SERVICE, message, map[string]string{
