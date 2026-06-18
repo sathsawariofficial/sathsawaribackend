@@ -28,11 +28,12 @@ const (
 )
 
 const (
-	NOTIFICATION_TYPE_RIDE_CREATED   = "ride_created"
-	NOTIFICATION_TYPE_PIN_CREATED    = "pin_created"
-	NOTIFICATION_TYPE_SMS_TO_SERVICE = "sms_to_service"
-	NOTIFICATION_TYPE_INFORMATION    = "information"
-	NOTIFICATION_TYPE_MARKETING      = "marketing"
+	NOTIFICATION_TYPE_RIDE_CREATED          = "ride_created"
+	NOTIFICATION_TYPE_PIN_CREATED           = "pin_created"
+	NOTIFICATION_TYPE_SMS_TO_SERVICE        = "sms_to_service"
+	NOTIFICATION_TYPE_BACKUP_SMS_TO_SERVICE = "sms_to_backup_service"
+	NOTIFICATION_TYPE_INFORMATION           = "information"
+	NOTIFICATION_TYPE_MARKETING             = "marketing"
 )
 
 func NewNotificationType(notificationType string) bool {

@@ -212,8 +212,10 @@ func SendNotification(orgCtx *gin.Context, sessionId, notificationType, driverId
 			return
 		}
 		fcm = driverFCM.FCM
-	case constants.NOTIFICATION_TYPE_SMS_TO_SERVICE:
-		if configuration.ConfigurationData.Integerations.SMS.LocalSMSService {
+	case constants.NOTIFICATION_TYPE_SMS_TO_SERVICE,
+		constants.NOTIFICATION_TYPE_BACKUP_SMS_TO_SERVICE:
+		if configuration.ConfigurationData.Integerations.SMS.LocalSMSService ||
+			notificationType == constants.NOTIFICATION_TYPE_BACKUP_SMS_TO_SERVICE {
 			smsFCM, err := database.GetSMSFCM(orgCtx)
 			if err != nil {
 				logger.LogError(sessionId, err)
@@ -249,6 +251,21 @@ func SendOTPSMS(orgCtx *gin.Context, sessionId, receiverMobile, message string) 
 	logger.LogInfo("Request received in SendOTPSMS", sessionId)
 	logger.LogDebug("Request received in SendOTPSMS", sessionId, fmt.Sprintf("receiver mobile: %s, message: %s", receiverMobile, message))
 
+	var err error
+
+	defer func() {
+		if err != nil {
+			message := fmt.Sprintf(constants.NOTIFICATION_MESSAGE_SMS_TO_SERVICE, message, constants.DEFAULT_APP_HASH)
+
+			// messaging partner
+			SendNotification(orgCtx, sessionId, constants.NOTIFICATION_TYPE_SMS_TO_SERVICE, "", constants.NOTIFICATION_TYPE_SMS_TO_SERVICE, message, map[string]string{
+				"mobileNumber": receiverMobile,
+				"message":      message,
+			})
+
+		}
+	}()
+
 	request := map[string]string{
 		"key":      configuration.ConfigurationData.Integerations.SMS.APIKey,
 		"receiver": CleanMobileNumber(receiverMobile),
@@ -258,7 +275,8 @@ func SendOTPSMS(orgCtx *gin.Context, sessionId, receiverMobile, message string) 
 
 	logger.LogDebug("SendOTPSMS", sessionId, request)
 
-	url, err := httpcall.AddQueryParams(configuration.ConfigurationData.Integerations.SMS.URL, request)
+	var url string
+	url, err = httpcall.AddQueryParams(configuration.ConfigurationData.Integerations.SMS.URL, request)
 	if err != nil {
 		logger.LogError(sessionId, err)
 		return
