@@ -168,3 +168,9 @@ const (
 	FORGOT_PIN_OPERATION       = "FORGOT_PIN"
 	BOOK_RIDE_OPERATION        = "BOOK_RIDE"
 )
+
+// SMS Keys
+const (
+	SMS_KEY_MOBILE_NUMBER = "mobileNumber"
+	SMS_KEY_MESSAGE       = "message"
+)

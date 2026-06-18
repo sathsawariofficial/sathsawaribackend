@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -223,12 +224,13 @@ func SendNotification(orgCtx *gin.Context, sessionId, notificationType, driverId
 			}
 			fcm = smsFCM.FCM
 		} else {
-			driver, err := database.GetDriverById(orgCtx, driverId)
-			if err != nil {
+			mobileNumber, ok := data[constants.SMS_KEY_MOBILE_NUMBER]
+			if !ok {
+				err := errors.New("mobile number not found for sms")
 				logger.LogError(sessionId, err)
 				return
 			}
-			SendOTPSMS(orgCtx, sessionId, driver.DriverMobile, message)
+			go SendOTPSMS(orgCtx, sessionId, mobileNumber, message)
 			return
 		}
 	default:
@@ -255,12 +257,12 @@ func SendOTPSMS(orgCtx *gin.Context, sessionId, receiverMobile, message string) 
 
 	defer func() {
 		if err != nil {
-			message := fmt.Sprintf(constants.NOTIFICATION_MESSAGE_SMS_TO_SERVICE, message, constants.DEFAULT_APP_HASH)
+			message := fmt.Sprintf(constants.NOTIFICATION_TYPE_BACKUP_SMS_TO_SERVICE, message, constants.DEFAULT_APP_HASH)
 
 			// messaging partner
-			SendNotification(orgCtx, sessionId, constants.NOTIFICATION_TYPE_SMS_TO_SERVICE, "", constants.NOTIFICATION_TYPE_SMS_TO_SERVICE, message, map[string]string{
-				"mobileNumber": receiverMobile,
-				"message":      message,
+			SendNotification(orgCtx, sessionId, constants.NOTIFICATION_TYPE_BACKUP_SMS_TO_SERVICE, "", constants.NOTIFICATION_TYPE_SMS_TO_SERVICE, message, map[string]string{
+				constants.SMS_KEY_MOBILE_NUMBER: receiverMobile,
+				constants.SMS_KEY_MESSAGE:       message,
 			})
 
 		}
@@ -390,12 +392,15 @@ func SendOTP(ctx *gin.Context, sessionId, mobileNumber, operation string) (otp s
 
 	otp = GenerateOTP()
 
-	message := fmt.Sprintf(constants.NOTIFICATION_MESSAGE_SMS_TO_SERVICE, otp, constants.DEFAULT_APP_HASH)
+	message := otp
+	if configuration.ConfigurationData.Integerations.SMS.LocalSMSService {
+		message = fmt.Sprintf(constants.NOTIFICATION_MESSAGE_SMS_TO_SERVICE, otp, constants.DEFAULT_APP_HASH)
+	}
 
 	// messaging partner
 	SendNotification(ctx, sessionId, constants.NOTIFICATION_TYPE_SMS_TO_SERVICE, "", constants.NOTIFICATION_TYPE_SMS_TO_SERVICE, message, map[string]string{
-		"mobileNumber": mobileNumber,
-		"message":      message,
+		constants.SMS_KEY_MOBILE_NUMBER: mobileNumber,
+		constants.SMS_KEY_MESSAGE:       message,
 	})
 
 	key := fmt.Sprintf("%s:%s", mobileNumber, operation)

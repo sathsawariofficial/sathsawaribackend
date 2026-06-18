@@ -201,9 +201,9 @@ func sendDriverBroadcast(ginCtx *gin.Context, sessionId string, req postgress.Br
 				req.Title,
 				req.Message,
 				map[string]string{
-					"driverId": driver.ID,
-					"title":    req.Title,
-					"message":  req.Message,
+					"driverId":                driver.ID,
+					"title":                   req.Title,
+					constants.SMS_KEY_MESSAGE: req.Message,
 				},
 			)
 		}

@@ -75,8 +75,8 @@ func SetDriverPin(ctx *gin.Context, sessionId, driverId, pin string) (err error)
 	message := fmt.Sprintf(constants.NOTIFICATION_MESSAGE_PIN_CREATION, pin)
 	if utils.IsStringEmpty(driver.ID) {
 		utils.SendNotification(ctx, sessionId, constants.NOTIFICATION_TYPE_PIN_CREATED, driverId, constants.NOTIFICATION_TITLE_PIN_CREATION, message, map[string]string{
-			"mobileNumber": driver.DriverMobile,
-			"message":      message,
+			constants.SMS_KEY_MOBILE_NUMBER: driver.DriverMobile,
+			constants.SMS_KEY_MESSAGE:       message,
 		})
 	}
 
