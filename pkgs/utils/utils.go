@@ -285,7 +285,7 @@ func SendOTPSMS(orgCtx *gin.Context, sessionId, receiverMobile, message string) 
 	}
 
 	resp, err := httpcall.MakeRequest(orgCtx, httpcall.RequestOptions{
-		Method:    http.MethodPost,
+		Method:    http.MethodGet,
 		Path:      url,
 		Body:      nil,
 		Headers:   map[string]string{},
