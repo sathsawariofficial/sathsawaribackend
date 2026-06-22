@@ -87,12 +87,11 @@ func dirverProfileResp(driverDetails postgress.DriverDetails) utils.APIResponse 
 		Message: constants.Success,
 		Data: DriverProfileInfoResponse{
 			DriverDetails: DriverDetails{
-				DriverName:    driverDetails.DriverName,
-				DriverMobile:  driverDetails.DriverMobile,
-				VehicleNumber: driverDetails.VehicleNumber,
-				VehicleInfo:   driverDetails.VehicleInfo,
-				TotalRides:    driverDetails.TotalRides,
-				Rating:        driverDetails.Rating,
+				ID:           driverDetails.ID,
+				DriverMobile: driverDetails.DriverMobile,
+				DriverName:   driverDetails.DriverName,
+				Rating:       driverDetails.Rating,
+				HasPin:       driverDetails.HasPin,
 			},
 		},
 	}

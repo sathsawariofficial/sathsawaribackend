@@ -154,12 +154,12 @@ type PassengerRating struct {
 }
 
 type DriverDetails struct {
-	DriverName    string `json:"driver_name"`
-	DriverMobile  string `json:"driver_mobile"`
-	VehicleNumber string `json:"vehicle_number"`
-	VehicleInfo   string `json:"vehicle_info"`
-	TotalRides    int    `json:"total_rides"`
-	Rating        string `json:"rating"`
+	ID           string `json:"id"`
+	VehicleID    string `json:"vehicleId"`
+	DriverMobile string `json:"driverMobile"`
+	DriverName   string `json:"driverName"`
+	Rating       string `json:"rating"`
+	HasPin       bool   `json:"hasPin"`
 }
 
 type DriverOldData struct {

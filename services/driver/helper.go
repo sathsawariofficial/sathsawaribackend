@@ -364,22 +364,27 @@ func calculateRating(sessionId string, oldAverage float64, oldCount int, newRati
 
 func getDriverDetails(orgCtx *gin.Context, driverId string) (response postgress.DriverDetails, err error) {
 	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	ctx, cancel := context.WithTimeout(
+		orgCtx,
+		time.Duration(configuration.ConfigurationData.Timeout)*time.Second,
+	)
 	defer cancel()
 
-	err = database.DatabaseConn.Postgres.WithContext(ctx).Table("drivers").
+	err = database.DatabaseConn.Postgres.WithContext(ctx).
+		Table("drivers").
 		Select(`
-            drivers.driver_name,
+			drivers.id,
+			vehicles.id AS vehicle_id,
 			drivers.driver_mobile,
-            vehicles.vehicle_number,
-            vehicles.vehicle_info,
-            COUNT(rides.id) AS total_rides,
-            drivers.rating
-        `).
-		Joins("JOIN vehicles ON drivers.id = vehicles.driver_id").
-		Joins("LEFT JOIN rides ON drivers.id = rides.driver_id").
+			drivers.driver_name,
+			drivers.rating,
+			CASE
+				WHEN drivers.pin IS NOT NULL AND drivers.pin <> '' THEN true
+				ELSE false
+			END AS has_pin
+		`).
+		Joins("LEFT JOIN vehicles ON drivers.id = vehicles.driver_id").
 		Where("drivers.id = ?", driverId).
-		Group("drivers.id, vehicles.id").
 		Scan(&response).Error
 
 	return

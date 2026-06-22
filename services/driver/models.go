@@ -72,12 +72,12 @@ type DriverProfileInfoResponse struct {
 }
 
 type DriverDetails struct {
-	DriverName    string `json:"driverName"`
-	DriverMobile  string `json:"driverMobile"`
-	VehicleNumber string `json:"vehicleNumber"`
-	VehicleInfo   string `json:"vehicleInfo"`
-	TotalRides    int    `json:"totalRides"`
-	Rating        string `json:"rating"`
+	ID           string `json:"id"`
+	VehicleID    string `json:"vehicleId"`
+	DriverMobile string `json:"driverMobile"`
+	DriverName   string `json:"driverName"`
+	Rating       string `json:"rating"`
+	HasPin       bool   `json:"hasPin"`
 }
 
 type DriverLogin struct {
