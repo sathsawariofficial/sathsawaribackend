@@ -58,8 +58,8 @@ func ValidateRideCreation(sessionId, driverId string, request *RideCreationReque
 	if routeDetailsLen < constants.RouteDetails_Min_Len || routeDetailsLen > constants.RouteDetails_Max_Len {
 		return fmt.Errorf("length of the route details should be between %v and %v characters", constants.RouteDetails_Min_Len, constants.RouteDetails_Max_Len)
 	}
-	if routePointsLen < constants.RoutePoints_Min_Len || routePointsLen > constants.RoutePoints_Max_Len {
-		return fmt.Errorf("length of the route points should be between %v and %v characters", constants.RoutePoints_Min_Len, constants.RoutePoints_Max_Len)
+	if routePointsLen != 0 && routePointsLen > constants.RoutePoints_Max_Len {
+		return fmt.Errorf("route points should be not be more then %v", constants.RoutePoints_Max_Len)
 	}
 
 	// Parse with local timezone (important for consistency)

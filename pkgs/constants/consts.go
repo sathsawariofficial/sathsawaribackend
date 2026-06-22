@@ -125,7 +125,6 @@ const (
 	Number_Of_Seats_Max_Value = 80
 	RouteDetails_Min_Len      = 1
 	RouteDetails_Max_Len      = 200
-	RoutePoints_Min_Len       = 1
 	RoutePoints_Max_Len       = 5
 	Fare_Min_Len              = 0
 	Fare_Max_Len              = 100000
