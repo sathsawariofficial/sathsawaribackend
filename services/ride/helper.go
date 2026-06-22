@@ -147,6 +147,7 @@ func getAllRidesByDriver(orgCtx *gin.Context, page int, driverId, startTime, end
 			rides.end_location,
 			rides.route_points AS route_points,
 			rides.fare,
+			rides.vehicle_id,
 			rides.code,
 			rides.route_details,
 			rides.is_active,

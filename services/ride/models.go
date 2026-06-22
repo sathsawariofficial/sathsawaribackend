@@ -40,6 +40,7 @@ type RideDetails struct {
 	DriverName           string   `json:"driverName"`
 	DriverMobile         string   `json:"driverMobile"`
 	Rating               string   `json:"rating"`
+	VehicleId            string   `json:"vehicleId"`
 	VehicleNumber        string   `json:"vehicleNumber"`
 	VehicleInfo          string   `json:"vehicleInfo"`
 	StartDatetime        string   `json:"startDatetime"`

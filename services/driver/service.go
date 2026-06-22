@@ -173,6 +173,7 @@ func handleFCM(ctx *gin.Context, sessionId, driverId, fcm string) {
 		}
 	} else {
 		if driverFCM.FCM != fcm {
+			logger.LogInfo("updating fcm", sessionId)
 			err = updateDriverFCM(ctx, driverId, fcm)
 			if err != nil {
 				logger.LogError(sessionId, err)

@@ -127,6 +127,7 @@ type RideDetails struct {
 	EndLocation          string         `json:"end_location"`
 	RoutePoints          pq.StringArray `json:"route_points" gorm:"column:route_points"`
 	Fare                 float64        `json:"fare"`
+	VehicleId            string         `json:"vehicle_id"`
 	Code                 string         `json:"code"`
 	RouteDetails         string         `json:"route_details"`
 	IsActive             bool           `json:"is_active"`

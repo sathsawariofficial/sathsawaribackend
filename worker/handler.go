@@ -52,13 +52,11 @@ func ProcessNotifications() {
 	redis.ProcessNotifications(database.DatabaseConn.RedisConn, func(data redis.NotificationRequest) {
 		var err error
 		if data.NotificationType != constants.NOTIFICATION_TYPE_SMS_TO_SERVICE {
-			err = saveNotification(data)
+			_ = saveNotification(data)
 		}
-		if err == nil {
-			err = utils.SendPush(data.Token, data.Title, data.Message, data.NotificationType, data.Data)
-			if err != nil {
-				logger.LogError(constants.WROKER_SESSION, err)
-			}
+		err = utils.SendPush(data.Token, data.Title, data.Message, data.NotificationType, data.Data)
+		if err != nil {
+			logger.LogError(constants.WROKER_SESSION, err)
 		}
 		logger.LogError(constants.WROKER_SESSION, err)
 	})

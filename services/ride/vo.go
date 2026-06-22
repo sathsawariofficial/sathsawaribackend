@@ -29,6 +29,7 @@ func getDriverRidesResp(rides []postgress.RideDetails, totalPages int, driverId 
 			DriverName:           ride.DriverName,
 			DriverMobile:         ride.DriverMobile,
 			Rating:               ride.Rating,
+			VehicleId:            ride.VehicleId,
 			VehicleNumber:        ride.VehicleNumber,
 			VehicleInfo:          ride.VehicleInfo,
 			StartDatetime:        ride.StartDatetime,
