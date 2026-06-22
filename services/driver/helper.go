@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm/clause"
 )
 
 func mapDriverData(request DriverRegistrationRequest) postgress.Driver {
@@ -110,16 +111,25 @@ func updateDeviceId(orgCtx *gin.Context, driverId, deviceId string) error {
 	return nil
 }
 
-func updateDriverFCM(orgCtx *gin.Context, id, fcm string) (err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+func updateDriverFCM(orgCtx *gin.Context, id, fcm string) error {
+	ctx, cancel := context.WithTimeout(
+		orgCtx,
+		time.Duration(configuration.ConfigurationData.Timeout)*time.Second,
+	)
 	defer cancel()
 
-	err = database.DatabaseConn.Postgres.WithContext(ctx).
+	err := database.DatabaseConn.Postgres.WithContext(ctx).
 		Model(&postgress.DriverFCM{}).
-		Where("driver_Id = ?", id).
-		Update("fcm", fcm).Error
-	return
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "driver_id"}}, // conflict key
+			DoUpdates: clause.AssignmentColumns([]string{"fcm"}),
+		}).
+		Create(&postgress.DriverFCM{
+			DriverId: id,
+			FCM:      fcm,
+		}).Error
+
+	return err
 }
 
 func updateDriverStatus(orgCtx *gin.Context, driverId, status string) (err error) {
