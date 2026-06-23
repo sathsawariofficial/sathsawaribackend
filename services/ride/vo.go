@@ -77,6 +77,7 @@ func filteredRidesResp(rides []postgress.RideDetails, totalRows int64) utils.API
 			StartLocation:        ride.StartLocation,
 			EndLocation:          ride.EndLocation,
 			RoutePoints:          ride.RoutePoints,
+			VehicleId:            ride.VehicleId,
 			Fare:                 ride.Fare,
 			RouteDetails:         ride.RouteDetails,
 			IsActive:             ride.IsActive,

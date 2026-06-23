@@ -249,6 +249,7 @@ func getFilteredRides(
 			rides.start_location,
 			rides.end_location,
 			rides.route_points AS route_points,
+			rides.vehicle_id,
 			rides.fare,
 			rides.route_details,
 			rides.is_active,
