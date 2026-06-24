@@ -93,8 +93,8 @@ func DeleteDriver(orgCtx *gin.Context, driver postgress.Driver, updateById strin
 		Model(&postgress.Driver{}).
 		Where("id = ?", driver.ID).
 		Update("status", constants.Status_InActive).
-		Update("driver_mobile", fmt.Sprintf("DEL_%v", time.Now(), driver.DriverMobile)).
-		Update("driver_name", fmt.Sprintf("DEL_%v", time.Now(), driver.DriverName)).
+		Update("driver_mobile", fmt.Sprintf("DEL_%v_%s", time.Now(), driver.DriverMobile)).
+		Update("driver_name", fmt.Sprintf("DEL_%v_%s", time.Now(), driver.DriverName)).
 		Update("update_by", updateById).
 		Error
 }

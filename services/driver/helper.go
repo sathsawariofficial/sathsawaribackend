@@ -67,7 +67,7 @@ func mapVehicleUpdateData(
 	if request.Status != "" {
 		updated.Status = request.Status
 		if request.Status == constants.Status_InActive {
-			updated.VehicleNumber = fmt.Sprintf("DEL_%s", updated.VehicleNumber)
+			updated.VehicleNumber = fmt.Sprintf("DEL_%v_%s", time.Now(), updated.VehicleNumber)
 		}
 	}
 
