@@ -167,7 +167,7 @@ func LoginDriverHandler(ctx *gin.Context) {
 		logger.LogError(sessionId, "validation error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
-			Message: err.Error(),
+			Message: constants.Login_Failed,
 		})
 		return
 	}
