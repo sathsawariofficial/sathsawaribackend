@@ -74,11 +74,11 @@ func mapVehicleUpdateData(
 	return updated
 }
 
-func mapFCMData(driverId, fcm string) postgress.DriverFCM {
-	return postgress.DriverFCM{
-		ID:       utils.GenerateUUID(),
-		DriverId: driverId,
-		FCM:      fcm,
+func mapFCMData(userId, fcm string) postgress.UserFCM {
+	return postgress.UserFCM{
+		ID:     utils.GenerateUUID(),
+		UserId: userId,
+		FCM:    fcm,
 	}
 }
 
@@ -114,7 +114,7 @@ func updateDeviceId(orgCtx *gin.Context, driverId, deviceId string) error {
 	return nil
 }
 
-func updateDriverFCM(orgCtx *gin.Context, id, fcm string) error {
+func updateUserFCM(orgCtx *gin.Context, id, fcm string) error {
 	ctx, cancel := context.WithTimeout(
 		orgCtx,
 		time.Duration(configuration.ConfigurationData.Timeout)*time.Second,
@@ -122,14 +122,14 @@ func updateDriverFCM(orgCtx *gin.Context, id, fcm string) error {
 	defer cancel()
 
 	err := database.DatabaseConn.Postgres.WithContext(ctx).
-		Model(&postgress.DriverFCM{}).
+		Model(&postgress.UserFCM{}).
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "driver_id"}}, // conflict key
 			DoUpdates: clause.AssignmentColumns([]string{"fcm"}),
 		}).
-		Create(&postgress.DriverFCM{
-			DriverId: id,
-			FCM:      fcm,
+		Create(&postgress.UserFCM{
+			UserId: id,
+			FCM:    fcm,
 		}).Error
 
 	return err

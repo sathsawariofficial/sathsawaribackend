@@ -45,9 +45,9 @@ type DriverDevice struct {
 	DeviceId string `json:"device_id"`
 }
 
-type DriverFCM struct {
+type UserFCM struct {
 	ID        string    `json:"id" gorm:"primary_key"`
-	DriverId  string    `json:"driver_Id" gorm:"not null"`
+	UserId    string    `gorm:"index:idx_user_fcm,unique;not null"`
 	FCM       string    `json:"FCM"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

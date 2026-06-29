@@ -84,6 +84,7 @@ const (
 const (
 	NOTIFICATION_MESSAGE_RIDE_CREATION  = "You have created a ride"
 	NOTIFICATION_MESSAGE_PIN_CREATION   = "Please remember your secure PIN “%s” for future operations in the app"
+	NOTIFICATION_MESSAGE_PIN_UPDATED    = "Your pin has been updated, Please do not share it with anyone"
 	NOTIFICATION_MESSAGE_SMS_TO_SERVICE = "<#> Sathsawari verification code: %s. Do not share this code with anyone.\n%s"
 )
 

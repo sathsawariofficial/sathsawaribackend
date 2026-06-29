@@ -110,17 +110,17 @@ func updatePassword(ctx *gin.Context, sessionId, mobileNumber, otp string) (err 
 	return nil
 }
 
-func updateForgottonPin(ctx *gin.Context, sessionId, mobileNumber, Pin, otp string) (err error) {
+func updateForgottonPin(ctx *gin.Context, sessionId, mobileNumber, pin, otp string) (err error) {
 	logger.LogInfo("Request recevied in updateForgottonPin", sessionId)
 
-	excryptedPin, err := utils.HashPassword(sessionId, Pin)
+	excryptedPin, err := utils.HashPassword(sessionId, pin)
 	if err != nil {
 		logger.LogError(sessionId, err)
 		err = fmt.Errorf(constants.Registeration_Failed, "vehicle")
 		return
 	}
 
-	err = updatePinByMobile(ctx, mobileNumber, excryptedPin)
+	err = updatePinByMobile(ctx, sessionId, mobileNumber, excryptedPin)
 	if err != nil {
 		logger.LogError(sessionId, "update forgotton Pin error: "+err.Error())
 		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
@@ -132,17 +132,30 @@ func updateForgottonPin(ctx *gin.Context, sessionId, mobileNumber, Pin, otp stri
 	return nil
 }
 
-func updatePinByMobile(orgCtx *gin.Context, mobileNumber, Pin string) (err error) {
+func updatePinByMobile(orgCtx *gin.Context, sessionId, mobileNumber, encryptedPIN string) (err error) {
 	var cancel context.CancelFunc
 	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
 	defer cancel()
 
 	if err = database.DatabaseConn.Postgres.WithContext(ctx).Model(&postgress.Driver{}).Where("driver_mobile = ?", mobileNumber).
 		Updates(postgress.Driver{
-			Pin: Pin,
+			Pin: encryptedPIN,
 		}).Error; err != nil {
 		return
 	}
+
+	driver, err := utils.GetDriver(orgCtx, mobileNumber)
+	if err != nil {
+		logger.LogError(sessionId, "update Pin error: "+err.Error())
+		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
+		return
+	}
+
+	message := fmt.Sprintf(constants.NOTIFICATION_MESSAGE_PIN_UPDATED)
+	utils.SendNotification(orgCtx, sessionId, constants.NOTIFICATION_TYPE_PIN_CREATED, driver.ID, constants.NOTIFICATION_TITLE_PIN_CREATION, message, map[string]string{
+		constants.SMS_KEY_MOBILE_NUMBER: driver.DriverMobile,
+		constants.SMS_KEY_MESSAGE:       message,
+	})
 
 	return
 }
@@ -157,7 +170,7 @@ func updatePin(ctx *gin.Context, sessionId, mobileNumber, otp string) (err error
 		return
 	}
 
-	err = updatePinByMobile(ctx, mobileNumber, excryptedPin)
+	err = updatePinByMobile(ctx, sessionId, mobileNumber, excryptedPin)
 	if err != nil {
 		logger.LogError(sessionId, "update Pin error: "+err.Error())
 		err = fmt.Errorf(constants.Unable_To_Do_Job, "update the Pin")

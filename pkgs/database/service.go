@@ -29,12 +29,12 @@ func GetDriverById(orgCtx *gin.Context, driverId string) (driver postgress.Drive
 	return
 }
 
-func GetDriverFCM(orgCtx *gin.Context, id string) (driverFCM postgress.DriverFCM, err error) {
+func GetDriverFCM(orgCtx *gin.Context, id string) (driverFCM postgress.UserFCM, err error) {
 	var cancel context.CancelFunc
 	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
 	defer cancel()
 
-	err = DatabaseConn.Postgres.WithContext(ctx).Where(`driver_Id = ?`, id).Find(&driverFCM).Error
+	err = DatabaseConn.Postgres.WithContext(ctx).Where(`user_id = ?`, id).Find(&driverFCM).Error
 	return
 }
 

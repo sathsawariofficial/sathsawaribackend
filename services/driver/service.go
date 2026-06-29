@@ -57,7 +57,7 @@ func RegisterDriver(ctx *gin.Context, sessionId string, request DriverRegistrati
 }
 
 func SetDriverPin(ctx *gin.Context, sessionId, driverId, pin string) (err error) {
-	logger.LogInfo("Request returned from SetDriverPin", sessionId)
+	logger.LogInfo("Request received in SetDriverPin", sessionId)
 
 	err = saveDriverPin(ctx, sessionId, driverId, pin)
 	if err != nil {
@@ -73,12 +73,10 @@ func SetDriverPin(ctx *gin.Context, sessionId, driverId, pin string) (err error)
 	}
 
 	message := fmt.Sprintf(constants.NOTIFICATION_MESSAGE_PIN_CREATION, pin)
-	if utils.IsStringEmpty(driver.ID) {
-		utils.SendNotification(ctx, sessionId, constants.NOTIFICATION_TYPE_PIN_CREATED, driverId, constants.NOTIFICATION_TITLE_PIN_CREATION, message, map[string]string{
-			constants.SMS_KEY_MOBILE_NUMBER: driver.DriverMobile,
-			constants.SMS_KEY_MESSAGE:       message,
-		})
-	}
+	utils.SendNotification(ctx, sessionId, constants.NOTIFICATION_TYPE_PIN_CREATED, driverId, constants.NOTIFICATION_TITLE_PIN_CREATION, message, map[string]string{
+		constants.SMS_KEY_MOBILE_NUMBER: driver.DriverMobile,
+		constants.SMS_KEY_MESSAGE:       message,
+	})
 
 	logger.LogInfo("Response returned from SetDriverPin", sessionId)
 
@@ -86,7 +84,7 @@ func SetDriverPin(ctx *gin.Context, sessionId, driverId, pin string) (err error)
 }
 
 func RegisterVehicle(ctx *gin.Context, sessionId string, request VehicleRegistrationRequest) (vehicleId, otp string, err error) {
-	logger.LogInfo("Request returned from RegisterDriver", sessionId)
+	logger.LogInfo("Request received in RegisterDriver", sessionId)
 
 	driverId := ctx.GetString(constants.User_KEY)
 	driver, err := database.GetActiveDriverById(ctx, driverId)
@@ -116,7 +114,7 @@ func RegisterVehicle(ctx *gin.Context, sessionId string, request VehicleRegistra
 }
 
 func LoginDriver(ctx *gin.Context, sessionId string, request DriverLoginRequest) (token, otp string, driver postgress.Driver, err error) {
-	logger.LogInfo("Request returned from LoginDriver", sessionId)
+	logger.LogInfo("Request received in LoginDriver", sessionId)
 
 	driver, err = utils.GetDriver(ctx, request.MobileNumber)
 	if err != nil {
@@ -161,7 +159,7 @@ func LoginDriver(ctx *gin.Context, sessionId string, request DriverLoginRequest)
 }
 
 func handleFCM(ctx *gin.Context, sessionId, driverId, fcm string) {
-	logger.LogInfo("Request returned from handleFCM", sessionId)
+	logger.LogInfo("Request received in handleFCM", sessionId)
 
 	driverFCM, err := database.GetDriverFCM(ctx, driverId)
 	if err != nil {
@@ -173,7 +171,7 @@ func handleFCM(ctx *gin.Context, sessionId, driverId, fcm string) {
 		}
 	} else {
 		if driverFCM.FCM != fcm {
-			err = updateDriverFCM(ctx, driverId, fcm)
+			err = updateUserFCM(ctx, driverId, fcm)
 			if err != nil {
 				logger.LogError(sessionId, err)
 			}
