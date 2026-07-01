@@ -1,0 +1,63 @@
+{
+    servers {
+        timeouts {
+            read_body 30s
+            read_header 10s
+            write 2m
+            idle 2m
+        }
+    }
+}
+
+sathsawari.com {
+
+    encode zstd gzip
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "geolocation=(self)"
+        -Server
+    }
+
+    request_body {
+        max_size 25MB
+    }
+
+    handle /ws* {
+        reverse_proxy localhost:1024 {
+            transport http {
+                dial_timeout 5s
+                response_header_timeout 30s
+                read_timeout 2m
+                write_timeout 2m
+                keepalive 30s
+            }
+        }
+    }
+
+    handle {
+        reverse_proxy localhost:1025 {
+            lb_policy least_conn
+
+            health_uri /health
+            health_interval 15s
+            health_timeout 2s
+            fail_duration 30s
+            max_fails 3
+
+            transport http {
+                dial_timeout 5s
+                response_header_timeout 30s
+                read_timeout 2m
+                write_timeout 2m
+                keepalive 30s
+            }
+
+            lb_try_duration 5s
+            lb_try_interval 250ms
+        }
+    }
+}
