@@ -1,9 +1,11 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"rideshare/pkgs/configuration"
+	"rideshare/pkgs/database"
 	"rideshare/pkgs/logger"
 	"rideshare/pkgs/monitoring"
 	"runtime/debug"
@@ -88,5 +90,50 @@ func StatsMiddleware() gin.HandlerFunc {
 				}
 			}
 		}
+	}
+}
+
+func HealthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Only intercept /health
+		if c.Request.URL.Path != "/health" {
+			c.Next()
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+		defer cancel()
+
+		resp := HealthResponse{
+			Status:   "healthy",
+			Postgres: "up",
+			Redis:    "up",
+		}
+
+		status := http.StatusOK
+
+		if database.DatabaseConn.Postgres == nil {
+			resp.Status = "unhealthy"
+			resp.Postgres = "down"
+			status = http.StatusBadGateway
+		} else {
+			sqlDB, err := database.DatabaseConn.Postgres.DB()
+			if err != nil || sqlDB.PingContext(ctx) != nil {
+				resp.Status = "unhealthy"
+				resp.Postgres = "down"
+				status = http.StatusBadGateway
+			}
+		}
+
+		if database.DatabaseConn.RedisConn == nil || database.DatabaseConn.RedisConn.Ping().Err() != nil {
+			resp.Status = "unhealthy"
+			resp.Redis = "down"
+			status = http.StatusBadGateway
+		}
+
+		c.JSON(status, resp)
+
+		// Prevent any further handlers from executing
+		c.Abort()
 	}
 }

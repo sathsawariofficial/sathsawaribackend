@@ -40,7 +40,7 @@ func main() {
 	}
 
 	router.Use(cors.New(config))
-	router.Use(middleware.Logger(), middleware.RecoveryMiddleware(), middleware.StatsMiddleware())
+	router.Use(middleware.Logger(), middleware.RecoveryMiddleware(), middleware.StatsMiddleware(), middleware.HealthMiddleware())
 
 	setup()
 
