@@ -109,6 +109,9 @@ type RideTemplate struct {
 	IsActive             bool      `json:"is_active"`
 	CreatedAt            time.Time `json:"created_at"`
 	UpdatedAt            time.Time `json:"updated_at"`
+
+	// forign key relation
+	Vehicle Vehicle `json:"vehicles" gorm:"foreignKey:VehicleID;references:ID"`
 }
 
 type RideDetails struct {
@@ -161,18 +164,6 @@ type DriverDetails struct {
 	DriverName   string `json:"driverName"`
 	Rating       string `json:"rating"`
 	HasPin       bool   `json:"hasPin"`
-}
-
-type DriverOldData struct {
-	ID            string    `json:"id" gorm:"primary_key"`
-	DriverID      string    `json:"driver_id"`
-	DriverMobile  string    `json:"driver_mobile" gorm:"unique;not null"`
-	DriverName    string    `json:"driver_name" gorm:"not null"`
-	Password      string    `json:"password" gorm:"not null"`
-	VehicleNumber string    `json:"vehicle_number" gorm:"unique;not null"`
-	VehicleInfo   string    `json:"vehicle_info" gorm:"not null"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 type ApprochInfo struct {

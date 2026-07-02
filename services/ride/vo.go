@@ -124,7 +124,7 @@ func getBookedSeatsResp(bookedSeats []postgress.RidePassenger) utils.APIResponse
 	return rideResp
 }
 
-func getRideTempaltesResp(sessionId string, templates []postgress.RideTemplate) utils.APIResponse {
+func getRideTemplatesResp(sessionId string, templates []postgress.RideTemplate) utils.APIResponse {
 	var rideTemplates []RideTemplate
 
 	for _, template := range templates {
@@ -159,6 +159,8 @@ func getRideTempaltesResp(sessionId string, templates []postgress.RideTemplate) 
 			RideID:               template.RideID,
 			DriverID:             template.DriverID,
 			VehicleID:            template.VehicleID,
+			VehicleNumber:        template.Vehicle.VehicleNumber,
+			VehicleInfo:          template.Vehicle.VehicleInfo,
 			StartDatetime:        newStart.Format(constants.DateTimeLayout),
 			EstimatedEndDatetime: newEnd.Format(constants.DateTimeLayout),
 			NumberOfSeats:        template.NumberOfSeats,

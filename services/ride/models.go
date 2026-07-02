@@ -81,6 +81,8 @@ type RideTemplate struct {
 	RideID               string  `json:"rideId"`
 	DriverID             string  `json:"driverId"`
 	VehicleID            string  `json:"vehicleId"`
+	VehicleNumber        string  `json:"vehicleNumber"`
+	VehicleInfo          string  `json:"vehicleInfo"`
 	StartDatetime        string  `json:"startDatetime"`
 	EstimatedEndDatetime string  `json:"estimatedEndDatetime"`
 	NumberOfSeats        int     `json:"numberOfSeats"`

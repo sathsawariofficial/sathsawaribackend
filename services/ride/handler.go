@@ -342,7 +342,7 @@ func GetRideTemplatesHandler(ctx *gin.Context) {
 		return
 	}
 
-	templateResp := getRideTempaltesResp(sessionId, rideTemplates)
+	templateResp := getRideTemplatesResp(sessionId, rideTemplates)
 
 	logger.LogInfo("Response received in GetRideTemplatesHandler", sessionId)
 	logger.LogDebug2("Response received in GetRideTemplatesHandler", sessionId, templateResp)
