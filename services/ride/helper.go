@@ -435,7 +435,14 @@ func getRideTemplates(orgCtx *gin.Context, sessionId, driverId string) (rideTemp
 	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
 	defer cancel()
 
-	err = database.DatabaseConn.Postgres.WithContext(ctx).Where(`driver_id = ?`, driverId).Where(`is_active = ?`, true).Find(&rideTemplates).Error
+	err = database.DatabaseConn.Postgres.
+		WithContext(ctx).
+		Joins("JOIN vehicles ON vehicles.id = ride_templates.vehicle_id").
+		Where("ride_templates.driver_id = ?", driverId).
+		Where("ride_templates.is_active = ?", true).
+		Where("vehicles.status = ?", constants.Status_Active).
+		Preload("Vehicle").
+		Find(&rideTemplates).Error
 
 	logger.LogInfo("Response returned from getRideTemplates", sessionId)
 	return
