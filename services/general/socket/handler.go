@@ -44,14 +44,14 @@ func StatsSocketHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Abnormal closure (1006)
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseAbnormalClosure) {
+			if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
 				logger.LogError(sessionId, fmt.Sprintf("abnormal websocket close (1006): %s", err.Error()))
 				break
 			}
 
 			// Real unexpected error (network, panic, broken pipe)
 			logger.LogError(sessionId, fmt.Sprintf("read error: %s", err.Error()))
-			continue
+			break
 		}
 
 		logger.LogInfo("----------------------HTTP Request Recieved----------------------", sessionId)
