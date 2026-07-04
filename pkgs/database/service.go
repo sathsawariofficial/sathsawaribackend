@@ -98,3 +98,20 @@ func DeleteDriver(orgCtx *gin.Context, driver postgress.Driver, updateById strin
 		Update("update_by", updateById).
 		Error
 }
+
+func GetDriverByRideId(orgCtx *gin.Context, rideId string) (driver postgress.Driver, err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(
+		orgCtx,
+		time.Duration(configuration.ConfigurationData.Timeout)*time.Second,
+	)
+	defer cancel()
+
+	err = DatabaseConn.Postgres.WithContext(ctx).
+		Table("drivers").
+		Joins("JOIN rides ON rides.driver_id = drivers.id").
+		Where("rides.id = ?", rideId).
+		First(&driver).Error
+
+	return
+}

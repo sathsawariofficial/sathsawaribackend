@@ -77,15 +77,17 @@ const (
 const (
 	NOTIFICATION_TITLE_RIDE_CREATION  = "Ride Created"
 	NOTIFICATION_TITLE_PIN_CREATION   = "Pin Created"
+	NOTIFICATION_TITLE_RIDE_BOOKED    = "Ride Booked"
 	NOTIFICATION_TITLE_SMS_TO_SERVICE = "SathSawari sent an OTP"
 )
 
 // notification message
 const (
-	NOTIFICATION_MESSAGE_RIDE_CREATION  = "You have created a ride"
-	NOTIFICATION_MESSAGE_PIN_CREATION   = "Please remember your secure PIN “%s” for future operations in the app"
-	NOTIFICATION_MESSAGE_PIN_UPDATED    = "Your pin has been updated, Please do not share it with anyone"
-	NOTIFICATION_MESSAGE_SMS_TO_SERVICE = "<#> Sathsawari verification code: %s. Do not share this code with anyone.\n%s"
+	NOTIFICATION_MESSAGE_RIDE_CREATION      = "You have created a ride"
+	NOTIFICATION_MESSAGE_PIN_CREATION       = "Please remember your secure PIN “%s” for future operations in the app"
+	NOTIFICATION_MESSSGE_RIDE_BOOKED_DRIVER = "%v seat(s) have booked."
+	NOTIFICATION_MESSAGE_PIN_UPDATED        = "Your pin has been updated, Please do not share it with anyone"
+	NOTIFICATION_MESSAGE_SMS_TO_SERVICE     = "<#> Sathsawari verification code: %s. Do not share this code with anyone.\n%s"
 )
 
 // genders
@@ -173,4 +175,9 @@ const (
 const (
 	SMS_KEY_MOBILE_NUMBER = "mobileNumber"
 	SMS_KEY_MESSAGE       = "message"
+)
+
+// Notifications Key
+const (
+	NOTIFICATION_KEY_RIDE_ID = "rideId"
 )

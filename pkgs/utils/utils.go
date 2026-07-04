@@ -206,7 +206,8 @@ func SendNotification(orgCtx *gin.Context, sessionId, notificationType, driverId
 	case constants.NOTIFICATION_TYPE_RIDE_CREATED,
 		constants.NOTIFICATION_TYPE_PIN_CREATED,
 		constants.NOTIFICATION_TYPE_INFORMATION,
-		constants.NOTIFICATION_TYPE_MARKETING:
+		constants.NOTIFICATION_TYPE_MARKETING,
+		constants.NOTIFICATION_TITLE_RIDE_BOOKED:
 		driverFCM, err := database.GetDriverFCM(orgCtx, driverId)
 		if err != nil {
 			logger.LogError(sessionId, err)

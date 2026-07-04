@@ -8,12 +8,13 @@ type GetNotificationsResponse struct {
 }
 
 type NotificationRequest struct {
-	ID        string    `json:"id"`
-	UserId    string    `json:"userId"`
-	UserType  int       `json:"userType"`
-	Title     string    `json:"title"`
-	Message   string    `json:"message"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID        string         `json:"id"`
+	UserId    string         `json:"userId"`
+	UserType  int            `json:"userType"`
+	Title     string         `json:"title"`
+	Message   string         `json:"message"`
+	Data      map[string]any `json:"data"`
+	CreatedAt time.Time      `json:"createdAt"`
 }
 
 type SMSFCMRequest struct {

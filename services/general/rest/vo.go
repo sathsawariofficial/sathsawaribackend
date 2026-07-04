@@ -1,23 +1,30 @@
 package general
 
 import (
+	"encoding/json"
 	"net/http"
 	"rideshare/pkgs/constants"
 	"rideshare/pkgs/database/postgress"
+	"rideshare/pkgs/logger"
 	"rideshare/pkgs/utils"
 )
 
 func getNotificationsResp(notifications []postgress.NotificationRequest, totalRows int64) utils.APIResponse {
 	var userNotifications []NotificationRequest
 	for _, notification := range notifications {
-		userNotifications = append(userNotifications, NotificationRequest{
+		data := NotificationRequest{
 			ID:        notification.ID,
 			UserId:    notification.UserId,
 			UserType:  notification.UserType,
 			Title:     notification.Title,
 			Message:   notification.Message,
 			CreatedAt: notification.CreatedAt,
-		})
+		}
+		err := json.Unmarshal([]byte(notification.Data), &data.Data)
+		if err != nil {
+			logger.LogError(notification.ID, err)
+		}
+		userNotifications = append(userNotifications, data)
 	}
 
 	userNotificationResp := utils.APIResponse{
