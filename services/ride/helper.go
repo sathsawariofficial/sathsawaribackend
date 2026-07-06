@@ -80,7 +80,6 @@ func mapRideToRideTemplateData(request RideCreationRequest, rideId, driverId, ve
 		EndLocation:          request.EndLocation,
 		Fare:                 request.Fare,
 		RouteDetails:         request.RouteDetails,
-		IsActive:             true,
 	}
 }
 
@@ -449,17 +448,18 @@ func getRideTemplates(orgCtx *gin.Context, sessionId, driverId string) (rideTemp
 }
 
 func deleteRideTemplate(orgCtx *gin.Context, sessionId, rideTemplateId string) (err error) {
-	logger.LogInfo("Request recevied in deleteRideTemplate", sessionId)
-	logger.LogDebug("Request recevied in deleteRideTemplate", sessionId, rideTemplateId)
+	logger.LogInfo("Request received in deleteRideTemplate", sessionId)
+	logger.LogDebug("Request received in deleteRideTemplate", sessionId, rideTemplateId)
 
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	ctx, cancel := context.WithTimeout(
+		orgCtx,
+		time.Duration(configuration.ConfigurationData.Timeout)*time.Second,
+	)
 	defer cancel()
 
 	err = database.DatabaseConn.Postgres.WithContext(ctx).
-		Model(&postgress.RideTemplate{}).
-		Where(`id = ?`, rideTemplateId).
-		Update("is_active", false).Error
+		Where("id = ?", rideTemplateId).
+		Delete(&postgress.RideTemplate{}).Error
 
 	logger.LogInfo("Response returned from deleteRideTemplate", sessionId)
 	return

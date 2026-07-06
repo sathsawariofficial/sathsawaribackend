@@ -1,14 +1,17 @@
 package ride
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"rideshare/pkgs/configuration"
 	"rideshare/pkgs/constants"
 	"rideshare/pkgs/database"
 	"rideshare/pkgs/database/postgress"
 	"rideshare/pkgs/logger"
 	"rideshare/pkgs/utils"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -197,34 +200,99 @@ func DriverRide(ctx *gin.Context, sessionId string, ride_status, driverId, start
 	return
 }
 
-func UpdateRide(ctx *gin.Context, sessionId, rideId string, request UpdateRideRequest) (err error) {
-	logger.LogInfo("Response returned from DriverRide", sessionId)
+func UpdateRide(orgCtx *gin.Context, sessionId, rideId string, request UpdateRideRequest) error {
+	logger.LogInfo("Request received in UpdateRide", sessionId)
 
-	var rideStatus bool
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(
+		orgCtx,
+		time.Duration(configuration.ConfigurationData.Timeout)*time.Second,
+	)
+	defer cancel()
 
-	query := database.DatabaseConn.Postgres.
-		Model(&postgress.Ride{}).
-		Where("id = ?", rideId)
+	tx := database.DatabaseConn.Postgres.WithContext(ctx).Begin()
 
-	if request.Status != nil {
-		if strings.EqualFold(*request.Status, constants.Ride_Status_Active) {
-			rideStatus = true
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
 		}
-		if err = query.Update("is_active", rideStatus).Error; err != nil {
-			logger.LogError(sessionId, err.Error())
+	}()
+
+	var ride postgress.Ride
+	if err := tx.Where("id = ?", rideId).First(&ride).Error; err != nil {
+		tx.Rollback()
+		logger.LogError(sessionId, err)
+		return errors.New(constants.Ride_Not_Found)
+	}
+
+	// Archive and delete if ride is being deactivated
+	if request.Status != nil && strings.EqualFold(*request.Status, constants.Ride_Status_InActive) {
+		delRide := postgress.DELRide{
+			ID:                   ride.ID,
+			DriverID:             ride.DriverID,
+			VehicleID:            ride.VehicleID,
+			StartDatetime:        ride.StartDatetime,
+			EstimatedEndDatetime: ride.EstimatedEndDatetime,
+			NumberOfSeats:        ride.NumberOfSeats,
+			SeatsTaken:           ride.SeatsTaken,
+			StartLocation:        ride.StartLocation,
+			EndLocation:          ride.EndLocation,
+			RoutePoints:          ride.RoutePoints,
+			Fare:                 ride.Fare,
+			RouteDetails:         ride.RouteDetails,
+			IsActive:             false,
+			ParentRideId:         ride.ParentRideId,
+			Code:                 ride.Code,
+			CreatedAt:            ride.CreatedAt,
+			UpdatedAt:            time.Now(),
+		}
+
+		if err := tx.Create(&delRide).Error; err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
 			return errors.New(constants.General_Error)
 		}
+
+		if err := tx.Delete(&postgress.Ride{}, "id = ?", ride.ID).Error; err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return errors.New(constants.General_Error)
+		}
+
+		if err := tx.Commit().Error; err != nil {
+			logger.LogError(sessionId, err)
+			return errors.New(constants.Unknown_Error)
+		}
+
+		logger.LogInfo("Response returned from UpdateRide", sessionId)
+		return nil
+	}
+
+	// Normal updates
+	updates := map[string]interface{}{}
+
+	if request.Status != nil {
+		updates["is_active"] = strings.EqualFold(*request.Status, constants.Ride_Status_Active)
 	}
 
 	if request.NumberOfSeats > 0 {
-		if err = query.Update("number_of_seats", request.NumberOfSeats).Error; err != nil {
-			logger.LogError(sessionId, err.Error())
+		updates["number_of_seats"] = request.NumberOfSeats
+	}
+
+	if len(updates) > 0 {
+		if err := tx.Model(&ride).Updates(updates).Error; err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
 			return errors.New(constants.General_Error)
 		}
 	}
 
-	logger.LogInfo("Response returned from DriverRide", sessionId)
+	if err := tx.Commit().Error; err != nil {
+		logger.LogError(sessionId, err)
+		return errors.New(constants.Unknown_Error)
+	}
 
+	logger.LogInfo("Response returned from UpdateRide", sessionId)
 	return nil
 }
 

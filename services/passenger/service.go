@@ -13,7 +13,7 @@ import (
 func BookSeat(ctx *gin.Context, sessionId string, request BookSeatRequest) (err error) {
 	logger.LogInfo("Request returned from BookSeat", sessionId)
 
-	driver, err := database.GetDriverByRideId(ctx, request.RideId)
+	driverId, vehicleNumber, driverMobile, err := database.GetDriverByRideId(ctx, request.RideId)
 	if err != nil {
 		logger.LogError(sessionId, "failed to get driver error: "+err.Error())
 		err = fmt.Errorf(constants.Not_Found, "ride")
@@ -26,9 +26,9 @@ func BookSeat(ctx *gin.Context, sessionId string, request BookSeatRequest) (err 
 		return err
 	}
 
-	message := fmt.Sprintf(constants.NOTIFICATION_MESSSGE_RIDE_BOOKED_DRIVER, request.Seats)
-	utils.SendNotification(ctx, sessionId, constants.NOTIFICATION_TITLE_RIDE_BOOKED, driver.ID, constants.NOTIFICATION_TITLE_RIDE_BOOKED, message, map[string]string{
-		constants.SMS_KEY_MOBILE_NUMBER:    driver.DriverMobile,
+	message := fmt.Sprintf(constants.NOTIFICATION_MESSSGE_RIDE_BOOKED_DRIVER, request.Seats, vehicleNumber)
+	utils.SendNotification(ctx, sessionId, constants.NOTIFICATION_TITLE_RIDE_BOOKED, driverId, constants.NOTIFICATION_TITLE_RIDE_BOOKED, message, map[string]string{
+		constants.SMS_KEY_MOBILE_NUMBER:    driverMobile,
 		constants.SMS_KEY_MESSAGE:          message,
 		constants.NOTIFICATION_KEY_RIDE_ID: request.RideId,
 	})

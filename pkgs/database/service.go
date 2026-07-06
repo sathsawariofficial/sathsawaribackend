@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"rideshare/pkgs/configuration"
 	"rideshare/pkgs/constants"
@@ -84,22 +85,7 @@ func SaveMissingLocation(orgCtx context.Context, request postgress.MissingLocati
 	return
 }
 
-func DeleteDriver(orgCtx *gin.Context, driver postgress.Driver, updateById string) (err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	return DatabaseConn.Postgres.WithContext(ctx).
-		Model(&postgress.Driver{}).
-		Where("id = ?", driver.ID).
-		Update("status", constants.Status_InActive).
-		Update("driver_mobile", fmt.Sprintf("DEL_%v_%s", time.Now(), driver.DriverMobile)).
-		Update("driver_name", fmt.Sprintf("DEL_%v_%s", time.Now(), driver.DriverName)).
-		Update("update_by", updateById).
-		Error
-}
-
-func GetDriverByRideId(orgCtx *gin.Context, rideId string) (driver postgress.Driver, err error) {
+func DeleteDriver(orgCtx *gin.Context, driver postgress.Driver, updateById string) error {
 	var cancel context.CancelFunc
 	ctx, cancel := context.WithTimeout(
 		orgCtx,
@@ -107,11 +93,125 @@ func GetDriverByRideId(orgCtx *gin.Context, rideId string) (driver postgress.Dri
 	)
 	defer cancel()
 
-	err = DatabaseConn.Postgres.WithContext(ctx).
-		Table("drivers").
-		Joins("JOIN rides ON rides.driver_id = drivers.id").
-		Where("rides.id = ?", rideId).
-		First(&driver).Error
+	tx := DatabaseConn.Postgres.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
 
+	////////// DELETE DRIVER //////////
+	// Copy driver to archive table
+	delDriver := postgress.DELDriver{
+		ID:            driver.ID,
+		DriverName:    driver.DriverName,
+		DriverMobile:  driver.DriverMobile,
+		Status:        constants.Status_InActive,
+		UpdateBy:      updateById,
+		Password:      driver.Password,
+		Pin:           driver.Pin,
+		Rating:        driver.Rating,
+		NumberOfVotes: driver.NumberOfVotes,
+		CreatedAt:     driver.CreatedAt,
+		UpdatedAt:     time.Now(),
+	}
+
+	if err := tx.Create(&delDriver).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// Delete original record
+	if err := tx.Delete(&postgress.Driver{}, "id = ?", driver.ID).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	////////// DELETE VEHICLES //////////
+	for _, vehicle := range driver.Vehicles {
+		delVehicle := postgress.DELVehicle{
+			ID:            vehicle.ID,
+			DriverId:      vehicle.DriverId,
+			VehicleNumber: vehicle.VehicleNumber,
+			VehicleInfo:   vehicle.VehicleInfo,
+			Status:        constants.Status_InActive,
+			CreatedAt:     vehicle.CreatedAt,
+			UpdatedAt:     time.Now(),
+		}
+
+		if err := tx.Create(&delVehicle).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf(constants.Update_Failed, "vehicle")
+		}
+
+		if err := tx.Delete(&postgress.Vehicle{}, "id = ?", vehicle.ID).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf(constants.Update_Failed, "vehicle")
+		}
+	}
+
+	////////// DELETE RIDES //////////
+	var rides []postgress.Ride
+	err := DatabaseConn.Postgres.Where("is_active = ?", true).Find(&rides).Error
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	for _, ride := range rides {
+		delRide := postgress.DELRide{
+			ID:                   ride.ID,
+			DriverID:             ride.DriverID,
+			VehicleID:            ride.VehicleID,
+			StartDatetime:        ride.StartDatetime,
+			EstimatedEndDatetime: ride.EstimatedEndDatetime,
+			NumberOfSeats:        ride.NumberOfSeats,
+			SeatsTaken:           ride.SeatsTaken,
+			StartLocation:        ride.StartLocation,
+			EndLocation:          ride.EndLocation,
+			RoutePoints:          ride.RoutePoints,
+			Fare:                 ride.Fare,
+			RouteDetails:         ride.RouteDetails,
+			IsActive:             false,
+			ParentRideId:         ride.ParentRideId,
+			Code:                 ride.Code,
+			CreatedAt:            ride.CreatedAt,
+			UpdatedAt:            time.Now(),
+		}
+
+		if err := tx.Create(&delRide).Error; err != nil {
+			tx.Rollback()
+			return errors.New(constants.General_Error)
+		}
+
+		if err := tx.Delete(&postgress.Ride{}, "id = ?", ride.ID).Error; err != nil {
+			tx.Rollback()
+			return errors.New(constants.General_Error)
+		}
+	}
+
+	return tx.Commit().Error
+}
+
+func GetDriverByRideId(orgCtx *gin.Context, rideId string) (
+	driverID string,
+	vehicleNumber string,
+	driverMobile string,
+	err error,
+) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(
+		orgCtx,
+		time.Duration(configuration.ConfigurationData.Timeout)*time.Second,
+	)
+	defer cancel()
+
+	row := DatabaseConn.Postgres.WithContext(ctx).
+		Table("drivers").
+		Select("drivers.id, vehicles.vehicle_number, drivers.driver_mobile").
+		Joins("JOIN rides ON rides.driver_id = drivers.id").
+		Joins("JOIN vehicles ON vehicles.id = rides.vehicle_id").
+		Where("rides.id = ?", rideId).
+		Row()
+
+	err = row.Scan(&driverID, &vehicleNumber, &driverMobile)
 	return
 }

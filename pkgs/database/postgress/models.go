@@ -40,6 +40,20 @@ type Driver struct {
 	Vehicles []Vehicle `json:"vehicles" gorm:"foreignKey:DriverId;references:ID"`
 }
 
+type DELDriver struct {
+	ID            string    `json:"id" gorm:"primary_key"`
+	DriverMobile  string    `json:"driver_mobile" gorm:"unique;not null"`
+	DriverName    string    `json:"driver_name" gorm:"not null"`
+	Password      string    `json:"password" gorm:"not null"`
+	Pin           string    `json:"pin" gorm:"not null"`
+	Rating        string    `json:"rating"`
+	NumberOfVotes string    `json:"number_of_votes"`
+	Status        string    `json:"status"`
+	UpdateBy      string    `json:"update_by"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
 type DriverDevice struct {
 	DriverId string `json:"driver_id"`
 	DeviceId string `json:"device_id"`
@@ -63,7 +77,37 @@ type Vehicle struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
+type DELVehicle struct {
+	ID            string    `json:"id" gorm:"primary_key"`
+	DriverId      string    `json:"driver_id" gorm:"not null"`
+	VehicleNumber string    `json:"vehicle_number" gorm:"unique;not null"`
+	VehicleInfo   string    `json:"vehicle_info" gorm:"not null"`
+	Status        string    `json:"status"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
 type Ride struct {
+	ID                   string         `json:"id" gorm:"primary_key"`
+	DriverID             string         `json:"driver_id" gorm:"not null"`
+	VehicleID            string         `json:"vehicle_id" gorm:"not null"`
+	StartDatetime        string         `json:"start_datetime" gorm:"not null"`
+	EstimatedEndDatetime string         `json:"estimated_end_datetime" gorm:"not null"`
+	NumberOfSeats        int            `json:"number_of_seats" gorm:"not null"`
+	SeatsTaken           int            `json:"seats_taken" gorm:"not null;default:0"`
+	StartLocation        string         `json:"start_location" gorm:"not null"`
+	EndLocation          string         `json:"end_location" gorm:"not null"`
+	RoutePoints          pq.StringArray `json:"route_points" gorm:"type:text[]"`
+	Fare                 float64        `json:"fare" gorm:"not null"`
+	RouteDetails         string         `json:"route_details" gorm:"not null"`
+	IsActive             bool           `json:"is_active" gorm:"not null"`
+	ParentRideId         string         `json:"parent_id"`
+	Code                 string         `json:"code"`
+	CreatedAt            time.Time      `json:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at"`
+}
+
+type DELRide struct {
 	ID                   string         `json:"id" gorm:"primary_key"`
 	DriverID             string         `json:"driver_id" gorm:"not null"`
 	VehicleID            string         `json:"vehicle_id" gorm:"not null"`
@@ -106,7 +150,6 @@ type RideTemplate struct {
 	EndLocation          string    `json:"end_location" gorm:"not null"`
 	Fare                 float64   `json:"fare" gorm:"not null"`
 	RouteDetails         string    `json:"route_details" gorm:"not null"`
-	IsActive             bool      `json:"is_active"`
 	CreatedAt            time.Time `json:"created_at"`
 	UpdatedAt            time.Time `json:"updated_at"`
 

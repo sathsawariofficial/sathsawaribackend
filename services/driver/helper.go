@@ -301,7 +301,10 @@ func updateVehicleInfo(orgCtx *gin.Context, sessionId, driverId string, request 
 	logger.LogInfo("Request received in updateVehicleInfo", sessionId)
 
 	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	ctx, cancel := context.WithTimeout(
+		orgCtx,
+		time.Duration(configuration.ConfigurationData.Timeout)*time.Second,
+	)
 	defer cancel()
 
 	tx := database.DatabaseConn.Postgres.WithContext(ctx).Begin()
@@ -313,17 +316,92 @@ func updateVehicleInfo(orgCtx *gin.Context, sessionId, driverId string, request 
 	}()
 
 	var existingVehicle postgress.Vehicle
-	if err := tx.Where("id = ? AND driver_id = ? AND status = ?",
+	if err := tx.Where(
+		"id = ? AND driver_id = ? AND status = ?",
 		request.VehicleId,
 		driverId,
-		constants.Status_Active).First(&existingVehicle).Error; err != nil {
+		constants.Status_Active,
+	).First(&existingVehicle).Error; err != nil {
 		tx.Rollback()
 		logger.LogError(sessionId, err)
 		return errors.New(constants.Vehicle_Not_Found)
 	}
 
-	updatedVehicle := mapVehicleUpdateData(request, existingVehicle, driverId)
+	// Archive and delete if vehicle is being inactivated
+	if request.Status == constants.Status_InActive {
+		delVehicle := postgress.DELVehicle{
+			ID:            existingVehicle.ID,
+			DriverId:      existingVehicle.DriverId,
+			VehicleNumber: existingVehicle.VehicleNumber,
+			VehicleInfo:   existingVehicle.VehicleInfo,
+			Status:        constants.Status_InActive,
+			CreatedAt:     existingVehicle.CreatedAt,
+			UpdatedAt:     time.Now(),
+		}
 
+		if err := tx.Create(&delVehicle).Error; err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return fmt.Errorf(constants.Update_Failed, "vehicle")
+		}
+
+		if err := tx.Delete(&postgress.Vehicle{}, "id = ?", existingVehicle.ID).Error; err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return fmt.Errorf(constants.Update_Failed, "vehicle")
+		}
+
+		var rides []postgress.Ride
+		err := database.DatabaseConn.Postgres.Where("is_active = ?", true).Find(&rides)
+		if err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return fmt.Errorf(constants.Update_Failed, "vehicle")
+		}
+
+		for _, ride := range rides {
+			delRide := postgress.DELRide{
+				ID:                   ride.ID,
+				DriverID:             ride.DriverID,
+				VehicleID:            ride.VehicleID,
+				StartDatetime:        ride.StartDatetime,
+				EstimatedEndDatetime: ride.EstimatedEndDatetime,
+				NumberOfSeats:        ride.NumberOfSeats,
+				SeatsTaken:           ride.SeatsTaken,
+				StartLocation:        ride.StartLocation,
+				EndLocation:          ride.EndLocation,
+				RoutePoints:          ride.RoutePoints,
+				Fare:                 ride.Fare,
+				RouteDetails:         ride.RouteDetails,
+				IsActive:             false,
+				ParentRideId:         ride.ParentRideId,
+				Code:                 ride.Code,
+				CreatedAt:            ride.CreatedAt,
+				UpdatedAt:            time.Now(),
+			}
+
+			if err := tx.Create(&delRide).Error; err != nil {
+				tx.Rollback()
+				return errors.New(constants.General_Error)
+			}
+
+			if err := tx.Delete(&postgress.Ride{}, "id = ?", ride.ID).Error; err != nil {
+				tx.Rollback()
+				return errors.New(constants.General_Error)
+			}
+		}
+
+		if err := tx.Commit().Error; err != nil {
+			logger.LogError(sessionId, err)
+			return errors.New(constants.Unknown_Error)
+		}
+
+		logger.LogInfo("Response returned from updateVehicleInfo", sessionId)
+		return nil
+	}
+
+	// Normal update
+	updatedVehicle := mapVehicleUpdateData(request, existingVehicle, driverId)
 	updatedVehicle.ID = existingVehicle.ID
 	updatedVehicle.CreatedAt = existingVehicle.CreatedAt
 
@@ -339,7 +417,6 @@ func updateVehicleInfo(orgCtx *gin.Context, sessionId, driverId string, request 
 	}
 
 	logger.LogInfo("Response returned from updateVehicleInfo", sessionId)
-
 	return nil
 }
 

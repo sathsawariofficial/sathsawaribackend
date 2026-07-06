@@ -58,6 +58,10 @@ func NewPortgress() (db *gorm.DB, err error) {
 		&DriverDevice{},
 		&BroadcastNotificationRequests{},
 		&RideBooking{},
+
+		&DELVehicle{},
+		&DELRide{},
+		&DELDriver{},
 	)
 
 	if err != nil {
