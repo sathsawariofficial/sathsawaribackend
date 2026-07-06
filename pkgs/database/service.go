@@ -119,38 +119,24 @@ func DeleteDriver(orgCtx *gin.Context, driver postgress.Driver, updateById strin
 		return err
 	}
 
-	// Delete original record
-	if err := tx.Delete(&postgress.Driver{}, "id = ?", driver.ID).Error; err != nil {
+	////////// DELETE TEMPLATES //////////
+	var templates []postgress.RideTemplate
+	err := tx.Where("driver_id = ?", driver.ID).Find(&templates).Error
+	if err != nil {
 		tx.Rollback()
 		return err
 	}
 
-	////////// DELETE VEHICLES //////////
-	for _, vehicle := range driver.Vehicles {
-		delVehicle := postgress.DELVehicle{
-			ID:            vehicle.ID,
-			DriverId:      vehicle.DriverId,
-			VehicleNumber: vehicle.VehicleNumber,
-			VehicleInfo:   vehicle.VehicleInfo,
-			Status:        constants.Status_InActive,
-			CreatedAt:     vehicle.CreatedAt,
-			UpdatedAt:     time.Now(),
-		}
-
-		if err := tx.Create(&delVehicle).Error; err != nil {
+	for _, template := range templates {
+		if err := tx.Delete(&postgress.RideTemplate{}, "id = ?", template.ID).Error; err != nil {
 			tx.Rollback()
-			return fmt.Errorf(constants.Update_Failed, "vehicle")
-		}
-
-		if err := tx.Delete(&postgress.Vehicle{}, "id = ?", vehicle.ID).Error; err != nil {
-			tx.Rollback()
-			return fmt.Errorf(constants.Update_Failed, "vehicle")
+			return errors.New(constants.General_Error)
 		}
 	}
 
 	////////// DELETE RIDES //////////
 	var rides []postgress.Ride
-	err := DatabaseConn.Postgres.Where("is_active = ?", true).Find(&rides).Error
+	err = tx.Where("driver_id = ?", driver.ID).Find(&rides).Error
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -186,6 +172,41 @@ func DeleteDriver(orgCtx *gin.Context, driver postgress.Driver, updateById strin
 			tx.Rollback()
 			return errors.New(constants.General_Error)
 		}
+	}
+
+	////////// DELETE VEHICLES //////////
+	var vehicles []postgress.Vehicle
+	err = DatabaseConn.Postgres.Where("driver_id = ?", driver.ID).Find(&vehicles).Error
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	for _, vehicle := range vehicles {
+		delVehicle := postgress.DELVehicle{
+			ID:            vehicle.ID,
+			DriverId:      vehicle.DriverId,
+			VehicleNumber: vehicle.VehicleNumber,
+			VehicleInfo:   vehicle.VehicleInfo,
+			Status:        constants.Status_InActive,
+			CreatedAt:     vehicle.CreatedAt,
+			UpdatedAt:     time.Now(),
+		}
+
+		if err := tx.Create(&delVehicle).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf(constants.Update_Failed, "vehicle")
+		}
+
+		if err := tx.Delete(&postgress.Vehicle{}, "id = ?", vehicle.ID).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf(constants.Update_Failed, "vehicle")
+		}
+	}
+
+	// Delete original record
+	if err := tx.Delete(&postgress.Driver{}, "id = ?", driver.ID).Error; err != nil {
+		tx.Rollback()
+		return err
 	}
 
 	return tx.Commit().Error

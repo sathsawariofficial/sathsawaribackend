@@ -315,6 +315,22 @@ func updateVehicleInfo(orgCtx *gin.Context, sessionId, driverId string, request 
 		}
 	}()
 
+	////////// DELETE TEMPLATES //////////
+	var templates []postgress.RideTemplate
+	err := tx.Where("driver_id = ?", driverId).Find(&templates).Error
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	for _, template := range templates {
+		if err := tx.Delete(&postgress.RideTemplate{}, "id = ?", template.ID).Error; err != nil {
+			tx.Rollback()
+			return errors.New(constants.General_Error)
+		}
+	}
+
+	////////// DELETE TEMPLATES //////////
 	var existingVehicle postgress.Vehicle
 	if err := tx.Where(
 		"id = ? AND driver_id = ? AND status = ?",
