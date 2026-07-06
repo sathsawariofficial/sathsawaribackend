@@ -328,6 +328,39 @@ func UpdateBookSeatHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, bookingResp)
 }
 
+func GetRideHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetRideHandler", sessionId)
+
+	vehicleId := ctx.Query(constants.Vehicle_KEY)
+	if utils.IsStringEmpty(vehicleId) {
+		err := fmt.Errorf(constants.Not_Found, "vehicle")
+		logger.LogError(sessionId, err)
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	ride, err := GetRide(ctx, sessionId, vehicleId)
+	if err != nil {
+		logger.LogError(sessionId, "error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	rideResp := getRideResp(sessionId, ride)
+
+	logger.LogInfo("Response received in GetRideHandler", sessionId)
+	logger.LogDebug2("Response received in GetRideHandler", sessionId, rideResp)
+
+	ctx.JSON(http.StatusOK, rideResp)
+}
+
 func GetRideTemplatesHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in GetRideTemplatesHandler", sessionId)

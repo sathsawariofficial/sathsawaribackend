@@ -370,6 +370,23 @@ func UpdateBookedSeat(ctx *gin.Context, sessionId, ridePassengerId string) (err 
 	return
 }
 
+func GetRide(ctx *gin.Context, sessionId, vehicleId string) (ride postgress.Ride, err error) {
+	logger.LogInfo("Request returned from GetRide", sessionId)
+	logger.LogDebug("Request returned from GetRide", sessionId, vehicleId)
+
+	ride, err = getRide(ctx, sessionId, vehicleId)
+	if err != nil {
+		logger.LogError(sessionId, err)
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get template")
+		return
+	}
+
+	logger.LogInfo("Response returned from GetRide", sessionId)
+	logger.LogDebug("Response returned from GetRide", sessionId, ride)
+
+	return
+}
+
 func GetRideTemplates(ctx *gin.Context, sessionId string) (rideTemplates []postgress.RideTemplate, err error) {
 	logger.LogInfo("Request returned from GetRideTemplates", sessionId)
 

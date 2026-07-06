@@ -124,6 +124,26 @@ func getBookedSeatsResp(bookedSeats []postgress.RidePassenger) utils.APIResponse
 	return rideResp
 }
 
+func getRideResp(sessionId string, ride postgress.Ride) utils.APIResponse {
+	return utils.APIResponse{
+		Code:    http.StatusOK,
+		Message: constants.Success,
+		Data: RideDetails{
+			ID:                   ride.ID,
+			DriverID:             ride.DriverID,
+			StartDatetime:        ride.StartDatetime,
+			EstimatedEndDatetime: ride.EstimatedEndDatetime,
+			NumberOfSeats:        ride.NumberOfSeats,
+			SeatsTaken:           ride.SeatsTaken,
+			StartLocation:        ride.StartLocation,
+			EndLocation:          ride.EndLocation,
+			RoutePoints:          ride.RoutePoints,
+			Fare:                 ride.Fare,
+			Code:                 ride.Code,
+		},
+	}
+}
+
 func getRideTemplatesResp(sessionId string, templates []postgress.RideTemplate) utils.APIResponse {
 	var rideTemplates []RideTemplate
 

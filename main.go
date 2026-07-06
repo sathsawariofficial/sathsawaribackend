@@ -104,6 +104,7 @@ func main() {
 			{
 				driverProtected.POST("/pin", driver.SetDriverPinHandler)
 				driverProtected.GET("/rides", ride.DriverRideHandler)
+				driverProtected.GET("/ride", ride.GetRideHandler)
 				driverProtected.PATCH("/ride/update", ride.UpdateRideHandler)
 				driverProtected.GET("/logout", driver.LogoutDriverHandler)
 				driverProtected.GET("/info", driver.DriverProfileInfoHandler)

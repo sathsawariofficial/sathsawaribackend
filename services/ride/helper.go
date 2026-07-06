@@ -450,6 +450,23 @@ func bookSeatByDriver(orgCtx *gin.Context, sessionId, driverId string, request B
 	return
 }
 
+func getRide(orgCtx *gin.Context, sessionId, vehicleId string) (ride postgress.Ride, err error) {
+	logger.LogInfo("Request recevied in getRide", sessionId)
+	logger.LogDebug("Request recevied in getRide", sessionId, vehicleId)
+
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	err = database.DatabaseConn.Postgres.
+		WithContext(ctx).
+		Where("vehicle_id = ?", vehicleId).
+		Find(&ride).Error
+
+	logger.LogInfo("Response returned from getRideTemplates", sessionId)
+	return
+}
+
 func getRideTemplates(orgCtx *gin.Context, sessionId, driverId string) (rideTemplates []postgress.RideTemplate, err error) {
 	logger.LogInfo("Request recevied in getRideTemplates", sessionId)
 	logger.LogDebug("Request recevied in getRideTemplates", sessionId, driverId)
