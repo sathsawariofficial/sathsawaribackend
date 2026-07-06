@@ -83,6 +83,30 @@ func mapRideToRideTemplateData(request RideCreationRequest, rideId, driverId, ve
 	}
 }
 
+func VehicleHasRideDuringTime(
+	vehicleID string,
+	startTime string,
+	endTime string,
+) (bool, error) {
+
+	var count int64
+
+	err := database.DatabaseConn.Postgres.Model(&postgress.Ride{}).
+		Where("vehicle_id = ?", vehicleID).
+		Where("is_active = ?", true).
+		Where(`
+			start_datetime < ?
+			AND estimated_end_datetime > ?
+		`, endTime, startTime).
+		Count(&count).Error
+
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
+
 func getVehicleById(orgCtx *gin.Context, vehicleId string) (driver postgress.Vehicle, err error) {
 	var cancel context.CancelFunc
 	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
