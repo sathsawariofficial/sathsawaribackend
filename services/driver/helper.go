@@ -317,7 +317,7 @@ func updateVehicleInfo(orgCtx *gin.Context, sessionId, driverId string, request 
 
 	////////// DELETE TEMPLATES //////////
 	var templates []postgress.RideTemplate
-	err := tx.Where("driver_id = ?", driverId).Find(&templates).Error
+	err := tx.Where("vehicle_id = ?", request.VehicleId).Find(&templates).Error
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -330,7 +330,47 @@ func updateVehicleInfo(orgCtx *gin.Context, sessionId, driverId string, request 
 		}
 	}
 
-	////////// DELETE TEMPLATES //////////
+	////////// DELETE RIDES //////////
+	var rides []postgress.Ride
+	err = tx.Where("vehicle_id = ?", request.VehicleId).Find(&rides).Error
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	for _, ride := range rides {
+		delRide := postgress.DELRide{
+			ID:                   ride.ID,
+			DriverID:             ride.DriverID,
+			VehicleID:            ride.VehicleID,
+			StartDatetime:        ride.StartDatetime,
+			EstimatedEndDatetime: ride.EstimatedEndDatetime,
+			NumberOfSeats:        ride.NumberOfSeats,
+			SeatsTaken:           ride.SeatsTaken,
+			StartLocation:        ride.StartLocation,
+			EndLocation:          ride.EndLocation,
+			RoutePoints:          ride.RoutePoints,
+			Fare:                 ride.Fare,
+			RouteDetails:         ride.RouteDetails,
+			IsActive:             false,
+			ParentRideId:         ride.ParentRideId,
+			Code:                 ride.Code,
+			CreatedAt:            ride.CreatedAt,
+			UpdatedAt:            time.Now(),
+		}
+
+		if err := tx.Create(&delRide).Error; err != nil {
+			tx.Rollback()
+			return errors.New(constants.General_Error)
+		}
+
+		if err := tx.Delete(&postgress.Ride{}, "id = ?", ride.ID).Error; err != nil {
+			tx.Rollback()
+			return errors.New(constants.General_Error)
+		}
+	}
+
+	////////// DELETE Vehicles //////////
 	var existingVehicle postgress.Vehicle
 	if err := tx.Where(
 		"id = ? AND driver_id = ? AND status = ?",
