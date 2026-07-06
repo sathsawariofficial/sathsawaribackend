@@ -103,7 +103,7 @@ func DeleteDriver(orgCtx *gin.Context, driver postgress.Driver, updateById strin
 	delDriver := postgress.DELDriver{
 		ID:            driver.ID,
 		DriverName:    driver.DriverName,
-		DriverMobile:  driver.DriverMobile,
+		DriverMobile:  fmt.Sprintf("DEL_%s_%s", driver.DriverMobile, time.Now().String()),
 		Status:        constants.Status_InActive,
 		UpdateBy:      updateById,
 		Password:      driver.Password,
@@ -185,7 +185,7 @@ func DeleteDriver(orgCtx *gin.Context, driver postgress.Driver, updateById strin
 		delVehicle := postgress.DELVehicle{
 			ID:            vehicle.ID,
 			DriverId:      vehicle.DriverId,
-			VehicleNumber: vehicle.VehicleNumber,
+			VehicleNumber: fmt.Sprintf("DEL_%s_%s", vehicle.VehicleNumber, time.Now().String()),
 			VehicleInfo:   vehicle.VehicleInfo,
 			Status:        constants.Status_InActive,
 			CreatedAt:     vehicle.CreatedAt,

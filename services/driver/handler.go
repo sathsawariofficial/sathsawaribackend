@@ -375,7 +375,7 @@ func UpdateVehicleHandler(ctx *gin.Context) {
 		return
 	}
 
-	registrationResp := updateVehicleResp(request.VehicleId)
+	registrationResp := updateVehicleResp(request.VehicleId, request.Status)
 
 	logger.LogInfo("Response received in UpdateVehicleHandler", sessionId)
 	logger.LogDebug2("Response received in UpdateVehicleHandler", sessionId, registrationResp)

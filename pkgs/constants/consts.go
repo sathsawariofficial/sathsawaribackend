@@ -5,6 +5,7 @@ const (
 	// SUCCESS
 	Registered_Successfully       = "%v registered successfully"
 	Updated_Successfully          = "%v updated successfully"
+	Deleted_Successfully          = "%v updated successfully"
 	Loggedin_Successfully         = "%s loggedin successfully"
 	Loggedout_Successfully        = "%s loggedout successfully"
 	Created_Successfully          = "%s created successfully"

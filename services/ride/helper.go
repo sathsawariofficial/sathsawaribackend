@@ -462,7 +462,6 @@ func getRideTemplates(orgCtx *gin.Context, sessionId, driverId string) (rideTemp
 		WithContext(ctx).
 		Joins("JOIN vehicles ON vehicles.id = ride_templates.vehicle_id").
 		Where("ride_templates.driver_id = ?", driverId).
-		Where("ride_templates.is_active = ?", true).
 		Where("vehicles.status = ?", constants.Status_Active).
 		Preload("Vehicle").
 		Find(&rideTemplates).Error

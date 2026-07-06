@@ -30,10 +30,15 @@ func registerVehicleResp(vehicleId, otp string) utils.APIResponse {
 	}
 }
 
-func updateVehicleResp(vehicleId string) utils.APIResponse {
+func updateVehicleResp(vehicleId, status string) utils.APIResponse {
+	msg := fmt.Sprintf(constants.Updated_Successfully, "Vehicle")
+	if status == constants.Status_InActive {
+		msg = fmt.Sprintf(constants.Deleted_Successfully, "Vehicle")
+	}
+
 	return utils.APIResponse{
 		Code:    http.StatusOK,
-		Message: fmt.Sprintf(constants.Updated_Successfully, "Vehicle"),
+		Message: msg,
 		Data: VehicleUpdateResponse{
 			VehicleId: vehicleId,
 		},

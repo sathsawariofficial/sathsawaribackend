@@ -315,62 +315,6 @@ func updateVehicleInfo(orgCtx *gin.Context, sessionId, driverId string, request 
 		}
 	}()
 
-	////////// DELETE TEMPLATES //////////
-	var templates []postgress.RideTemplate
-	err := tx.Where("vehicle_id = ?", request.VehicleId).Find(&templates).Error
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	for _, template := range templates {
-		if err := tx.Delete(&postgress.RideTemplate{}, "id = ?", template.ID).Error; err != nil {
-			tx.Rollback()
-			return errors.New(constants.General_Error)
-		}
-	}
-
-	////////// DELETE RIDES //////////
-	var rides []postgress.Ride
-	err = tx.Where("vehicle_id = ?", request.VehicleId).Find(&rides).Error
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	for _, ride := range rides {
-		delRide := postgress.DELRide{
-			ID:                   ride.ID,
-			DriverID:             ride.DriverID,
-			VehicleID:            ride.VehicleID,
-			StartDatetime:        ride.StartDatetime,
-			EstimatedEndDatetime: ride.EstimatedEndDatetime,
-			NumberOfSeats:        ride.NumberOfSeats,
-			SeatsTaken:           ride.SeatsTaken,
-			StartLocation:        ride.StartLocation,
-			EndLocation:          ride.EndLocation,
-			RoutePoints:          ride.RoutePoints,
-			Fare:                 ride.Fare,
-			RouteDetails:         ride.RouteDetails,
-			IsActive:             false,
-			ParentRideId:         ride.ParentRideId,
-			Code:                 ride.Code,
-			CreatedAt:            ride.CreatedAt,
-			UpdatedAt:            time.Now(),
-		}
-
-		if err := tx.Create(&delRide).Error; err != nil {
-			tx.Rollback()
-			return errors.New(constants.General_Error)
-		}
-
-		if err := tx.Delete(&postgress.Ride{}, "id = ?", ride.ID).Error; err != nil {
-			tx.Rollback()
-			return errors.New(constants.General_Error)
-		}
-	}
-
-	////////// DELETE Vehicles //////////
 	var existingVehicle postgress.Vehicle
 	if err := tx.Where(
 		"id = ? AND driver_id = ? AND status = ?",
@@ -385,30 +329,25 @@ func updateVehicleInfo(orgCtx *gin.Context, sessionId, driverId string, request 
 
 	// Archive and delete if vehicle is being inactivated
 	if request.Status == constants.Status_InActive {
-		delVehicle := postgress.DELVehicle{
-			ID:            existingVehicle.ID,
-			DriverId:      existingVehicle.DriverId,
-			VehicleNumber: existingVehicle.VehicleNumber,
-			VehicleInfo:   existingVehicle.VehicleInfo,
-			Status:        constants.Status_InActive,
-			CreatedAt:     existingVehicle.CreatedAt,
-			UpdatedAt:     time.Now(),
-		}
 
-		if err := tx.Create(&delVehicle).Error; err != nil {
+		////////// DELETE TEMPLATES //////////
+		var templates []postgress.RideTemplate
+		err := tx.Where("vehicle_id = ?", request.VehicleId).Find(&templates).Error
+		if err != nil {
 			tx.Rollback()
-			logger.LogError(sessionId, err)
-			return fmt.Errorf(constants.Update_Failed, "vehicle")
+			return err
 		}
 
-		if err := tx.Delete(&postgress.Vehicle{}, "id = ?", existingVehicle.ID).Error; err != nil {
-			tx.Rollback()
-			logger.LogError(sessionId, err)
-			return fmt.Errorf(constants.Update_Failed, "vehicle")
+		for _, template := range templates {
+			if err := tx.Delete(&postgress.RideTemplate{}, "id = ?", template.ID).Error; err != nil {
+				tx.Rollback()
+				return errors.New(constants.General_Error)
+			}
 		}
 
+		////// DELETE RIDES //////
 		var rides []postgress.Ride
-		err := database.DatabaseConn.Postgres.Where("is_active = ?", true).Find(&rides)
+		err = tx.Where("is_active = ?", true).Find(&rides).Error
 		if err != nil {
 			tx.Rollback()
 			logger.LogError(sessionId, err)
@@ -444,6 +383,29 @@ func updateVehicleInfo(orgCtx *gin.Context, sessionId, driverId string, request 
 			if err := tx.Delete(&postgress.Ride{}, "id = ?", ride.ID).Error; err != nil {
 				tx.Rollback()
 				return errors.New(constants.General_Error)
+			}
+
+			///// DELETE VEHICLE /////
+			delVehicle := postgress.DELVehicle{
+				ID:            existingVehicle.ID,
+				DriverId:      existingVehicle.DriverId,
+				VehicleNumber: fmt.Sprintf("DEL_%s_%s", existingVehicle.VehicleNumber, time.Now().String()),
+				VehicleInfo:   existingVehicle.VehicleInfo,
+				Status:        constants.Status_InActive,
+				CreatedAt:     existingVehicle.CreatedAt,
+				UpdatedAt:     time.Now(),
+			}
+
+			if err := tx.Create(&delVehicle).Error; err != nil {
+				tx.Rollback()
+				logger.LogError(sessionId, err)
+				return fmt.Errorf(constants.Update_Failed, "vehicle")
+			}
+
+			if err := tx.Delete(&postgress.Vehicle{}, "id = ?", existingVehicle.ID).Error; err != nil {
+				tx.Rollback()
+				logger.LogError(sessionId, err)
+				return fmt.Errorf(constants.Update_Failed, "vehicle")
 			}
 		}
 
