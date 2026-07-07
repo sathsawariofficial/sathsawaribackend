@@ -113,7 +113,7 @@ const (
 	Username_Min_Len          = 5
 	Username_Max_Len          = 50
 	Password_Min_Len          = 8
-	Password_Max_Len          = 12
+	Password_Max_Len          = 20
 	Long_Password_Min_Len     = 8
 	Long_Password_Max_Len     = 70
 	Pin_Len                   = 6
