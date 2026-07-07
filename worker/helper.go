@@ -32,7 +32,7 @@ func closeActiveRides() {
 		return
 	}
 
-	now := time.Now().UTC()
+	now := time.Now()
 
 	for _, ride := range rides {
 		endTime, err := utils.ConvertStrToTime(ride.EstimatedEndDatetime)
