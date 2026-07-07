@@ -107,6 +107,21 @@ type Ride struct {
 	UpdatedAt            time.Time      `json:"updated_at"`
 }
 
+type RideSearchReplica struct {
+	RideID         string         `gorm:"column:ride_id"`
+	StartLocation  string         `gorm:"column:start_location"`
+	EndLocation    string         `gorm:"column:end_location"`
+	RoutePoints    pq.StringArray `gorm:"column:route_points;type:text[]"`
+	StartDatetime  string         `gorm:"column:start_datetime"`
+	AvailableSeats int            `gorm:"column:available_seats"`
+	IsActive       bool           `gorm:"column:is_active"`
+}
+
+// TableName tells GORM to point to your new search replica table
+func (RideSearchReplica) TableName() string {
+	return "ride_searches"
+}
+
 type DELRide struct {
 	ID                   string         `json:"id" gorm:"primary_key"`
 	DriverID             string         `json:"driver_id" gorm:"not null"`

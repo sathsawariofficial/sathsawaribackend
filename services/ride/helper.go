@@ -225,12 +225,12 @@ func getFilteredRides(
 	pageSize := configuration.ConfigurationData.PageSize
 	offset := (page - 1) * pageSize
 
+	// Build date query targeting the indexed ride_searches table
 	dateCondition := ""
-
 	if startTime != "" && endTime != "" {
-		dateCondition = "rides.start_datetime >= ? AND rides.estimated_end_datetime <= ?"
+		dateCondition = "ride_searches.start_datetime >= ? AND rides.estimated_end_datetime <= ?"
 	} else if startTime != "" {
-		dateCondition = "rides.start_datetime >= ?"
+		dateCondition = "ride_searches.start_datetime >= ?"
 		endTime = ""
 	} else if endTime != "" {
 		dateCondition = "rides.estimated_end_datetime <= ?"
@@ -244,7 +244,7 @@ func getFilteredRides(
 		startTime = now.Format("2006-01-02 15:04:05")
 		endTime = weekLater.Format("2006-01-02 15:04:05")
 
-		dateCondition = "rides.start_datetime >= ? AND rides.start_datetime <= ?"
+		dateCondition = "ride_searches.start_datetime >= ? AND ride_searches.start_datetime <= ?"
 	}
 
 	var cancel context.CancelFunc
@@ -254,46 +254,52 @@ func getFilteredRides(
 	)
 	defer cancel()
 
+	// Base query targeting our fast replica table first
 	query := database.DatabaseConn.Postgres.
 		WithContext(ctx).
-		Table("rides").
+		Table("ride_searches").
 		Select(`
-			rides.id,
+			ride_searches.ride_id AS id,
 			rides.driver_id,
 			drivers.driver_name,
 			drivers.driver_mobile,
 			drivers.rating,
 			vehicles.vehicle_number,
 			vehicles.vehicle_info,
-			rides.start_datetime,
+			ride_searches.start_datetime,
 			rides.estimated_end_datetime,
 			rides.number_of_seats,
 			rides.seats_taken,
-			rides.start_location,
-			rides.end_location,
-			rides.route_points AS route_points,
+			ride_searches.start_location,
+			ride_searches.end_location,
+			ride_searches.route_points AS route_points,
 			rides.vehicle_id,
 			rides.fare,
 			rides.route_details,
-			rides.is_active,
+			ride_searches.is_active,
 			rides.created_at,
 			rides.updated_at
 		`).
+		// Lazy-join metadata ONLY on rows that pass search filters
+		Joins("JOIN rides ON ride_searches.ride_id = rides.id").
 		Joins("JOIN drivers ON rides.driver_id = drivers.id").
 		Joins("JOIN vehicles ON rides.vehicle_id = vehicles.id").
-		Where("rides.is_active = ?", true)
+		Where("ride_searches.is_active = ?", true)
 
-	// Route search using GIN index
+	// High-performance location match utilizing Trigram and GIN indexes
 	if strings.TrimSpace(searchLoc) != "" {
-		searchLoc = strings.ToLower(strings.TrimSpace(searchLoc))
+		cleanSearch := strings.TrimSpace(searchLoc)
 
+		// Evaluates Trigram index on strings and GIN index on route arrays concurrently
 		query = query.Where(
-			"rides.route_points @> ?",
-			pq.Array([]string{searchLoc}),
+			"ride_searches.start_location ILIKE ? OR ride_searches.end_location ILIKE ? OR ride_searches.route_points @> ARRAY[?]",
+			"%"+cleanSearch+"%",
+			"%"+cleanSearch+"%",
+			cleanSearch, // Handled case-sensitively for array match consistency
 		)
 	}
 
-	// Date filtering
+	// Apply structured dates
 	if dateCondition != "" {
 		if startTime != "" && endTime != "" {
 			query = query.Where(dateCondition, startTime, endTime)
@@ -304,21 +310,25 @@ func getFilteredRides(
 		}
 	}
 
+	// Clone the database session cleanly to count matching entries
 	countQuery := query.Session(&gorm.Session{})
 
+	// Add pagination and sort order optimization
 	query = query.
 		Limit(pageSize).
 		Offset(offset).
-		Order("rides.start_datetime ASC")
+		Order("ride_searches.start_datetime ASC")
 
+	// Execute execution loop
 	err = query.Find(&rides).Error
 	if err != nil {
-		return
+		return rides, 0, err
 	}
 
+	// Execute row tally
 	err = countQuery.Count(&totalRows).Error
 
-	return
+	return rides, totalRows, err
 }
 
 func getQueryParams(ctx *gin.Context) (startTime, endTime, searchLoc, startLoc, endLoc string) {
