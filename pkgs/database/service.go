@@ -101,8 +101,7 @@ func DeleteDriver(orgCtx *gin.Context, driver postgress.Driver, updateById strin
 	////////// DELETE DRIVER //////////
 	// Copy driver to archive table
 	delDriver := postgress.DELDriver{
-		ID:            GenerateUUID(),
-		DriverID:      driver.ID,
+		ID:            driver.ID,
 		DriverName:    driver.DriverName,
 		DriverMobile:  fmt.Sprintf("DEL_%s_%s", driver.DriverMobile, time.Now().String()),
 		Status:        constants.Status_InActive,
@@ -145,8 +144,7 @@ func DeleteDriver(orgCtx *gin.Context, driver postgress.Driver, updateById strin
 
 	for _, ride := range rides {
 		delRide := postgress.DELRide{
-			ID:                   GenerateUUID(),
-			RideID:               ride.ID,
+			ID:                   ride.ID,
 			DriverID:             ride.DriverID,
 			VehicleID:            ride.VehicleID,
 			StartDatetime:        ride.StartDatetime,
@@ -185,8 +183,7 @@ func DeleteDriver(orgCtx *gin.Context, driver postgress.Driver, updateById strin
 	}
 	for _, vehicle := range vehicles {
 		delVehicle := postgress.DELVehicle{
-			ID:            GenerateUUID(),
-			VehicleID:     vehicle.ID,
+			ID:            vehicle.ID,
 			DriverId:      vehicle.DriverId,
 			VehicleNumber: fmt.Sprintf("DEL_%s_%s", vehicle.VehicleNumber, time.Now().String()),
 			VehicleInfo:   vehicle.VehicleInfo,

@@ -113,6 +113,11 @@ func NewPortgress() (db *gorm.DB, err error) {
             CREATE OR REPLACE FUNCTION sync_rides_to_search_replica()
             RETURNS TRIGGER AS $$
             BEGIN
+                IF NEW.is_active = false THEN
+                    DELETE FROM ride_searches WHERE ride_id = NEW.id;
+                    RETURN NEW;
+                END IF;
+
                 INSERT INTO ride_searches (ride_id, start_location, end_location, route_points, start_datetime, available_seats, is_active)
                 VALUES (
                     NEW.id, 
@@ -172,6 +177,41 @@ func NewPortgress() (db *gorm.DB, err error) {
             AFTER DELETE ON rides
             FOR EACH ROW
             EXECUTE FUNCTION sync_delete_rides_to_search_replica();
+        `).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Exec(`
+            INSERT INTO ride_searches (ride_id, start_location, end_location, route_points, start_datetime, available_seats, is_active)
+            SELECT
+                id,
+                start_location,
+                end_location,
+                route_points,
+                start_datetime,
+                (number_of_seats - seats_taken),
+                is_active
+            FROM rides
+            WHERE is_active = true
+            ON CONFLICT (ride_id) DO UPDATE SET
+                start_location = EXCLUDED.start_location,
+                end_location = EXCLUDED.end_location,
+                route_points = EXCLUDED.route_points,
+                start_datetime = EXCLUDED.start_datetime,
+                available_seats = EXCLUDED.available_seats,
+                is_active = EXCLUDED.is_active;
+        `).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Exec(`
+            DELETE FROM ride_searches
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM rides
+                WHERE rides.id = ride_searches.ride_id
+                  AND rides.is_active = true
+            );
         `).Error; err != nil {
 			return err
 		}

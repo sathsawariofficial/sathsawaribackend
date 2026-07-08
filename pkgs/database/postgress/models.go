@@ -42,7 +42,6 @@ type Driver struct {
 
 type DELDriver struct {
 	ID            string    `json:"id" gorm:"primary_key"`
-	DriverID      string    `json:"driver_id" gorm:"not null"`
 	DriverMobile  string    `json:"driver_mobile" gorm:"unique;not null"`
 	DriverName    string    `json:"driver_name" gorm:"not null"`
 	Password      string    `json:"password" gorm:"not null"`
@@ -80,7 +79,6 @@ type Vehicle struct {
 
 type DELVehicle struct {
 	ID            string    `json:"id" gorm:"primary_key"`
-	VehicleID     string    `json:"vehicle_id" gorm:"not null"`
 	DriverId      string    `json:"driver_id" gorm:"not null"`
 	VehicleNumber string    `json:"vehicle_number" gorm:"unique;not null"`
 	VehicleInfo   string    `json:"vehicle_info" gorm:"not null"`
@@ -126,7 +124,6 @@ func (RideSearchReplica) TableName() string {
 
 type DELRide struct {
 	ID                   string         `json:"id" gorm:"primary_key"`
-	RideID               string         `json:"ride_id" gorm:"not null"`
 	DriverID             string         `json:"driver_id" gorm:"not null"`
 	VehicleID            string         `json:"vehicle_id" gorm:"not null"`
 	StartDatetime        string         `json:"start_datetime" gorm:"not null"`

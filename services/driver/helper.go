@@ -329,7 +329,6 @@ func updateVehicleInfo(orgCtx *gin.Context, sessionId, driverId string, request 
 
 	// Archive and delete if vehicle is being inactivated
 	if request.Status == constants.Status_InActive {
-
 		////////// DELETE TEMPLATES //////////
 		var templates []postgress.RideTemplate
 		err := tx.Where("vehicle_id = ?", request.VehicleId).Find(&templates).Error
@@ -347,7 +346,7 @@ func updateVehicleInfo(orgCtx *gin.Context, sessionId, driverId string, request 
 
 		////// DELETE RIDES //////
 		var rides []postgress.Ride
-		err = tx.Where("is_active = ?", true).Find(&rides).Error
+		err = tx.Where("vehicle_id = ? AND is_active = ?", request.VehicleId, true).Find(&rides).Error
 		if err != nil {
 			tx.Rollback()
 			logger.LogError(sessionId, err)
@@ -356,8 +355,7 @@ func updateVehicleInfo(orgCtx *gin.Context, sessionId, driverId string, request 
 
 		for _, ride := range rides {
 			delRide := postgress.DELRide{
-				ID:                   database.GenerateUUID(),
-				RideID:               ride.ID,
+				ID:                   ride.ID,
 				DriverID:             ride.DriverID,
 				VehicleID:            ride.VehicleID,
 				StartDatetime:        ride.StartDatetime,
@@ -385,30 +383,29 @@ func updateVehicleInfo(orgCtx *gin.Context, sessionId, driverId string, request 
 				tx.Rollback()
 				return errors.New(constants.General_Error)
 			}
+		}
 
-			///// DELETE VEHICLE /////
-			delVehicle := postgress.DELVehicle{
-				ID:            database.GenerateUUID(),
-				VehicleID:     existingVehicle.ID,
-				DriverId:      existingVehicle.DriverId,
-				VehicleNumber: fmt.Sprintf("DEL_%s_%s", existingVehicle.VehicleNumber, time.Now().String()),
-				VehicleInfo:   existingVehicle.VehicleInfo,
-				Status:        constants.Status_InActive,
-				CreatedAt:     existingVehicle.CreatedAt,
-				UpdatedAt:     time.Now(),
-			}
+		///// DELETE VEHICLE /////
+		delVehicle := postgress.DELVehicle{
+			ID:            existingVehicle.ID,
+			DriverId:      existingVehicle.DriverId,
+			VehicleNumber: fmt.Sprintf("DEL_%s_%s", existingVehicle.VehicleNumber, time.Now().Format("20060102150405.000000000")),
+			VehicleInfo:   existingVehicle.VehicleInfo,
+			Status:        constants.Status_InActive,
+			CreatedAt:     existingVehicle.CreatedAt,
+			UpdatedAt:     time.Now(),
+		}
 
-			if err := tx.Create(&delVehicle).Error; err != nil {
-				tx.Rollback()
-				logger.LogError(sessionId, err)
-				return fmt.Errorf(constants.Update_Failed, "vehicle")
-			}
+		if err := tx.Create(&delVehicle).Error; err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return fmt.Errorf(constants.Update_Failed, "vehicle")
+		}
 
-			if err := tx.Delete(&postgress.Vehicle{}, "id = ?", existingVehicle.ID).Error; err != nil {
-				tx.Rollback()
-				logger.LogError(sessionId, err)
-				return fmt.Errorf(constants.Update_Failed, "vehicle")
-			}
+		if err := tx.Delete(&postgress.Vehicle{}, "id = ?", existingVehicle.ID).Error; err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return fmt.Errorf(constants.Update_Failed, "vehicle")
 		}
 
 		if err := tx.Commit().Error; err != nil {

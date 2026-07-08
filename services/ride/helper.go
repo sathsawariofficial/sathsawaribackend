@@ -289,13 +289,14 @@ func getFilteredRides(
 	// High-performance location match utilizing Trigram and GIN indexes
 	if strings.TrimSpace(searchLoc) != "" {
 		cleanSearch := strings.TrimSpace(searchLoc)
+		normalizedSearch := strings.ToLower(cleanSearch)
 
 		// Evaluates Trigram index on strings and GIN index on route arrays concurrently
 		query = query.Where(
-			"ride_searches.start_location ILIKE ? OR ride_searches.end_location ILIKE ? OR ride_searches.route_points @> ARRAY[?]",
+			"ride_searches.start_location ILIKE ? OR ride_searches.end_location ILIKE ? OR ride_searches.route_points @> ?",
 			"%"+cleanSearch+"%",
 			"%"+cleanSearch+"%",
-			cleanSearch, // Handled case-sensitively for array match consistency
+			pq.Array([]string{normalizedSearch}),
 		)
 	}
 
