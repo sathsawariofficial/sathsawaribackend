@@ -144,7 +144,16 @@ func GenerateOTP() string {
 }
 
 func ConvertStrToTime(dateTime string) (time.Time, error) {
-	return time.Parse(constants.DateTimeLayout, dateTime)
+	loc, err := time.LoadLocation("Asia/Karachi")
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return time.ParseInLocation(
+		"2006-01-02 15:04:05",
+		dateTime,
+		loc,
+	)
 }
 
 func HandleMobileNumberInQuery(mobile_number string) string {
