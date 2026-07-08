@@ -31,6 +31,10 @@ func closeActiveRides() {
 		logger.LogError(sessionId, "failed to get ride error: "+err.Error())
 		return
 	}
+	if len(rides) == 0 {
+		logger.LogWarning(sessionId, "no ride found")
+		return
+	}
 
 	now := time.Now()
 
@@ -53,9 +57,8 @@ func closeActiveRides() {
 }
 
 func getAllActiveRides() (rides []postgress.Ride, err error) {
-	err = database.DatabaseConn.Postgres.Table("rides").
-		Select("*").
-		Where(`rides.is_active = ?`, true).
+	err = database.DatabaseConn.Postgres.
+		Where(`is_active = ?`, true).
 		Find(&rides).Error
 
 	return

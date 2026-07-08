@@ -124,7 +124,7 @@ func updateUserFCM(orgCtx *gin.Context, id, fcm string) error {
 	err := database.DatabaseConn.Postgres.WithContext(ctx).
 		Model(&postgress.UserFCM{}).
 		Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "driver_id"}}, // conflict key
+			Columns:   []clause.Column{{Name: "user_id"}}, // conflict key
 			DoUpdates: clause.AssignmentColumns([]string{"fcm"}),
 		}).
 		Create(&postgress.UserFCM{
