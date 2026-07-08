@@ -18,7 +18,7 @@ import (
 
 func mapSMSFcmRequest(request SMSFCMRequest) *postgress.SMSFCM {
 	return &postgress.SMSFCM{
-		ID:      utils.GenerateUUID(),
+		ID:      database.GenerateUUID(),
 		App:     request.App,
 		FCM:     request.FCM,
 		APPHash: utils.ChoiseMaker(request.AppHash, constants.DEFAULT_APP_HASH),
@@ -27,7 +27,7 @@ func mapSMSFcmRequest(request SMSFCMRequest) *postgress.SMSFCM {
 
 func mapContactData(request ApprochRequest) postgress.ApprochInfo {
 	return postgress.ApprochInfo{
-		ID:      utils.GenerateUUID(),
+		ID:      database.GenerateUUID(),
 		Name:    request.Name,
 		Number:  request.Number,
 		Email:   request.Email,

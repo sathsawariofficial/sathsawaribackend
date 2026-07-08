@@ -21,14 +21,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rs/xid"
 )
-
-func GenerateUUID() string {
-	return uuid.New().String()
-}
 
 func IsStringEmptyWithKey(targetString string, keyName string, result *string) bool {
 	isEmpty := IsStringEmpty(targetString)

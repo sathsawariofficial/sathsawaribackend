@@ -44,7 +44,7 @@ func mapRideData(
 	normalizedRoutePoints = append(normalizedRoutePoints, strings.ToLower(request.EndLocation))
 
 	return postgress.Ride{
-		ID:                   utils.GenerateUUID(),
+		ID:                   database.GenerateUUID(),
 		DriverID:             driverId,
 		VehicleID:            vehicleId,
 		StartDatetime:        request.StartDatetime,
@@ -68,7 +68,7 @@ func mapRideData(
 
 func mapRideToRideTemplateData(request RideCreationRequest, rideId, driverId, vehicleId string) postgress.RideTemplate {
 	return postgress.RideTemplate{
-		ID:                   utils.GenerateUUID(),
+		ID:                   database.GenerateUUID(),
 		RideID:               rideId,
 		DriverID:             driverId,
 		VehicleID:            vehicleId,
@@ -371,7 +371,7 @@ func updateTakenSeats(orgCtx *gin.Context, rideId string, seats_taken int) (err 
 
 func mapBookSeatData(request BookSeatRequest) postgress.RidePassenger {
 	return postgress.RidePassenger{
-		ID:           utils.GenerateUUID(),
+		ID:           database.GenerateUUID(),
 		RideId:       request.RideId,
 		PassengerId:  request.PassengerId,
 		Name:         request.Name,

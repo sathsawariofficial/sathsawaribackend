@@ -240,7 +240,8 @@ func UpdateRide(orgCtx *gin.Context, sessionId, rideId string, request UpdateRid
 	// Archive and delete if ride is being deactivated
 	if request.Status != nil && strings.EqualFold(*request.Status, constants.Ride_Status_InActive) {
 		delRide := postgress.DELRide{
-			ID:                   ride.ID,
+			ID:                   database.GenerateUUID(),
+			RideID:               ride.ID,
 			DriverID:             ride.DriverID,
 			VehicleID:            ride.VehicleID,
 			StartDatetime:        ride.StartDatetime,

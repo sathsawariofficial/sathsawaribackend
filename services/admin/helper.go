@@ -173,7 +173,7 @@ func getAllDriversWithVehicles(orgCtx *gin.Context, page int) (drivers []postgre
 
 func createAdminBroadcastRequest(req AdminBroadcastRequest) postgress.BroadcastNotificationRequests {
 	return postgress.BroadcastNotificationRequests{
-		ID:               utils.GenerateUUID(),
+		ID:               database.GenerateUUID(),
 		UserType:         req.UserType,
 		Title:            req.Title,
 		Message:          req.Message,

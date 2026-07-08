@@ -87,7 +87,7 @@ func getAllRecurringRides() (rides []postgress.Ride, err error) {
 
 func saveNotification(notification redis.NotificationRequest) (err error) {
 	notifyReq := &postgress.NotificationRequest{
-		ID:               utils.GenerateUUID(),
+		ID:               database.GenerateUUID(),
 		UserId:           notification.UserId,
 		UserType:         notification.UserType,
 		Title:            notification.Title,

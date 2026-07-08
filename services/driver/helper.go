@@ -19,7 +19,7 @@ import (
 
 func mapDriverData(request DriverRegistrationRequest) postgress.Driver {
 	return postgress.Driver{
-		ID:           utils.GenerateUUID(),
+		ID:           database.GenerateUUID(),
 		Status:       constants.Status_PendingApproval,
 		DriverMobile: request.MobileNumber,
 		DriverName:   request.Name,
@@ -29,7 +29,7 @@ func mapDriverData(request DriverRegistrationRequest) postgress.Driver {
 
 func mapDriverDataWithPin(driver postgress.Driver, pin string) postgress.Driver {
 	return postgress.Driver{
-		ID:           utils.GenerateUUID(),
+		ID:           database.GenerateUUID(),
 		Status:       constants.Status_PendingApproval,
 		DriverMobile: driver.DriverMobile,
 		DriverName:   driver.DriverName,
@@ -40,7 +40,7 @@ func mapDriverDataWithPin(driver postgress.Driver, pin string) postgress.Driver 
 
 func mapVehicleData(request VehicleRegistrationRequest, driverId string) postgress.Vehicle {
 	return postgress.Vehicle{
-		ID:            utils.GenerateUUID(),
+		ID:            database.GenerateUUID(),
 		DriverId:      driverId,
 		VehicleNumber: request.VehicleNumber,
 		VehicleInfo:   request.VehicleInfo,
@@ -76,7 +76,7 @@ func mapVehicleUpdateData(
 
 func mapFCMData(userId, fcm string) postgress.UserFCM {
 	return postgress.UserFCM{
-		ID:     utils.GenerateUUID(),
+		ID:     database.GenerateUUID(),
 		UserId: userId,
 		FCM:    fcm,
 	}
@@ -356,7 +356,8 @@ func updateVehicleInfo(orgCtx *gin.Context, sessionId, driverId string, request 
 
 		for _, ride := range rides {
 			delRide := postgress.DELRide{
-				ID:                   ride.ID,
+				ID:                   database.GenerateUUID(),
+				RideID:               ride.ID,
 				DriverID:             ride.DriverID,
 				VehicleID:            ride.VehicleID,
 				StartDatetime:        ride.StartDatetime,
@@ -387,7 +388,8 @@ func updateVehicleInfo(orgCtx *gin.Context, sessionId, driverId string, request 
 
 			///// DELETE VEHICLE /////
 			delVehicle := postgress.DELVehicle{
-				ID:            existingVehicle.ID,
+				ID:            database.GenerateUUID(),
+				VehicleID:     existingVehicle.ID,
 				DriverId:      existingVehicle.DriverId,
 				VehicleNumber: fmt.Sprintf("DEL_%s_%s", existingVehicle.VehicleNumber, time.Now().String()),
 				VehicleInfo:   existingVehicle.VehicleInfo,
@@ -440,7 +442,7 @@ func updateVehicleInfo(orgCtx *gin.Context, sessionId, driverId string, request 
 
 func mapRating(request RateDriverRequest) postgress.PassengerRating {
 	return postgress.PassengerRating{
-		ID:                    utils.GenerateUUID(),
+		ID:                    database.GenerateUUID(),
 		DriverID:              request.DriverId,
 		RideID:                request.RideId,
 		PassengerMobileNumber: request.MobileNumber,
@@ -610,7 +612,7 @@ func bookRide(orgCtx *gin.Context, sessionId, driverID string, request BookSeatR
 	}
 
 	if err := tx.Create(&postgress.RideBooking{
-		ID:           utils.GenerateUUID(),
+		ID:           database.GenerateUUID(),
 		RideID:       request.RideId,
 		MobileNumber: request.MobileNumber,
 		Name:         request.Name,

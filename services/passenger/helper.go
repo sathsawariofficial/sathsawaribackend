@@ -8,7 +8,6 @@ import (
 	"rideshare/pkgs/database"
 	"rideshare/pkgs/database/postgress"
 	"rideshare/pkgs/logger"
-	"rideshare/pkgs/utils"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -48,7 +47,7 @@ func bookRide(orgCtx *gin.Context, sessionId string, request BookSeatRequest) er
 	}
 
 	if err := tx.Create(&postgress.RideBooking{
-		ID:           utils.GenerateUUID(),
+		ID:           database.GenerateUUID(),
 		RideID:       request.RideId,
 		MobileNumber: request.MobileNumber,
 		Name:         request.Name,
