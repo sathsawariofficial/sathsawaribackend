@@ -191,6 +191,7 @@ type RideDetails struct {
 	VehicleId            string         `json:"vehicle_id"`
 	Code                 string         `json:"code"`
 	RouteDetails         string         `json:"route_details"`
+	ParentRideId         string         `json:"parent_id"`
 	IsActive             bool           `json:"is_active"`
 	CreatedAt            time.Time      `json:"created_at"`
 	UpdatedAt            time.Time      `json:"updated_at"`

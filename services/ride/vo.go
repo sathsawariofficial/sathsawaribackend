@@ -80,6 +80,7 @@ func filteredRidesResp(rides []postgress.RideDetails, totalRows int64) utils.API
 			VehicleId:            ride.VehicleId,
 			Fare:                 ride.Fare,
 			RouteDetails:         ride.RouteDetails,
+			ParentRideId:         ride.ParentRideId,
 			IsActive:             ride.IsActive,
 		})
 	}
@@ -124,13 +125,42 @@ func getBookedSeatsResp(bookedSeats []postgress.RidePassenger) utils.APIResponse
 	return rideResp
 }
 
-func getRideResp(sessionId string, ride postgress.Ride) utils.APIResponse {
-	return utils.APIResponse{
-		Code:    http.StatusOK,
-		Message: constants.Success,
-		Data: RideDetails{
+func getRideResp(sessionId string, ride postgress.RideDetails, childRides []postgress.RideDetails) utils.APIResponse {
+	var response RideDetailsWithChildrenResponse
+	response.Ride = RideDetails{
+		ID:                   ride.ID,
+		DriverID:             ride.DriverID,
+		DriverName:           ride.DriverName,
+		DriverMobile:         ride.DriverMobile,
+		Rating:               ride.Rating,
+		VehicleId:            ride.VehicleId,
+		VehicleNumber:        ride.VehicleNumber,
+		VehicleInfo:          ride.VehicleInfo,
+		RouteDetails:         ride.RouteDetails,
+		ParentRideId:         ride.ParentRideId,
+		StartDatetime:        ride.StartDatetime,
+		EstimatedEndDatetime: ride.EstimatedEndDatetime,
+		NumberOfSeats:        ride.NumberOfSeats,
+		SeatsTaken:           ride.SeatsTaken,
+		StartLocation:        ride.StartLocation,
+		EndLocation:          ride.EndLocation,
+		RoutePoints:          ride.RoutePoints,
+		Fare:                 ride.Fare,
+		Code:                 ride.Code,
+	}
+
+	for _, ride := range childRides {
+		response.ChildRides = append(response.ChildRides, RideDetails{
 			ID:                   ride.ID,
 			DriverID:             ride.DriverID,
+			DriverName:           ride.DriverName,
+			DriverMobile:         ride.DriverMobile,
+			Rating:               ride.Rating,
+			VehicleId:            ride.VehicleId,
+			VehicleNumber:        ride.VehicleNumber,
+			VehicleInfo:          ride.VehicleInfo,
+			RouteDetails:         ride.RouteDetails,
+			ParentRideId:         ride.ParentRideId,
 			StartDatetime:        ride.StartDatetime,
 			EstimatedEndDatetime: ride.EstimatedEndDatetime,
 			NumberOfSeats:        ride.NumberOfSeats,
@@ -140,7 +170,13 @@ func getRideResp(sessionId string, ride postgress.Ride) utils.APIResponse {
 			RoutePoints:          ride.RoutePoints,
 			Fare:                 ride.Fare,
 			Code:                 ride.Code,
-		},
+		})
+	}
+
+	return utils.APIResponse{
+		Code:    http.StatusOK,
+		Message: constants.Success,
+		Data:    response,
 	}
 }
 

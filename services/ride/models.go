@@ -34,6 +34,11 @@ type DriverRideResponse struct {
 	Rides      []RideDetails `json:"rides"`
 }
 
+type RideDetailsWithChildrenResponse struct {
+	Ride       RideDetails   `json:"ride"`
+	ChildRides []RideDetails `json:"childRides"`
+}
+
 type RideDetails struct {
 	ID                   string   `json:"id"`
 	DriverID             string   `json:"driverId"`
@@ -53,6 +58,7 @@ type RideDetails struct {
 	Code                 string   `json:"code"`
 	Fare                 float64  `json:"fare"`
 	RouteDetails         string   `json:"routeDetails"`
+	ParentRideId         string   `json:"parent_id"`
 	IsActive             bool     `json:"isActive"`
 }
 

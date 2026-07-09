@@ -332,9 +332,9 @@ func GetRideHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in GetRideHandler", sessionId)
 
-	vehicleId := ctx.Query(constants.Vehicle_KEY)
-	if utils.IsStringEmpty(vehicleId) {
-		err := fmt.Errorf(constants.Not_Found, "vehicle")
+	rideId := ctx.Query(constants.Ride_Key)
+	if utils.IsStringEmpty(rideId) {
+		err := fmt.Errorf(constants.Not_Found, "ride")
 		logger.LogError(sessionId, err)
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
@@ -343,7 +343,7 @@ func GetRideHandler(ctx *gin.Context) {
 		return
 	}
 
-	ride, err := GetRide(ctx, sessionId, vehicleId)
+	ride, childRides, err := GetRide(ctx, sessionId, rideId)
 	if err != nil {
 		logger.LogError(sessionId, "error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
@@ -353,7 +353,7 @@ func GetRideHandler(ctx *gin.Context) {
 		return
 	}
 
-	rideResp := getRideResp(sessionId, ride)
+	rideResp := getRideResp(sessionId, ride, childRides)
 
 	logger.LogInfo("Response received in GetRideHandler", sessionId)
 	logger.LogDebug2("Response received in GetRideHandler", sessionId, rideResp)

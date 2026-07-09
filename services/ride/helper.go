@@ -276,6 +276,7 @@ func getFilteredRides(
 			rides.vehicle_id,
 			rides.fare,
 			rides.route_details,
+			rides.parent_ride_id,
 			ride_searches.is_active,
 			rides.created_at,
 			rides.updated_at
@@ -461,20 +462,74 @@ func bookSeatByDriver(orgCtx *gin.Context, sessionId, driverId string, request B
 	return
 }
 
-func getRide(orgCtx *gin.Context, sessionId, vehicleId string) (ride postgress.Ride, err error) {
-	logger.LogInfo("Request recevied in getRide", sessionId)
-	logger.LogDebug("Request recevied in getRide", sessionId, vehicleId)
+func getRide(
+	orgCtx *gin.Context,
+	sessionId,
+	rideId string,
+) (
+	ride postgress.RideDetails,
+	childRides []postgress.RideDetails,
+	err error,
+) {
+	logger.LogInfo("Request received in getRide", sessionId)
+	logger.LogDebug("Request received in getRide", sessionId, rideId)
 
 	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	ctx, cancel := context.WithTimeout(
+		orgCtx,
+		time.Duration(configuration.ConfigurationData.Timeout)*time.Second,
+	)
 	defer cancel()
 
-	err = database.DatabaseConn.Postgres.
-		WithContext(ctx).
-		Where("vehicle_id = ?", vehicleId).
-		Find(&ride).Error
+	db := database.DatabaseConn.Postgres.WithContext(ctx)
 
-	logger.LogInfo("Response returned from getRideTemplates", sessionId)
+	selectClause := `
+		rides.id,
+		rides.driver_id,
+		drivers.driver_name,
+		drivers.driver_mobile,
+		drivers.rating,
+		vehicles.vehicle_number,
+		vehicles.vehicle_info,
+		rides.start_datetime,
+		rides.estimated_end_datetime,
+		rides.number_of_seats,
+		rides.seats_taken,
+		rides.start_location,
+		rides.end_location,
+		rides.route_points,
+		rides.fare,
+		rides.vehicle_id,
+		rides.code,
+		rides.route_details,
+		rides.parent_ride_id AS parent_id,
+		rides.is_active,
+		rides.created_at,
+		rides.updated_at
+	`
+
+	err = db.
+		Table("rides").
+		Select(selectClause).
+		Joins("JOIN drivers ON rides.driver_id = drivers.id").
+		Joins("JOIN vehicles ON rides.vehicle_id = vehicles.id").
+		Where("rides.id = ? AND ride.is_active = ?", rideId, true).
+		First(&ride).Error
+	if err != nil {
+		return
+	}
+
+	err = db.
+		Table("rides").
+		Select(selectClause).
+		Joins("JOIN drivers ON rides.driver_id = drivers.id").
+		Joins("JOIN vehicles ON rides.vehicle_id = vehicles.id").
+		Where("rides.parent_ride_id = ?", rideId).
+		Order("rides.start_datetime ASC").
+		Find(&childRides).Error
+
+	logger.LogInfo("Response returned from getRide", sessionId)
+
 	return
 }
 

@@ -370,14 +370,14 @@ func UpdateBookedSeat(ctx *gin.Context, sessionId, ridePassengerId string) (err 
 	return
 }
 
-func GetRide(ctx *gin.Context, sessionId, vehicleId string) (ride postgress.Ride, err error) {
+func GetRide(ctx *gin.Context, sessionId, rideId string) (ride postgress.RideDetails, childRides []postgress.RideDetails, err error) {
 	logger.LogInfo("Request returned from GetRide", sessionId)
-	logger.LogDebug("Request returned from GetRide", sessionId, vehicleId)
+	logger.LogDebug("Request returned from GetRide", sessionId, rideId)
 
-	ride, err = getRide(ctx, sessionId, vehicleId)
+	ride, childRides, err = getRide(ctx, sessionId, rideId)
 	if err != nil {
 		logger.LogError(sessionId, err)
-		err = fmt.Errorf(constants.Failed_To_Do_Job, "get template")
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get ride")
 		return
 	}
 

@@ -108,20 +108,28 @@ func ValidateRideCreation(sessionId, driverId string, request *RideCreationReque
 		if request.Period == WEEKLY && lenDOW == 0 {
 			return fmt.Errorf(constants.Missing_Data, "days of week")
 		}
-		// we do not expect days of week for daily and monthly rides
-		if request.Period != WEEKLY && lenDOW > 0 {
-			return fmt.Errorf(constants.Invalid_Data, "days of week")
-		}
-		if lenDOW > 7 {
-			return errors.New("There cannot be more than 7 days")
-		}
+
 		if request.Period == DAILY {
 			if request.Frequency > constants.Max_Daily_Frequency {
 				return fmt.Errorf("Daily frequency cannot be more than %d", constants.Max_Daily_Frequency)
 			}
 		} else if request.Period == WEEKLY {
+			if lenDOW > 7 {
+				return errors.New("There cannot be more than 7 days")
+			}
 			if request.Frequency > constants.Max_Weekly_Frequency {
 				return fmt.Errorf("Weekly frequency cannot be more than %d", constants.Max_Weekly_Frequency)
+			}
+			for _, day := range request.DaysOfWeek {
+				if day != MONDAY &&
+					day != TUESDAY &&
+					day != WEDNESDAY &&
+					day != THRUSDAY &&
+					day != FRIDAY &&
+					day != SATURDAY &&
+					day != SUNDAY {
+					return errors.New("Week days are invalid")
+				}
 			}
 		} else if request.Period == MONTHLY {
 			if request.Frequency > constants.Max_Monthly_Frequency {
@@ -129,17 +137,6 @@ func ValidateRideCreation(sessionId, driverId string, request *RideCreationReque
 			}
 		} else {
 			return fmt.Errorf(constants.Invalid_Data, "period")
-		}
-		for _, day := range request.DaysOfWeek {
-			if day != MONDAY &&
-				day != TUESDAY &&
-				day != WEDNESDAY &&
-				day != THRUSDAY &&
-				day != FRIDAY &&
-				day != SATURDAY &&
-				day != SUNDAY {
-				return errors.New("Week days are invalid")
-			}
 		}
 	}
 
