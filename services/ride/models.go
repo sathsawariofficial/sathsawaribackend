@@ -40,26 +40,26 @@ type RideDetailsWithChildrenResponse struct {
 }
 
 type RideDetails struct {
-	ID                   string   `json:"id"`
-	DriverID             string   `json:"driverId"`
-	DriverName           string   `json:"driverName"`
-	DriverMobile         string   `json:"driverMobile"`
-	Rating               string   `json:"rating"`
-	VehicleId            string   `json:"vehicleId"`
-	VehicleNumber        string   `json:"vehicleNumber"`
-	VehicleInfo          string   `json:"vehicleInfo"`
-	StartDatetime        string   `json:"startDatetime"`
-	EstimatedEndDatetime string   `json:"estimatedEndDatetime"`
-	NumberOfSeats        int      `json:"numberOfSeats"`
-	SeatsTaken           int      `json:"seatsTaken"`
-	StartLocation        string   `json:"startLocation"`
-	EndLocation          string   `json:"endLocation"`
-	RoutePoints          []string `json:"routePoints"`
-	Code                 string   `json:"code"`
-	Fare                 float64  `json:"fare"`
-	RouteDetails         string   `json:"routeDetails"`
-	ParentRideId         string   `json:"parent_id"`
-	IsActive             bool     `json:"isActive"`
+	ID                   string   `json:"id,omitempty"`
+	DriverID             string   `json:"driverId,omitempty"`
+	DriverName           string   `json:"driverName,omitempty"`
+	DriverMobile         string   `json:"driverMobile,omitempty"`
+	Rating               string   `json:"rating,omitempty"`
+	VehicleId            string   `json:"vehicleId,omitempty"`
+	VehicleNumber        string   `json:"vehicleNumber,omitempty"`
+	VehicleInfo          string   `json:"vehicleInfo,omitempty"`
+	StartDatetime        string   `json:"startDatetime,omitempty"`
+	EstimatedEndDatetime string   `json:"estimatedEndDatetime,omitempty"`
+	NumberOfSeats        int      `json:"numberOfSeats,omitempty"`
+	SeatsTaken           int      `json:"seatsTaken,omitempty"`
+	StartLocation        string   `json:"startLocation,omitempty"`
+	EndLocation          string   `json:"endLocation,omitempty"`
+	RoutePoints          []string `json:"routePoints,omitempty"`
+	Code                 string   `json:"code,omitempty"`
+	Fare                 float64  `json:"fare,omitempty"`
+	RouteDetails         string   `json:"routeDetails,omitempty"`
+	ParentRideId         string   `json:"parent_id,omitempty"`
+	IsActive             bool     `json:"isActive,omitempty"`
 }
 
 type UpdateRideRequest struct {

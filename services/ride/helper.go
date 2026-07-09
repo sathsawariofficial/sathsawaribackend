@@ -513,10 +513,10 @@ func getRide(
 		Select(selectClause).
 		Joins("JOIN drivers ON rides.driver_id = drivers.id").
 		Joins("JOIN vehicles ON rides.vehicle_id = vehicles.id").
-		Where("rides.id = ? AND ride.is_active = ?", rideId, true).
+		Where("rides.id = ? AND rides.is_active = ?", rideId, true).
 		First(&ride).Error
 	if err != nil {
-		return
+		logger.LogError(sessionId, err)
 	}
 
 	err = db.
