@@ -11,6 +11,7 @@ import (
 	"rideshare/pkgs/database/redis"
 	"rideshare/pkgs/logger"
 	"rideshare/pkgs/utils"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -31,31 +32,38 @@ func closeActiveRides() {
 		logger.LogError(sessionId, "failed to get ride error: "+err.Error())
 		return
 	}
+
 	if len(rides) == 0 {
 		logger.LogWarning(sessionId, "no ride found")
 		return
 	}
 
-	now := time.Now()
+	pkt := time.FixedZone("PKT", 5*60*60)
+	now := time.Now().In(pkt)
 
 	for _, ride := range rides {
-		endTime, err := utils.ConvertStrToTime(ride.EstimatedEndDatetime)
+		endTime, err := time.ParseInLocation(
+			"2006-01-02 15:04:05",
+			strings.TrimSpace(ride.EstimatedEndDatetime),
+			pkt,
+		)
 		if err != nil {
-			logger.LogError(sessionId, "invalid datetime for ride "+fmt.Sprint(ride.ID))
+			logger.LogError(sessionId, fmt.Errorf("invalid datetime for ride %s: %v", ride.ID, err))
 			continue
 		}
 
-		if endTime.Before(now) || endTime.Equal(now) {
+		if !endTime.After(now) {
 			logger.LogDebug2("closing ride", sessionId, ride.ID)
 
-			database.DatabaseConn.Postgres.
+			if err := database.DatabaseConn.Postgres.
 				Model(&postgress.Ride{}).
 				Where("id = ?", ride.ID).
-				Update("is_active", false)
+				Update("is_active", false).Error; err != nil {
+				logger.LogError(sessionId, err)
+			}
 		}
 	}
 }
-
 func getAllActiveRides() (rides []postgress.Ride, err error) {
 	err = database.DatabaseConn.Postgres.
 		Where(`is_active = ?`, true).
