@@ -58,6 +58,7 @@ func NewPortgress() (db *gorm.DB, err error) {
 		&DriverDevice{},
 		&BroadcastNotificationRequests{},
 		&RideBooking{},
+		&RideRequest{},
 
 		&DELVehicle{},
 		&DELRide{},

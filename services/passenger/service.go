@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"rideshare/pkgs/constants"
 	"rideshare/pkgs/database"
+	"rideshare/pkgs/database/postgress"
 	"rideshare/pkgs/logger"
 	"rideshare/pkgs/utils"
 
@@ -34,6 +35,47 @@ func BookSeat(ctx *gin.Context, sessionId string, request BookSeatRequest) (err 
 	})
 
 	logger.LogInfo("Response returned from BookSeat", sessionId)
+
+	return
+}
+
+func RequestRide(ctx *gin.Context, sessionId string, request RideRequest) (err error) {
+	logger.LogInfo("Request returned from RequestRide", sessionId)
+
+	rideRequest := mapRideRequest(request)
+	if err := database.DatabaseConn.Postgres.Create(&rideRequest).Error; err != nil {
+		logger.LogError(sessionId, "failed to create ride request error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "record request")
+		return err
+	}
+
+	logger.LogInfo("Response returned from RequestRide", sessionId)
+
+	return
+}
+
+func GetRequestedRide(ctx *gin.Context, sessionId string, request GetRideRequest) (rides []postgress.RideRequest, totalPages int, err error) {
+	logger.LogInfo("Request returned from GetRequestedRide", sessionId)
+
+	page, err := utils.GetPageNumber(ctx)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get page number error: "+err.Error())
+		err = fmt.Errorf(constants.Invalid_Data, "page")
+		return
+	}
+
+	if rides, totalPages, err = getFilterAndPaginateRideRequests(ctx,
+		page,
+		request.StartDatetime,
+		request.EstimatedEndDatetime,
+		request.StartLocation,
+		request.EndLocation); err != nil {
+		logger.LogError(sessionId, "failed to get requested rides error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "fetch request data")
+		return
+	}
+
+	logger.LogInfo("Response returned from GetRequestedRide", sessionId)
 
 	return
 }

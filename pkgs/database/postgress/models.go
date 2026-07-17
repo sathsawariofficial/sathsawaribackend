@@ -266,3 +266,16 @@ type BroadcastNotificationRequests struct {
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 }
+
+type RideRequest struct {
+	ID                   string    `json:"id" gorm:"primary_key"`
+	StartDatetime        string    `json:"start_datetime" gorm:"not null"`
+	EstimatedEndDatetime string    `json:"estimated_end_datetime" gorm:"not null"`
+	NumberOfSeats        int       `json:"number_of_seats" gorm:"not null"`
+	StartLocation        string    `json:"start_location" gorm:"not null"`
+	EndLocation          string    `json:"end_location" gorm:"not null"`
+	RouteDetails         string    `json:"route_details" gorm:"not null"`
+	IsActive             bool      `json:"is_active" gorm:"not null"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
+}

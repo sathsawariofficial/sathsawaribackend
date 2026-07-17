@@ -84,6 +84,7 @@ func main() {
 			passengerPublic := public.Group("/passenger")
 			{
 				passengerPublic.POST("/seat/book", passenger.BookSeatHandler)
+				passengerPublic.POST("/ride/request", passenger.RideRequestHandler)
 			}
 		}
 
@@ -114,6 +115,7 @@ func main() {
 				driverProtected.POST("/pin/reset", driver.ChangePinHandler)
 				driverProtected.POST("/seat/book", driver.BookSeatHandler)
 				driverProtected.GET("/bookings", driver.GetBookSeatHandler)
+				driverProtected.POST("/ride/requests", passenger.GetRideRequestHandler)
 
 				/*
 					// NOTE: this feature is not needed atm
