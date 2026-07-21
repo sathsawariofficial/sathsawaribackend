@@ -48,6 +48,10 @@ func ValidateRideRequest(sessionId string, request RideRequest) error {
 		return fmt.Errorf(constants.Missing_Data, errMessage)
 	}
 
+	if err := utils.IsValidMobileNumber(request.ContactNumber); err != nil {
+		return err
+	}
+
 	// Length validations
 	startDateLen := len(request.StartDatetime)
 	estimatedEndDatetimeLen := len(request.EstimatedEndDatetime)

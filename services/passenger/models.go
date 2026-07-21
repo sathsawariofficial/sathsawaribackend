@@ -15,6 +15,7 @@ type RideRequest struct {
 	StartLocation        string `json:"startLocation"`
 	EndLocation          string `json:"endLocation"`
 	RouteDetails         string `json:"routeDetails"`
+	ContactNumber        string `json:"contactNumber"`
 }
 
 type GetRideRequest struct {

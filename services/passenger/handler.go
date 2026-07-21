@@ -103,15 +103,7 @@ func GetRideRequestHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in GetRideRequestHandler", sessionId)
 
-	var request GetRideRequest
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		logger.LogError(sessionId, "binding error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: fmt.Sprintf(constants.Unable_To_Do_Job, "book ride"),
-		})
-		return
-	}
+	request := getRideRequestFromQuery(ctx, sessionId)
 
 	logger.LogDebug2("Response received in GetRideRequestHandler", sessionId, request)
 

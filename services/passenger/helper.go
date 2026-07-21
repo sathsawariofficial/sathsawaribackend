@@ -16,6 +16,22 @@ import (
 	"gorm.io/gorm"
 )
 
+func getRideRequestFromQuery(orgCtx *gin.Context, sessionId string) GetRideRequest {
+	logger.LogInfo("Request received in getRideRequestFromQuery", sessionId)
+
+	request := GetRideRequest{
+		StartDatetime:        orgCtx.Query("startDatetime"),
+		EstimatedEndDatetime: orgCtx.Query("estimatedEndDatetime"),
+		StartLocation:        orgCtx.Query("startLocation"),
+		EndLocation:          orgCtx.Query("endLocation"),
+	}
+
+	logger.LogInfo("Response returned from getRideRequestFromQuery", sessionId)
+	logger.LogDebug("Response returned from getRideRequestFromQuery", sessionId, request)
+
+	return request
+}
+
 func bookRide(orgCtx *gin.Context, sessionId string, request BookSeatRequest) error {
 	ctx, cancel := context.WithTimeout(
 		orgCtx,
@@ -73,6 +89,7 @@ func mapRideRequest(request RideRequest) postgress.RideRequest {
 		StartLocation:        request.StartLocation,
 		EndLocation:          request.EndLocation,
 		RouteDetails:         request.RouteDetails,
+		ContactNumber:        request.ContactNumber,
 		IsActive:             true,
 	}
 }
@@ -100,7 +117,7 @@ func getFilterAndPaginateRideRequests(
 	defer cancel()
 
 	// 3. Build the base query
-	query := database.DatabaseConn.Postgres.WithContext(ctx).Model(&postgress.RideRequest{})
+	query := database.DatabaseConn.Postgres.WithContext(ctx).Model(&postgress.RideRequest{}).Where("is_active = ?", true)
 
 	// 4. Apply conditional location filters (ILIKE)
 	if startLoc = strings.TrimSpace(startLoc); startLoc != "" {

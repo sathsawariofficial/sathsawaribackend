@@ -275,6 +275,7 @@ type RideRequest struct {
 	StartLocation        string    `json:"start_location" gorm:"not null"`
 	EndLocation          string    `json:"end_location" gorm:"not null"`
 	RouteDetails         string    `json:"route_details" gorm:"not null"`
+	ContactNumber        string    `json:"contact_number" gorm:"not null;default:'N/A'"`
 	IsActive             bool      `json:"is_active" gorm:"not null"`
 	CreatedAt            time.Time `json:"created_at"`
 	UpdatedAt            time.Time `json:"updated_at"`
