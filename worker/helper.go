@@ -64,10 +64,67 @@ func closeActiveRides() {
 		}
 	}
 }
+
+func closeActiveRideRequests() {
+	sessionId := constants.WROKER_SESSION
+	logger.LogInfo("Request received in CloseActiveRideRequests", sessionId)
+
+	defer func() {
+		if r := recover(); r != nil {
+			logger.LogError(sessionId, fmt.Errorf("panic recovered: %v", r))
+		}
+	}()
+
+	rideRequests, err := getAllActiveRideRequest()
+	if err != nil {
+		logger.LogError(sessionId, "failed to get ride request error: "+err.Error())
+		return
+	}
+
+	if len(rideRequests) == 0 {
+		logger.LogWarning(sessionId, "no ride request found")
+		return
+	}
+
+	pkt := time.FixedZone("PKT", 5*60*60)
+	now := time.Now().In(pkt)
+
+	for _, request := range rideRequests {
+		endTime, err := time.ParseInLocation(
+			"2006-01-02 15:04:05",
+			strings.TrimSpace(request.EstimatedEndDatetime),
+			pkt,
+		)
+		if err != nil {
+			logger.LogError(sessionId, fmt.Errorf("invalid datetime for ride request %s: %v", request.ID, err))
+			continue
+		}
+
+		if !endTime.After(now) {
+			logger.LogDebug2("closing ride request", sessionId, request.ID)
+
+			if err := database.DatabaseConn.Postgres.
+				Model(&postgress.RideRequest{}).
+				Where("id = ?", request.ID).
+				Update("is_active", false).Error; err != nil {
+				logger.LogError(sessionId, err)
+			}
+		}
+	}
+}
+
 func getAllActiveRides() (rides []postgress.Ride, err error) {
 	err = database.DatabaseConn.Postgres.
 		Where(`is_active = ?`, true).
 		Find(&rides).Error
+
+	return
+}
+
+func getAllActiveRideRequest() (requests []postgress.RideRequest, err error) {
+	err = database.DatabaseConn.Postgres.
+		Where(`is_active = ?`, true).
+		Find(&requests).Error
 
 	return
 }

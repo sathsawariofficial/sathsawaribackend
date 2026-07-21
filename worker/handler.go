@@ -42,6 +42,32 @@ func CloseActiveRidesScheduler() {
 	}
 }
 
+func CloseActiveRideRequestsScheduler() {
+	sessionId := constants.WROKER_SESSION
+	logger.LogInfo("Starting CloseActiveRideRequestsScheduler", sessionId)
+
+	defer func() {
+		if r := recover(); r != nil {
+			logger.LogError(sessionId, fmt.Errorf("panic recovered in scheduler: %v", r))
+		}
+	}()
+
+	ticker := time.NewTicker(
+		time.Duration(configuration.ConfigurationData.General.Tickers.RideCloseScheduler) * time.Second,
+	)
+	defer ticker.Stop()
+
+	// run once immediately on start
+	closeActiveRideRequests()
+
+	for {
+		select {
+		case <-ticker.C:
+			closeActiveRideRequests()
+		}
+	}
+}
+
 func ProcessNotifications() {
 	defer func() {
 		if r := recover(); r != nil {
