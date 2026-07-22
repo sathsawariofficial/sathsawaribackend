@@ -27,6 +27,7 @@ type GetRideRequest struct {
 
 type RideRequestDetails struct {
 	ID                   string `json:"id"`
+	ContactNumber        string `json:"contactNumber"`
 	StartDatetime        string `json:"startDatetime"`
 	EstimatedEndDatetime string `json:"estimatedEndDatetime"`
 	NumberOfSeats        int    `json:"numberOfSeats"`

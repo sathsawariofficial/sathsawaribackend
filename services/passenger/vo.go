@@ -12,6 +12,7 @@ func filteredRidesResp(rides []postgress.RideRequest, totalRows int) utils.APIRe
 	for _, ride := range rides {
 		rideRequests = append(rideRequests, RideRequestDetails{
 			ID:                   ride.ID,
+			ContactNumber:        ride.ContactNumber,
 			StartDatetime:        ride.StartDatetime,
 			EstimatedEndDatetime: ride.EstimatedEndDatetime,
 			NumberOfSeats:        ride.NumberOfSeats,
