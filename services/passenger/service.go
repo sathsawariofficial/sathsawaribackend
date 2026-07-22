@@ -11,20 +11,20 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func BookSeat(ctx *gin.Context, sessionId string, request BookSeatRequest) (err error) {
+func BookSeat(ctx *gin.Context, sessionId string, request BookSeatRequest) (uuid string, err error) {
 	logger.LogInfo("Request returned from BookSeat", sessionId)
 
 	driverId, vehicleNumber, driverMobile, err := database.GetDriverByRideId(ctx, request.RideId)
 	if err != nil {
 		logger.LogError(sessionId, "failed to get driver error: "+err.Error())
 		err = fmt.Errorf(constants.Not_Found, "ride")
-		return err
+		return uuid, err
 	}
 
-	if err := bookRide(ctx, sessionId, request); err != nil {
+	if uuid, err = bookRide(ctx, sessionId, request); err != nil {
 		logger.LogError(sessionId, "failed to book ride error: "+err.Error())
 		err = fmt.Errorf(constants.Failed_To_Do_Job, "book the seat")
-		return err
+		return uuid, err
 	}
 
 	message := fmt.Sprintf(constants.NOTIFICATION_MESSSGE_RIDE_BOOKED_DRIVER, request.Seats, vehicleNumber)

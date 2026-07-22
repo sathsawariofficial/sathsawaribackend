@@ -8,6 +8,10 @@ type BookSeatRequest struct {
 	Code         string `json:"code"`
 }
 
+type BookSeatResponse struct {
+	BookingId string `json:"bookingId"`
+}
+
 type RideRequest struct {
 	StartDatetime        string `json:"startDatetime"`
 	EstimatedEndDatetime string `json:"estimatedEndDatetime"`

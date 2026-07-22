@@ -170,6 +170,7 @@ func getBookedSeatsResp(bookings []postgress.RideBooking) utils.APIResponse {
 	for _, val := range bookings {
 		bookedSeats = append(bookedSeats, BookedSeat{
 			ID:           val.ID,
+			BookingID:    val.BookingID,
 			MobileNumber: val.MobileNumber,
 			Name:         val.Name,
 			Seats:        val.Seats,
@@ -186,6 +187,16 @@ func getBookedSeatsResp(bookings []postgress.RideBooking) utils.APIResponse {
 		Message: msg,
 		Data: &BookedSeatsResponse{
 			Bookings: bookedSeats,
+		},
+	}
+}
+
+func bookSeatResponse(msg, uuid string) utils.APIResponse {
+	return utils.APIResponse{
+		Code:    http.StatusOK,
+		Message: msg,
+		Data: BookSeatResponse{
+			BookingId: uuid,
 		},
 	}
 }

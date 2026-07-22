@@ -669,7 +669,7 @@ func BookSeatHandler(ctx *gin.Context) {
 
 	driverId := ctx.GetString(constants.User_KEY)
 
-	err = BookSeat(ctx, sessionId, driverId, request)
+	uuid, err := BookSeat(ctx, sessionId, driverId, request)
 	if err != nil {
 		logger.LogError(sessionId, "failed to book/unbook seat error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
@@ -683,7 +683,7 @@ func BookSeatHandler(ctx *gin.Context) {
 	if request.IsBook {
 		action = "Booked"
 	}
-	bookingResp := utils.GeneralSuccessResp(fmt.Sprintf(constants.Success_Info, fmt.Sprintf("%s the seat", action)))
+	bookingResp := bookSeatResponse(fmt.Sprintf(constants.Success_Info, fmt.Sprintf("%s the seat", action)), uuid)
 
 	logger.LogInfo("Response returned from GetBookSeatsHandler", sessionId)
 	logger.LogDebug2("Response returned from GetBookSeatsHandler", sessionId, bookingResp)

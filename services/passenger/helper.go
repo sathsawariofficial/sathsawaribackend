@@ -32,7 +32,9 @@ func getRideRequestFromQuery(orgCtx *gin.Context, sessionId string) GetRideReque
 	return request
 }
 
-func bookRide(orgCtx *gin.Context, sessionId string, request BookSeatRequest) error {
+func bookRide(orgCtx *gin.Context, sessionId string, request BookSeatRequest) (string, error) {
+	var bookingId string
+
 	ctx, cancel := context.WithTimeout(
 		orgCtx,
 		time.Duration(configuration.ConfigurationData.Timeout)*time.Second,
@@ -57,16 +59,18 @@ func bookRide(orgCtx *gin.Context, sessionId string, request BookSeatRequest) er
 
 	if result.Error != nil {
 		tx.Rollback()
-		return result.Error
+		return bookingId, result.Error
 	}
 
 	if result.RowsAffected == 0 {
 		tx.Rollback()
-		return fmt.Errorf("invalid ride code, ride not found, or insufficient seats available")
+		return bookingId, fmt.Errorf("invalid ride code, ride not found, or insufficient seats available")
 	}
 
+	bookingId = fmt.Sprintf("SS-%s", database.GenerateUUID())
 	if err := tx.Create(&postgress.RideBooking{
 		ID:           database.GenerateUUID(),
+		BookingID:    bookingId,
 		RideID:       request.RideId,
 		MobileNumber: request.MobileNumber,
 		Name:         request.Name,
@@ -74,10 +78,10 @@ func bookRide(orgCtx *gin.Context, sessionId string, request BookSeatRequest) er
 	}).Error; err != nil {
 		logger.LogError(sessionId, err)
 		tx.Rollback()
-		return fmt.Errorf(constants.Registeration_Failed, "booking")
+		return bookingId, fmt.Errorf(constants.Registeration_Failed, "booking")
 	}
 
-	return tx.Commit().Error
+	return bookingId, tx.Commit().Error
 }
 
 func mapRideRequest(request RideRequest) postgress.RideRequest {

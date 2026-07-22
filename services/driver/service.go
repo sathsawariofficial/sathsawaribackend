@@ -576,20 +576,20 @@ func ForgotPin(ctx *gin.Context, sessionId, mobileNumber string) (otp string, er
 	return
 }
 
-func BookSeat(ctx *gin.Context, sessionId, driverId string, request BookSeatRequest) (err error) {
+func BookSeat(ctx *gin.Context, sessionId, driverId string, request BookSeatRequest) (uuid string, err error) {
 	logger.LogInfo("Request returned from BookSeat", sessionId)
 
 	if request.IsBook {
-		if err := bookRide(ctx, sessionId, driverId, request); err != nil {
+		if uuid, err = bookRide(ctx, sessionId, driverId, request); err != nil {
 			logger.LogError(sessionId, "failed to book ride error: "+err.Error())
 			err = fmt.Errorf(constants.Failed_To_Do_Job, "book the seat")
-			return err
+			return
 		}
 	} else {
-		if err := unBookRide(ctx, sessionId, driverId, request); err != nil {
+		if err = unBookRide(ctx, sessionId, driverId, request); err != nil {
 			logger.LogError(sessionId, "failed to unbook ride error: "+err.Error())
 			err = fmt.Errorf(constants.Failed_To_Do_Job, "unbook the seat")
-			return err
+			return
 		}
 	}
 

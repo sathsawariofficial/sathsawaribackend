@@ -7,6 +7,16 @@ import (
 	"rideshare/pkgs/utils"
 )
 
+func bookSeatResponse(msg, uuid string) utils.APIResponse {
+	return utils.APIResponse{
+		Code:    http.StatusOK,
+		Message: msg,
+		Data: BookSeatResponse{
+			BookingId: uuid,
+		},
+	}
+}
+
 func filteredRidesResp(rides []postgress.RideRequest, totalRows int) utils.APIResponse {
 	var rideRequests []RideRequestDetails
 	for _, ride := range rides {

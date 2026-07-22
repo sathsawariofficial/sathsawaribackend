@@ -136,8 +136,12 @@ type BookSeatRequest struct {
 	IsBook       bool   `json:"isBook"`
 }
 
+type BookSeatResponse struct {
+	BookingId string `json:"bookingId"`
+}
 type BookedSeat struct {
 	ID           string `json:"id"`
+	BookingID    string `json:"bookingId"`
 	MobileNumber string `json:"mobileNumber"`
 	Name         string `json:"name"`
 	Seats        int    `json:"seats"`

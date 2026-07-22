@@ -583,10 +583,11 @@ func validatePin(orgCtx *gin.Context, sessionId string, driver postgress.Driver,
 	return true
 }
 
-func bookRide(orgCtx *gin.Context, sessionId, driverID string, request BookSeatRequest) error {
+func bookRide(orgCtx *gin.Context, sessionId, driverID string, request BookSeatRequest) (string, error) {
 	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
 	defer cancel()
 
+	var uuid string
 	tx := database.DatabaseConn.Postgres.WithContext(ctx).Begin()
 
 	result := tx.Exec(`
@@ -600,27 +601,29 @@ func bookRide(orgCtx *gin.Context, sessionId, driverID string, request BookSeatR
 
 	if result.Error != nil {
 		tx.Rollback()
-		return result.Error
+		return uuid, result.Error
 	}
 
 	if result.RowsAffected == 0 {
 		tx.Rollback()
-		return fmt.Errorf("ride not found or insufficient seats available")
+		return uuid, fmt.Errorf("ride not found or insufficient seats available")
 	}
 
+	uuid = fmt.Sprintf("SS-%s", database.GenerateUUID())
 	if err := tx.Create(&postgress.RideBooking{
 		ID:           database.GenerateUUID(),
 		RideID:       request.RideId,
+		BookingID:    uuid,
 		MobileNumber: request.MobileNumber,
 		Name:         request.Name,
 		Seats:        request.Seats,
 	}).Error; err != nil {
 		logger.LogError(sessionId, err)
 		tx.Rollback()
-		return fmt.Errorf(constants.Registeration_Failed, "driver")
+		return uuid, fmt.Errorf(constants.Registeration_Failed, "driver")
 	}
 
-	return tx.Commit().Error
+	return uuid, tx.Commit().Error
 }
 
 func unBookRide(orgCtx *gin.Context, sessionId, driverID string, request BookSeatRequest) error {

@@ -145,6 +145,7 @@ type DELRide struct {
 type RideBooking struct {
 	ID           string    `json:"id" gorm:"primary_key"`
 	RideID       string    `json:"ride_id" gorm:"not null"`
+	BookingID    string    `json:"booking_id"`
 	Name         string    `json:"name" gorm:"not null"`
 	MobileNumber string    `json:"mobileNumber" gorm:"not null"`
 	Seats        int       `json:"seats" gorm:"not null"`

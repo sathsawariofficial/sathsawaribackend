@@ -37,7 +37,7 @@ func BookSeatHandler(ctx *gin.Context) {
 		return
 	}
 
-	err = BookSeat(ctx, sessionId, request)
+	uuid, err := BookSeat(ctx, sessionId, request)
 	if err != nil {
 		logger.LogError(sessionId, "failed to book seat error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
@@ -47,7 +47,7 @@ func BookSeatHandler(ctx *gin.Context) {
 		return
 	}
 
-	bookingResp := utils.GeneralSuccessResp(fmt.Sprintf(constants.Success_Info, "Booked the seat"))
+	bookingResp := bookSeatResponse(fmt.Sprintf(constants.Success_Info, "Booked the seat"), uuid)
 
 	logger.LogInfo("Response returned from GetBookSeatsHandler", sessionId)
 	logger.LogDebug2("Response returned from GetBookSeatsHandler", sessionId, bookingResp)
