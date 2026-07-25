@@ -723,3 +723,38 @@ func GetBookSeatHandler(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, bookingResp)
 }
+
+func ReserveSeatHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in ReserveSeatHandler", sessionId)
+
+	driverId := ctx.GetString(constants.User_KEY)
+	bookingId := ctx.Query(constants.Booking_Key)
+
+	err := ValidateReserveSeat(sessionId, bookingId)
+	if err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	err = ReserveSeat(ctx, sessionId, bookingId, driverId)
+	if err != nil {
+		logger.LogError(sessionId, "failed to reserve seat error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	reservationResp := utils.GeneralSuccessResp("Seat reserved successfully")
+
+	logger.LogInfo("Response returned from ReserveSeatHandler", sessionId)
+	logger.LogDebug2("Response returned from ReserveSeatHandler", sessionId, reservationResp)
+
+	ctx.JSON(http.StatusOK, reservationResp)
+}

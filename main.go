@@ -116,6 +116,7 @@ func main() {
 				driverProtected.POST("/seat/book", driver.BookSeatHandler)
 				driverProtected.GET("/bookings", driver.GetBookSeatHandler)
 				driverProtected.GET("/ride/requests", passenger.GetRideRequestHandler)
+				driverProtected.GET("/booking/reserve", driver.ReserveSeatHandler)
 
 				/*
 					// NOTE: this feature is not needed atm

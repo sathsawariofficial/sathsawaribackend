@@ -743,3 +743,37 @@ func updateForgottonPin(ctx *gin.Context, sessionId, mobileNumber, Pin, otp stri
 
 	return nil
 }
+
+func reserveRideBooking(orgCtx *gin.Context, sessionId, bookingID, driverID string) error {
+	logger.LogInfo("Request received in reserveRideBooking", sessionId)
+	logger.LogDebug("Request received in reserveRideBooking", sessionId, fmt.Sprintf("booking id: %s, driver id: %s", bookingID, driverID))
+
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	result := database.DatabaseConn.Postgres.WithContext(ctx).Exec(`
+		UPDATE ride_bookings rb
+		SET reserved = true,
+		    updated_at = NOW()
+		FROM rides r
+		WHERE rb.ride_id = r.id
+		  AND rb.booking_id = $1
+		  AND r.driver_id = $2
+		  AND r.is_active = true
+	`, bookingID, driverID)
+	if result.Error != nil {
+		logger.LogError(sessionId, result.Error)
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		err := fmt.Errorf("booking not found")
+		logger.LogError(sessionId, err)
+		return err
+	}
+
+	logger.LogInfo("Response returned from reserveRideBooking", sessionId)
+
+	return nil
+}

@@ -145,6 +145,7 @@ type BookedSeat struct {
 	MobileNumber string `json:"mobileNumber"`
 	Name         string `json:"name"`
 	Seats        int    `json:"seats"`
+	Reserved     bool   `json:"reserved"`
 }
 
 type BookedSeatsResponse struct {

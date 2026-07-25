@@ -149,6 +149,7 @@ type RideBooking struct {
 	Name         string    `json:"name" gorm:"not null"`
 	MobileNumber string    `json:"mobileNumber" gorm:"not null"`
 	Seats        int       `json:"seats" gorm:"not null"`
+	Reserved     bool      `json:"reserved" gorm:"not null;default:false"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }

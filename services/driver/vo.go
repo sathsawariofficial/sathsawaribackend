@@ -174,6 +174,7 @@ func getBookedSeatsResp(bookings []postgress.RideBooking) utils.APIResponse {
 			MobileNumber: val.MobileNumber,
 			Name:         val.Name,
 			Seats:        val.Seats,
+			Reserved:     val.Reserved,
 		})
 	}
 

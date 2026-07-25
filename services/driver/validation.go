@@ -232,3 +232,11 @@ func ValidateGetBookSeat(sessionId, rideId string) error {
 
 	return nil
 }
+
+func ValidateReserveSeat(sessionId, bookingId string) error {
+	if utils.IsStringEmpty(bookingId) {
+		return fmt.Errorf(constants.Invalid_Data, "booking id")
+	}
+
+	return nil
+}

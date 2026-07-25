@@ -611,3 +611,18 @@ func GetBookedSeat(ctx *gin.Context, sessionId, rideId string) (bookings []postg
 
 	return
 }
+
+func ReserveSeat(ctx *gin.Context, sessionId, bookingID, driverID string) (err error) {
+	logger.LogInfo("Request returned from ReserveSeat", sessionId)
+	logger.LogDebug("Request received in ReserveSeat", sessionId, fmt.Sprintf("booking id: %s, driver id: %s", bookingID, driverID))
+
+	if err = reserveRideBooking(ctx, sessionId, bookingID, driverID); err != nil {
+		logger.LogError(sessionId, "failed to reserve seat error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "reserve seat")
+		return
+	}
+
+	logger.LogInfo("Response returned from ReserveSeat", sessionId)
+
+	return
+}
