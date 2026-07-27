@@ -453,3 +453,7 @@ func encodeBase62(n uint64) string {
 
 	return string(out)
 }
+
+func CreateOpenRideLink(shortCode string) string {
+	return constants.RIDE_BASE_URL + shortCode
+}

@@ -77,7 +77,7 @@ func CreateRide(ctx *gin.Context, sessionId string, request RideCreationRequest)
 	}
 
 	shortCode := utils.GenerateShortCode(rideId)
-	openURL = constants.RIDE_BASE_URL + shortCode
+	openURL = utils.CreateOpenRideLink(shortCode)
 	redis.SetRedisValue(database.DatabaseConn.RedisConn, shortCode, rideId)
 
 	utils.SendNotification(ctx, sessionId, constants.NOTIFICATION_TYPE_RIDE_CREATED, request.EXTDriverId, constants.NOTIFICATION_TITLE_RIDE_CREATION, constants.NOTIFICATION_MESSAGE_RIDE_CREATION, nil)
