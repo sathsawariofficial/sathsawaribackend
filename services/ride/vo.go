@@ -4,17 +4,22 @@ import (
 	"fmt"
 	"net/http"
 	"rideshare/pkgs/constants"
+	"rideshare/pkgs/database"
 	"rideshare/pkgs/database/postgress"
+	"rideshare/pkgs/database/redis"
 	"rideshare/pkgs/logger"
 	"rideshare/pkgs/utils"
 	"time"
 )
 
-func createRideResp(rideId string) utils.APIResponse {
+func createRideResp(rideId, openURL string) utils.APIResponse {
 	rideResp := utils.APIResponse{
 		Code:    http.StatusOK,
 		Message: fmt.Sprintf(constants.Created_Successfully, "Ride"),
-		Data:    rideId,
+		Data: CreateRideResponse{
+			Id:      rideId,
+			OpenURL: openURL,
+		},
 	}
 
 	return rideResp
@@ -23,6 +28,7 @@ func createRideResp(rideId string) utils.APIResponse {
 func getDriverRidesResp(rides []postgress.RideDetails, totalPages int, driverId string) utils.APIResponse {
 	var ridesDetils []RideDetails
 	for _, ride := range rides {
+		openURL, _ := redis.GetRedisValue(database.DatabaseConn.RedisConn, utils.GenerateShortCode(ride.ID))
 		ridesDetils = append(ridesDetils, RideDetails{
 			ID:                   ride.ID,
 			DriverID:             ride.DriverID,
@@ -43,6 +49,7 @@ func getDriverRidesResp(rides []postgress.RideDetails, totalPages int, driverId 
 			Fare:                 ride.Fare,
 			RouteDetails:         ride.RouteDetails,
 			IsActive:             ride.IsActive,
+			OpenURL:              openURL,
 		})
 	}
 
@@ -62,6 +69,7 @@ func getDriverRidesResp(rides []postgress.RideDetails, totalPages int, driverId 
 func filteredRidesResp(rides []postgress.RideDetails, totalRows int64) utils.APIResponse {
 	var ridesDetils []RideDetails
 	for _, ride := range rides {
+		openURL, _ := redis.GetRedisValue(database.DatabaseConn.RedisConn, utils.GenerateShortCode(ride.ID))
 		ridesDetils = append(ridesDetils, RideDetails{
 			ID:                   ride.ID,
 			DriverID:             ride.DriverID,
@@ -82,6 +90,8 @@ func filteredRidesResp(rides []postgress.RideDetails, totalRows int64) utils.API
 			RouteDetails:         ride.RouteDetails,
 			ParentRideId:         ride.ParentRideId,
 			IsActive:             ride.IsActive,
+			Code:                 ride.Code,
+			OpenURL:              openURL,
 		})
 	}
 
@@ -127,6 +137,12 @@ func getBookedSeatsResp(bookedSeats []postgress.RidePassenger) utils.APIResponse
 
 func getRideResp(sessionId string, ride postgress.RideDetails, childRides []postgress.RideDetails) utils.APIResponse {
 	var response RideDetailsWithChildrenResponse
+
+	openUrl, err := redis.GetRedisValue(database.DatabaseConn.RedisConn, utils.GenerateShortCode(ride.ID))
+	if err != nil {
+		logger.LogError(sessionId, err)
+	}
+
 	response.Ride = RideDetails{
 		ID:                   ride.ID,
 		DriverID:             ride.DriverID,
@@ -147,9 +163,15 @@ func getRideResp(sessionId string, ride postgress.RideDetails, childRides []post
 		RoutePoints:          ride.RoutePoints,
 		Fare:                 ride.Fare,
 		Code:                 ride.Code,
+		OpenURL:              openUrl,
 	}
 
 	for _, ride := range childRides {
+		openUrl, err := redis.GetRedisValue(database.DatabaseConn.RedisConn, utils.GenerateShortCode(ride.ID))
+		if err != nil {
+			logger.LogError(sessionId, err)
+		}
+
 		response.ChildRides = append(response.ChildRides, RideDetails{
 			ID:                   ride.ID,
 			DriverID:             ride.DriverID,
@@ -170,6 +192,7 @@ func getRideResp(sessionId string, ride postgress.RideDetails, childRides []post
 			RoutePoints:          ride.RoutePoints,
 			Fare:                 ride.Fare,
 			Code:                 ride.Code,
+			OpenURL:              openUrl,
 		})
 	}
 

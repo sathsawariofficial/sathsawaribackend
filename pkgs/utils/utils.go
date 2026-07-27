@@ -2,7 +2,9 @@ package utils
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -421,4 +423,33 @@ func GetDriver(orgCtx *gin.Context, mobile string) (driver postgress.Driver, err
 	err = database.DatabaseConn.Postgres.WithContext(ctx).Where(`driver_mobile = ?`, mobile).Find(&driver).Error
 
 	return
+}
+
+func GenerateShortCode(id string) string {
+	hash := sha256.Sum256([]byte(id))
+
+	// First 8 bytes -> uint64
+	n := binary.BigEndian.Uint64(hash[:8])
+
+	return encodeBase62(n)
+}
+
+func encodeBase62(n uint64) string {
+	if n == 0 {
+		return "0"
+	}
+
+	var out []byte
+
+	for n > 0 {
+		out = append(out, constants.URL_SHORTNER_SEED[n%62])
+		n /= 62
+	}
+
+	// reverse
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
+	}
+
+	return string(out)
 }

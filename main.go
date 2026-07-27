@@ -47,6 +47,7 @@ func main() {
 	router.GET("/", general_rest.GetHomePage)
 	router.GET("/terms", general_rest.GetTermsAndConditions)
 	router.GET("/privacy-policy", general_rest.GetPrivacyPolicy)
+	router.GET("/r/:id", ride.GetOpenRideHandler)
 
 	v1 := router.Group("/api/v1")
 	{

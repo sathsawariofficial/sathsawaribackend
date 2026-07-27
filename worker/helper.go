@@ -61,6 +61,11 @@ func closeActiveRides() {
 				Update("is_active", false).Error; err != nil {
 				logger.LogError(sessionId, err)
 			}
+
+			err = redis.DeleteRedisValue(database.DatabaseConn.RedisConn, utils.GenerateShortCode((ride.ID)))
+			if err != nil {
+				logger.LogError(sessionId, err)
+			}
 		}
 	}
 }

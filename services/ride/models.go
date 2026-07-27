@@ -39,6 +39,11 @@ type RideDetailsWithChildrenResponse struct {
 	ChildRides []RideDetails `json:"childRides"`
 }
 
+type CreateRideResponse struct {
+	Id      string `json:"id"`
+	OpenURL string `json:"openUrl"`
+}
+
 type RideDetails struct {
 	ID                   string   `json:"id,omitempty"`
 	DriverID             string   `json:"driverId,omitempty"`
@@ -60,6 +65,7 @@ type RideDetails struct {
 	RouteDetails         string   `json:"routeDetails,omitempty"`
 	ParentRideId         string   `json:"parent_id,omitempty"`
 	IsActive             bool     `json:"isActive,omitempty"`
+	OpenURL              string   `json:"openUrl,omitempty"`
 }
 
 type UpdateRideRequest struct {

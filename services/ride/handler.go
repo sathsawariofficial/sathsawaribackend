@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"rideshare/pkgs/constants"
+	"rideshare/pkgs/database"
+	"rideshare/pkgs/database/redis"
 	"rideshare/pkgs/logger"
 	"rideshare/pkgs/utils"
 
@@ -40,7 +42,7 @@ func CreateRideHandler(ctx *gin.Context) {
 	}
 	request.EXTDriverId = driverId
 
-	rideId, err := CreateRide(ctx, sessionId, request)
+	rideId, openURL, err := CreateRide(ctx, sessionId, request)
 	if err != nil {
 		logger.LogError(sessionId, "ride creation error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
@@ -50,7 +52,7 @@ func CreateRideHandler(ctx *gin.Context) {
 		return
 	}
 
-	rideResp := createRideResp(rideId)
+	rideResp := createRideResp(rideId, openURL)
 
 	logger.LogInfo("Response returned from CreateRideHandler", sessionId)
 	logger.LogDebug2("Response returned from CreateRideHandler", sessionId, rideResp)
@@ -357,6 +359,50 @@ func GetRideHandler(ctx *gin.Context) {
 
 	logger.LogInfo("Response received in GetRideHandler", sessionId)
 	logger.LogDebug2("Response received in GetRideHandler", sessionId, rideResp)
+
+	ctx.JSON(http.StatusOK, rideResp)
+}
+
+func GetOpenRideHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetOpenRideHandler", sessionId)
+
+	rideCode := ctx.Param("id")
+	rideId, err := redis.GetRedisValue(database.DatabaseConn.RedisConn, rideCode)
+	if err != nil {
+		logger.LogError(sessionId, err)
+		err := fmt.Errorf(constants.Not_Found, "ride")
+		logger.LogError(sessionId, err)
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+	if utils.IsStringEmpty(rideId) {
+		err := fmt.Errorf(constants.Not_Found, "ride")
+		logger.LogError(sessionId, err)
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	ride, childRides, err := GetRide(ctx, sessionId, rideId)
+	if err != nil {
+		logger.LogError(sessionId, "error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	rideResp := getRideResp(sessionId, ride, childRides)
+
+	logger.LogInfo("Response received in GetOpenRideHandler", sessionId)
+	logger.LogDebug2("Response received in GetOpenRideHandler", sessionId, rideResp)
 
 	ctx.JSON(http.StatusOK, rideResp)
 }

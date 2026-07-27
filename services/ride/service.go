@@ -8,6 +8,7 @@ import (
 	"rideshare/pkgs/constants"
 	"rideshare/pkgs/database"
 	"rideshare/pkgs/database/postgress"
+	"rideshare/pkgs/database/redis"
 	"rideshare/pkgs/logger"
 	"rideshare/pkgs/utils"
 	"strings"
@@ -16,7 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func CreateRide(ctx *gin.Context, sessionId string, request RideCreationRequest) (rideId string, err error) {
+func CreateRide(ctx *gin.Context, sessionId string, request RideCreationRequest) (rideId, openURL string, err error) {
 	logger.LogInfo("Request received in CreateRide", sessionId)
 
 	vehicle, err := getVehicleById(ctx, request.VehicleId)
@@ -74,6 +75,10 @@ func CreateRide(ctx *gin.Context, sessionId string, request RideCreationRequest)
 			return
 		}
 	}
+
+	shortCode := utils.GenerateShortCode(rideId)
+	openURL = constants.RIDE_BASE_URL + shortCode
+	redis.SetRedisValue(database.DatabaseConn.RedisConn, shortCode, rideId)
 
 	utils.SendNotification(ctx, sessionId, constants.NOTIFICATION_TYPE_RIDE_CREATED, request.EXTDriverId, constants.NOTIFICATION_TITLE_RIDE_CREATION, constants.NOTIFICATION_MESSAGE_RIDE_CREATION, nil)
 
@@ -274,6 +279,11 @@ func UpdateRide(orgCtx *gin.Context, sessionId, rideId string, request UpdateRid
 		if err := tx.Commit().Error; err != nil {
 			logger.LogError(sessionId, err)
 			return errors.New(constants.Unknown_Error)
+		}
+
+		err := redis.DeleteRedisValue(database.DatabaseConn.RedisConn, utils.GenerateShortCode(ride.ID))
+		if err != nil {
+			logger.LogError(sessionId, err)
 		}
 
 		logger.LogInfo("Response returned from UpdateRide", sessionId)
