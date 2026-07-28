@@ -41,6 +41,7 @@ type RideDetailsWithChildrenResponse struct {
 
 type CreateRideResponse struct {
 	Id      string `json:"id"`
+	IsPro   bool   `json:"isPro"`
 	OpenURL string `json:"openUrl"`
 }
 
