@@ -374,10 +374,11 @@ func GetOpenRideHandler(ctx *gin.Context) {
 			err = fmt.Errorf(constants.Not_Found, "ride")
 		}
 		logger.LogError(sessionId, err)
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
+		redirectURL := fmt.Sprintf(
+			constants.APP_BASE_URL+"/?page=expired",
+			rideId,
+		)
+		ctx.Redirect(http.StatusFound, redirectURL)
 		return
 	}
 
