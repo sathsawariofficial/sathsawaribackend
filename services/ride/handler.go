@@ -369,18 +369,10 @@ func GetOpenRideHandler(ctx *gin.Context) {
 
 	rideCode := ctx.Param("id")
 	rideId, err := redis.GetRedisValue(database.DatabaseConn.RedisConn, rideCode)
-	if err != nil {
-		logger.LogError(sessionId, err)
-		err := fmt.Errorf(constants.Not_Found, "ride")
-		logger.LogError(sessionId, err)
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
-		return
-	}
-	if utils.IsStringEmpty(rideId) {
-		err := fmt.Errorf(constants.Not_Found, "ride")
+	if err != nil || utils.IsStringEmpty(rideId) {
+		if err == nil {
+			err = fmt.Errorf(constants.Not_Found, "ride")
+		}
 		logger.LogError(sessionId, err)
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
@@ -389,22 +381,15 @@ func GetOpenRideHandler(ctx *gin.Context) {
 		return
 	}
 
-	ride, childRides, err := GetRide(ctx, sessionId, rideId)
-	if err != nil {
-		logger.LogError(sessionId, "error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
-		return
-	}
+	redirectURL := fmt.Sprintf(
+		constants.APP_BASE_URL+"/?page=reserve&rideId=%s",
+		rideId,
+	)
 
-	rideResp := getRideResp(sessionId, ride, childRides)
+	logger.LogInfo("Redirecting user", sessionId)
+	logger.LogDebug2("Redirect URL", sessionId, redirectURL)
 
-	logger.LogInfo("Response received in GetOpenRideHandler", sessionId)
-	logger.LogDebug2("Response received in GetOpenRideHandler", sessionId, rideResp)
-
-	ctx.JSON(http.StatusOK, rideResp)
+	ctx.Redirect(http.StatusFound, redirectURL)
 }
 
 func GetRideTemplatesHandler(ctx *gin.Context) {
