@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/rs/xid"
@@ -429,7 +431,7 @@ func GenerateShortCode(id string) string {
 	hash := sha256.Sum256([]byte(id))
 
 	// First 8 bytes -> uint64
-	n := binary.BigEndian.Uint64(hash[:8])
+	n := binary.BigEndian.Uint64(hash[:constants.DEFAULT_SHORT_CODE_LEN])
 
 	return encodeBase62(n)
 }
@@ -456,4 +458,9 @@ func encodeBase62(n uint64) string {
 
 func CreateOpenRideLink(shortCode string) string {
 	return constants.RIDE_BASE_URL + shortCode
+}
+
+func IsUUID(s string) bool {
+	_, err := uuid.Parse(s)
+	return err == nil
 }

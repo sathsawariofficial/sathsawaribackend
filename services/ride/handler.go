@@ -345,6 +345,19 @@ func GetRideHandler(ctx *gin.Context) {
 		return
 	}
 
+	if !utils.IsUUID(rideId) {
+		var err error
+		rideId, err = redis.GetRedisValue(database.DatabaseConn.RedisConn, rideId)
+		if err != nil {
+			logger.LogError(sessionId, "error: "+err.Error())
+			ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+				Code:    http.StatusBadRequest,
+				Message: err.Error(),
+			})
+			return
+		}
+	}
+
 	ride, childRides, err := GetRide(ctx, sessionId, rideId)
 	if err != nil {
 		logger.LogError(sessionId, "error: "+err.Error())

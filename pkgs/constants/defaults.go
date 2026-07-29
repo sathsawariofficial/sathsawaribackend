@@ -11,8 +11,9 @@ const (
 )
 
 const (
-	DEFAULT_APP_HASH  = "aqfUly2KTch"
-	URL_SHORTNER_SEED = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-	APP_BASE_URL      = "https://sathsawari.com/"
-	RIDE_BASE_URL     = APP_BASE_URL + "r/"
+	DEFAULT_SHORT_CODE_LEN = 8
+	DEFAULT_APP_HASH       = "aqfUly2KTch"
+	URL_SHORTNER_SEED      = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	APP_BASE_URL           = "https://sathsawari.com/"
+	RIDE_BASE_URL          = APP_BASE_URL + "r/"
 )
