@@ -388,7 +388,7 @@ func GetOpenRideHandler(ctx *gin.Context) {
 		}
 		logger.LogError(sessionId, err)
 		redirectURL := fmt.Sprintf(
-			constants.APP_BASE_URL+"/?page=expired",
+			constants.APP_BASE_URL+"?page=expired",
 			rideId,
 		)
 		ctx.Redirect(http.StatusFound, redirectURL)
