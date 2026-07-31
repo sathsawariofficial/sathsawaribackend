@@ -396,7 +396,7 @@ func GetOpenRideHandler(ctx *gin.Context) {
 	}
 
 	redirectURL := fmt.Sprintf(
-		constants.APP_BASE_URL+"/?page=reserve&rideId=%s",
+		constants.APP_BASE_URL+"?page=reserve&rideId=%s",
 		rideId,
 	)
 
