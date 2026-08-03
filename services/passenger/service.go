@@ -5,6 +5,7 @@ import (
 	"rideshare/pkgs/constants"
 	"rideshare/pkgs/database"
 	"rideshare/pkgs/database/postgress"
+	"rideshare/pkgs/database/redis"
 	"rideshare/pkgs/logger"
 	"rideshare/pkgs/utils"
 
@@ -39,23 +40,28 @@ func BookSeat(ctx *gin.Context, sessionId string, request BookSeatRequest) (uuid
 	return
 }
 
-func RequestRide(ctx *gin.Context, sessionId string, request RideRequest) (err error) {
+func RequestRide(ctx *gin.Context, sessionId string, request RideRequest) (requestId, openURL string, err error) {
 	logger.LogInfo("Request returned from RequestRide", sessionId)
 
 	rideRequest := mapRideRequest(request)
-	if err := database.DatabaseConn.Postgres.Create(&rideRequest).Error; err != nil {
+	if err = database.DatabaseConn.Postgres.Create(&rideRequest).Error; err != nil {
 		logger.LogError(sessionId, "failed to create ride request error: "+err.Error())
 		err = fmt.Errorf(constants.Failed_To_Do_Job, "record request")
-		return err
+		return
 	}
+	requestId = rideRequest.ID
+
+	shortCode := utils.GenerateShortCode(rideRequest.ID)
+	openURL = utils.CreateOpenRideLink(constants.LIKE_TYPE_RIDE_REQUEST_URL, shortCode)
+	redis.SetRedisValue(database.DatabaseConn.RedisConn, shortCode, rideRequest.ID)
 
 	logger.LogInfo("Response returned from RequestRide", sessionId)
 
 	return
 }
 
-func GetRequestedRide(ctx *gin.Context, sessionId string, request GetRideRequest) (rides []postgress.RideRequest, totalPages int, err error) {
-	logger.LogInfo("Request returned from GetRequestedRide", sessionId)
+func GetRequestedRides(ctx *gin.Context, sessionId string, request GetRideRequest) (rides []postgress.RideRequest, totalPages int, err error) {
+	logger.LogInfo("Request returned from GetRequestedRides", sessionId)
 
 	page, err := utils.GetPageNumber(ctx)
 	if err != nil {
@@ -75,7 +81,24 @@ func GetRequestedRide(ctx *gin.Context, sessionId string, request GetRideRequest
 		return
 	}
 
+	logger.LogInfo("Response returned from GetRequestedRides", sessionId)
+
+	return
+}
+
+func GetRequestedRide(ctx *gin.Context, sessionId, rideId string) (rideRequest postgress.RideRequest, err error) {
+	logger.LogInfo("Request returned from GetRequestedRide", sessionId)
+	logger.LogDebug("Request returned from GetRequestedRide", sessionId, rideId)
+
+	rideRequest, err = getRideRequestByID(ctx, rideId)
+	if err != nil {
+		logger.LogError(sessionId, err)
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get ride")
+		return
+	}
+
 	logger.LogInfo("Response returned from GetRequestedRide", sessionId)
+	logger.LogDebug("Response returned from GetRequestedRide", sessionId, rideRequest)
 
 	return
 }

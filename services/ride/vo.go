@@ -26,7 +26,7 @@ func createRideResp(rideId, openURL string) utils.APIResponse {
 func getDriverRidesResp(rides []postgress.RideDetails, totalPages int, driverId string) utils.APIResponse {
 	var ridesDetils []RideDetails
 	for _, ride := range rides {
-		openURL := utils.CreateOpenRideLink(utils.GenerateShortCode(ride.ID))
+		openURL := utils.CreateOpenRideLink(constants.LIKE_TYPE_RIDE_URL, utils.GenerateShortCode(ride.ID))
 
 		ridesDetils = append(ridesDetils, RideDetails{
 			ID:                   ride.ID,
@@ -68,7 +68,7 @@ func getDriverRidesResp(rides []postgress.RideDetails, totalPages int, driverId 
 func filteredRidesResp(rides []postgress.RideDetails, totalRows int64) utils.APIResponse {
 	var ridesDetils []RideDetails
 	for _, ride := range rides {
-		openURL := utils.CreateOpenRideLink(utils.GenerateShortCode(ride.ID))
+		openURL := utils.CreateOpenRideLink(constants.LIKE_TYPE_RIDE_URL, utils.GenerateShortCode(ride.ID))
 		ridesDetils = append(ridesDetils, RideDetails{
 			ID:                   ride.ID,
 			DriverID:             ride.DriverID,
@@ -137,7 +137,7 @@ func getBookedSeatsResp(bookedSeats []postgress.RidePassenger) utils.APIResponse
 func getRideResp(sessionId string, ride postgress.RideDetails, childRides []postgress.RideDetails) utils.APIResponse {
 	var response RideDetailsWithChildrenResponse
 
-	openUrl := utils.CreateOpenRideLink(utils.GenerateShortCode(ride.ID))
+	openUrl := utils.CreateOpenRideLink(constants.LIKE_TYPE_RIDE_URL, utils.GenerateShortCode(ride.ID))
 
 	response.Ride = RideDetails{
 		ID:                   ride.ID,
@@ -163,7 +163,7 @@ func getRideResp(sessionId string, ride postgress.RideDetails, childRides []post
 	}
 
 	for _, ride := range childRides {
-		openUrl := utils.CreateOpenRideLink(utils.GenerateShortCode(ride.ID))
+		openUrl := utils.CreateOpenRideLink(constants.LIKE_TYPE_RIDE_URL, utils.GenerateShortCode(ride.ID))
 
 		response.ChildRides = append(response.ChildRides, RideDetails{
 			ID:                   ride.ID,

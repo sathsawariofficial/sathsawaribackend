@@ -16,4 +16,5 @@ const (
 	URL_SHORTNER_SEED      = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 	APP_BASE_URL           = "https://sathsawari.com/"
 	RIDE_BASE_URL          = APP_BASE_URL + "r/"
+	RIDE_REQUEST_BASE_URL  = APP_BASE_URL + "rq/"
 )

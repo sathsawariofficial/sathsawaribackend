@@ -48,6 +48,7 @@ func main() {
 	router.GET("/terms", general_rest.GetTermsAndConditions)
 	router.GET("/privacy-policy", general_rest.GetPrivacyPolicy)
 	router.GET("/r/:id", ride.GetOpenRideHandler)
+	router.GET("/rq/:id", ride.GetOpenRideHandler)
 
 	v1 := router.Group("/api/v1")
 	{
@@ -80,6 +81,7 @@ func main() {
 			{
 				ridePublic.GET("/filtered", ride.GetFilteredRidesHandler)
 				ridePublic.GET("", ride.GetRideHandler)
+				ridePublic.GET("/request", passenger.GetRideRequestHandler)
 			}
 
 			passengerPublic := public.Group("/passenger")
@@ -116,7 +118,7 @@ func main() {
 				driverProtected.POST("/pin/reset", driver.ChangePinHandler)
 				driverProtected.POST("/seat/book", driver.BookSeatHandler)
 				driverProtected.GET("/bookings", driver.GetBookSeatHandler)
-				driverProtected.GET("/ride/requests", passenger.GetRideRequestHandler)
+				driverProtected.GET("/ride/requests", passenger.GetRideRequestsHandler)
 				driverProtected.GET("/booking/reserve", driver.ReserveSeatHandler)
 
 				/*

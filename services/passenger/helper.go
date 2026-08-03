@@ -2,6 +2,7 @@ package passenger
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"rideshare/pkgs/configuration"
@@ -168,4 +169,29 @@ func getFilterAndPaginateRideRequests(
 	}
 
 	return rides, totalPages, nil
+}
+
+func getRideRequestByID(orgCtx *gin.Context, rideRequestID string) (postgress.RideRequest, error) {
+	ctx, cancel := context.WithTimeout(
+		orgCtx,
+		time.Duration(configuration.ConfigurationData.Timeout)*time.Second,
+	)
+	defer cancel()
+
+	var rideRequest postgress.RideRequest
+
+	err := database.DatabaseConn.Postgres.
+		WithContext(ctx).
+		Where("is_active = ?", true).
+		First(&rideRequest, "id = ?", rideRequestID).
+		Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return rideRequest, fmt.Errorf("ride request not found")
+		}
+		return rideRequest, err
+	}
+
+	return rideRequest, nil
 }

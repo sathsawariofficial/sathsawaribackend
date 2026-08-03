@@ -22,6 +22,11 @@ type RideRequest struct {
 	ContactNumber        string `json:"contactNumber"`
 }
 
+type RideRequestResponse struct {
+	OpenURL   string `json:"openUrl"`
+	RequestId string `json:"requestId"`
+}
+
 type GetRideRequest struct {
 	StartDatetime        string `json:"startDatetime"`
 	EstimatedEndDatetime string `json:"estimatedEndDatetime"`
@@ -40,7 +45,7 @@ type RideRequestDetails struct {
 	RouteDetails         string `json:"routeDetails"`
 }
 
-type RidesRequestDetailsResponse struct {
+type RidesRequestsDetailsResponse struct {
 	TotalPages int                  `json:"totalPages"`
 	Rides      []RideRequestDetails `json:"rides"`
 }

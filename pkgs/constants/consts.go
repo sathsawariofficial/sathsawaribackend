@@ -55,6 +55,7 @@ const (
 	Search_Loc_Key         = "search"
 	Status_Key             = "status"
 	Ride_Key               = "ride_id"
+	Ride_Request_Key       = "request_id"
 	Seat_Key               = "seat_id"
 	Booking_Key            = "booking_id"
 	Ride_Template_Key      = "ride_template_id"
@@ -182,4 +183,10 @@ const (
 // Notifications Key
 const (
 	NOTIFICATION_KEY_RIDE_ID = "rideId"
+)
+
+// deep linking url types
+const (
+	LIKE_TYPE_RIDE_URL         = "RIDE_URL"
+	LIKE_TYPE_RIDE_REQUEST_URL = "RIDE_REQUEST_URL"
 )

@@ -456,8 +456,15 @@ func encodeBase62(n uint64) string {
 	return string(out)
 }
 
-func CreateOpenRideLink(shortCode string) string {
-	return constants.RIDE_BASE_URL + shortCode
+func CreateOpenRideLink(urlType, shortCode string) string {
+	switch urlType {
+	case constants.LIKE_TYPE_RIDE_REQUEST_URL:
+		return constants.RIDE_REQUEST_BASE_URL + shortCode
+	case constants.LIKE_TYPE_RIDE_URL:
+		return constants.RIDE_BASE_URL + shortCode
+	default:
+		return constants.RIDE_BASE_URL + shortCode
+	}
 }
 
 func IsUUID(s string) bool {

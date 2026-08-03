@@ -8,6 +8,7 @@ import (
 	"rideshare/pkgs/database/redis"
 	"rideshare/pkgs/logger"
 	"rideshare/pkgs/utils"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/xid"
@@ -380,25 +381,35 @@ func GetOpenRideHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in GetOpenRideHandler", sessionId)
 
-	rideCode := ctx.Param("id")
-	rideId, err := redis.GetRedisValue(database.DatabaseConn.RedisConn, rideCode)
-	if err != nil || utils.IsStringEmpty(rideId) {
+	code := ctx.Param("id")
+	Id, err := redis.GetRedisValue(database.DatabaseConn.RedisConn, code)
+	if err != nil || utils.IsStringEmpty(Id) {
 		if err == nil {
 			err = fmt.Errorf(constants.Not_Found, "ride")
 		}
+
 		logger.LogError(sessionId, err)
-		redirectURL := fmt.Sprintf(
-			constants.APP_BASE_URL+"?page=expired",
-			rideId,
-		)
+
+		redirectURL := constants.APP_BASE_URL + "?page=expired"
 		ctx.Redirect(http.StatusFound, redirectURL)
 		return
 	}
 
-	redirectURL := fmt.Sprintf(
-		constants.APP_BASE_URL+"?page=reserve&rideId=%s",
-		rideId,
-	)
+	var redirectURL string
+
+	if strings.HasPrefix(ctx.Request.URL.Path, "/rq/") {
+		redirectURL = fmt.Sprintf(
+			"%s?page=reserve&ride_request_id=%s",
+			constants.APP_BASE_URL,
+			Id,
+		)
+	} else {
+		redirectURL = fmt.Sprintf(
+			"%s?page=reserve&ride_id=%s",
+			constants.APP_BASE_URL,
+			Id,
+		)
+	}
 
 	logger.LogInfo("Redirecting user", sessionId)
 	logger.LogDebug2("Redirect URL", sessionId, redirectURL)

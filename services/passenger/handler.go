@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"rideshare/pkgs/constants"
+	"rideshare/pkgs/database"
+	"rideshare/pkgs/database/redis"
 	"rideshare/pkgs/logger"
 	"rideshare/pkgs/utils"
 
@@ -81,7 +83,7 @@ func RideRequestHandler(ctx *gin.Context) {
 		return
 	}
 
-	err = RequestRide(ctx, sessionId, request)
+	openURL, requestId, err := RequestRide(ctx, sessionId, request)
 	if err != nil {
 		logger.LogError(sessionId, "failed to save ride request error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
@@ -91,7 +93,7 @@ func RideRequestHandler(ctx *gin.Context) {
 		return
 	}
 
-	bookingResp := utils.GeneralSuccessResp(fmt.Sprintf(constants.Success_Info, "Request recorded"))
+	bookingResp := rideRequestResponse(fmt.Sprintf(constants.Success_Info, "Request recorded"), requestId, openURL)
 
 	logger.LogInfo("Response returned from RideRequestHandler", sessionId)
 	logger.LogDebug2("Response returned from RideRequestHandler", sessionId, bookingResp)
@@ -99,13 +101,13 @@ func RideRequestHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, bookingResp)
 }
 
-func GetRideRequestHandler(ctx *gin.Context) {
+func GetRideRequestsHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
-	logger.LogInfo("Request received in GetRideRequestHandler", sessionId)
+	logger.LogInfo("Request received in GetRideRequestsHandler", sessionId)
 
 	request := getRideRequestFromQuery(ctx, sessionId)
 
-	logger.LogDebug2("Response received in GetRideRequestHandler", sessionId, request)
+	logger.LogDebug2("Response received in GetRideRequestsHandler", sessionId, request)
 
 	err := ValidateGetRideRequest(sessionId, request)
 	if err != nil {
@@ -117,7 +119,7 @@ func GetRideRequestHandler(ctx *gin.Context) {
 		return
 	}
 
-	rides, totalPages, err := GetRequestedRide(ctx, sessionId, request)
+	rides, totalPages, err := GetRequestedRides(ctx, sessionId, request)
 	if err != nil {
 		logger.LogError(sessionId, "failed to save ride request error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
@@ -138,8 +140,54 @@ func GetRideRequestHandler(ctx *gin.Context) {
 
 	rideRequestDetailsResp := filteredRidesResp(rides, totalPages)
 
-	logger.LogInfo("Response returned from GetRideRequestHandler", sessionId)
-	logger.LogDebug2("Response returned from GetRideRequestHandler", sessionId, rideRequestDetailsResp)
+	logger.LogInfo("Response returned from GetRideRequestsHandler", sessionId)
+	logger.LogDebug2("Response returned from GetRideRequestsHandler", sessionId, rideRequestDetailsResp)
 
 	ctx.JSON(http.StatusOK, rideRequestDetailsResp)
+}
+
+func GetRideRequestHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetRideRequestHandler", sessionId)
+
+	rideRequestId := ctx.Query(constants.Ride_Request_Key)
+	if utils.IsStringEmpty(rideRequestId) {
+		err := fmt.Errorf(constants.Not_Found, "ride")
+		logger.LogError(sessionId, err)
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	if !utils.IsUUID(rideRequestId) {
+		var err error
+		rideRequestId, err = redis.GetRedisValue(database.DatabaseConn.RedisConn, rideRequestId)
+		if err != nil {
+			logger.LogError(sessionId, "error: "+err.Error())
+			ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+				Code:    http.StatusBadRequest,
+				Message: err.Error(),
+			})
+			return
+		}
+	}
+
+	rideRequest, err := GetRequestedRide(ctx, sessionId, rideRequestId)
+	if err != nil {
+		logger.LogError(sessionId, "error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	rideRequestResp := rideRequestDetailsResp(rideRequest)
+
+	logger.LogInfo("Response received in GetRideRequestHandler", sessionId)
+	logger.LogDebug2("Response received in GetRideRequestHandler", sessionId, rideRequestResp)
+
+	ctx.JSON(http.StatusOK, rideRequestResp)
 }
