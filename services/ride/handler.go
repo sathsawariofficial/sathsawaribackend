@@ -399,7 +399,7 @@ func GetOpenRideHandler(ctx *gin.Context) {
 
 	if strings.HasPrefix(ctx.Request.URL.Path, "/rq/") {
 		redirectURL = fmt.Sprintf(
-			"%s?page=reserve&ride_request_id=%s",
+			"%s?page=seatrequests&request_id=%s",
 			constants.APP_BASE_URL,
 			Id,
 		)
