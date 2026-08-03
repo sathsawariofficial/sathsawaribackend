@@ -172,7 +172,7 @@ func LoginDriverHandler(ctx *gin.Context) {
 		return
 	}
 
-	driverSessionId, otp, driver, err := LoginDriver(ctx, sessionId, request)
+	driverSessionId, otp, driver, totalRides, totalVehicles, err := LoginDriver(ctx, sessionId, request)
 	if err != nil {
 		logger.LogError(sessionId, "login error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
@@ -182,7 +182,7 @@ func LoginDriverHandler(ctx *gin.Context) {
 		return
 	}
 
-	driverLoginResp := loginDriverResp(driverSessionId, otp, driver)
+	driverLoginResp := loginDriverResp(driverSessionId, otp, driver, totalRides, totalVehicles)
 
 	logger.LogInfo("Response received in LoginDriverHandler", sessionId)
 	logger.LogDebug2("Response received in LoginDriverHandler", sessionId, driverLoginResp)

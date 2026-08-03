@@ -777,3 +777,33 @@ func reserveRideBooking(orgCtx *gin.Context, sessionId, bookingID, driverID stri
 
 	return nil
 }
+
+func countRides(ctx *gin.Context, driverID string) (int64, error) {
+	var count int64
+
+	err := database.DatabaseConn.Postgres.
+		WithContext(ctx).
+		Model(&postgress.Ride{}).
+		Where("driver_id = ?", driverID).
+		Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countVehicles(ctx *gin.Context, driverID string) (int64, error) {
+	var count int64
+
+	err := database.DatabaseConn.Postgres.
+		WithContext(ctx).
+		Model(&postgress.Vehicle{}).
+		Where("driver_id = ?", driverID).
+		Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}

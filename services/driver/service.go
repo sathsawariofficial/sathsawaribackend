@@ -113,7 +113,7 @@ func RegisterVehicle(ctx *gin.Context, sessionId string, request VehicleRegistra
 	return
 }
 
-func LoginDriver(ctx *gin.Context, sessionId string, request DriverLoginRequest) (token, otp string, driver postgress.Driver, err error) {
+func LoginDriver(ctx *gin.Context, sessionId string, request DriverLoginRequest) (token, otp string, driver postgress.Driver, totalRides, totalVehicles int64, err error) {
 	logger.LogInfo("Request received in LoginDriver", sessionId)
 
 	driver, err = utils.GetDriver(ctx, request.MobileNumber)
@@ -152,6 +152,9 @@ func LoginDriver(ctx *gin.Context, sessionId string, request DriverLoginRequest)
 	if !utils.IsStringEmpty(request.FCM) {
 		handleFCM(ctx, sessionId, driver.ID, request.FCM)
 	}
+
+	totalRides, err = countRides(ctx, driver.ID)
+	totalVehicles, err = countVehicles(ctx, driver.ID)
 
 	logger.LogInfo("Response returned from LoginDriver", sessionId)
 

@@ -87,6 +87,9 @@ type DriverLogin struct {
 	DriverName   string `json:"driverName"`
 	Rating       string `json:"rating"`
 	HasPin       bool   `json:"hasPin"`
+	IsVerified   bool   `json:"isVerified"`
+	TotalRides   int64  `json:"totalRides"`
+	TotalVehicle int64  `json:"totalVehicles"`
 }
 
 type VehiclesResponse struct {

@@ -45,7 +45,7 @@ func updateVehicleResp(vehicleId, status string) utils.APIResponse {
 	}
 }
 
-func loginDriverResp(driverSessionId, otp string, driver postgress.Driver) utils.APIResponse {
+func loginDriverResp(driverSessionId, otp string, driver postgress.Driver, totalRides, totalVehicles int64) utils.APIResponse {
 	driverDetails := DriverLoginResponse{
 		Token: driverSessionId,
 		OTP:   otp,
@@ -55,6 +55,8 @@ func loginDriverResp(driverSessionId, otp string, driver postgress.Driver) utils
 			DriverName:   driver.DriverName,
 			Rating:       driver.Rating,
 			HasPin:       !utils.IsStringEmpty(driver.Pin),
+			TotalRides:   totalRides,
+			TotalVehicle: totalVehicles,
 		},
 	}
 
