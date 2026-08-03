@@ -138,7 +138,7 @@ func GetRideRequestsHandler(ctx *gin.Context) {
 		return
 	}
 
-	rideRequestDetailsResp := filteredRidesResp(rides, totalPages)
+	rideRequestDetailsResp := filteredRideRequestsResp(rides, totalPages)
 
 	logger.LogInfo("Response returned from GetRideRequestsHandler", sessionId)
 	logger.LogDebug2("Response returned from GetRideRequestsHandler", sessionId, rideRequestDetailsResp)

@@ -17,10 +17,10 @@ func bookSeatResponse(msg, uuid string) utils.APIResponse {
 	}
 }
 
-func filteredRidesResp(requests []postgress.RideRequest, totalRows int) utils.APIResponse {
+func filteredRideRequestsResp(requests []postgress.RideRequest, totalRows int) utils.APIResponse {
 	var rideRequests []RideRequestDetails
 	for _, request := range requests {
-		openUrl := utils.CreateOpenRideLink(constants.LIKE_TYPE_RIDE_URL, utils.GenerateShortCode(request.ID))
+		openUrl := utils.CreateOpenRideLink(constants.LIKE_TYPE_RIDE_REQUEST_URL, utils.GenerateShortCode(request.ID))
 
 		rideRequests = append(rideRequests, RideRequestDetails{
 			ID:                   request.ID,
@@ -48,7 +48,7 @@ func filteredRidesResp(requests []postgress.RideRequest, totalRows int) utils.AP
 }
 
 func rideRequestDetailsResp(rideRequest postgress.RideRequest) utils.APIResponse {
-	openUrl := utils.CreateOpenRideLink(constants.LIKE_TYPE_RIDE_URL, utils.GenerateShortCode(rideRequest.ID))
+	openUrl := utils.CreateOpenRideLink(constants.LIKE_TYPE_RIDE_REQUEST_URL, utils.GenerateShortCode(rideRequest.ID))
 
 	rideDetailsResp := utils.APIResponse{
 		Code:    http.StatusOK,
