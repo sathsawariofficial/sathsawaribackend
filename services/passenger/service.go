@@ -46,7 +46,7 @@ func RequestRide(ctx *gin.Context, sessionId string, request RideRequest) (reque
 	rideRequest := mapRideRequest(request)
 	if err = database.DatabaseConn.Postgres.Create(&rideRequest).Error; err != nil {
 		logger.LogError(sessionId, "failed to create ride request error: "+err.Error())
-		err = fmt.Errorf(constants.Failed_To_Do_Job, "record request")
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "broadcasted request")
 		return
 	}
 	requestId = rideRequest.ID

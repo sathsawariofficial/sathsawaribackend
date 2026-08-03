@@ -43,6 +43,7 @@ type RideRequestDetails struct {
 	StartLocation        string `json:"startLocation"`
 	EndLocation          string `json:"endLocation"`
 	RouteDetails         string `json:"routeDetails"`
+	OpenURL              string `json:"openUrl"`
 }
 
 type RidesRequestsDetailsResponse struct {

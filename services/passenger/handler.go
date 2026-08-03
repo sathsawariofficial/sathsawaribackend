@@ -66,7 +66,7 @@ func RideRequestHandler(ctx *gin.Context) {
 		logger.LogError(sessionId, "binding error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
-			Message: fmt.Sprintf(constants.Unable_To_Do_Job, "book ride"),
+			Message: fmt.Sprintf(constants.Unable_To_Do_Job, "broadcasted request"),
 		})
 		return
 	}
@@ -93,7 +93,7 @@ func RideRequestHandler(ctx *gin.Context) {
 		return
 	}
 
-	bookingResp := rideRequestResponse(fmt.Sprintf(constants.Success_Info, "Request recorded"), requestId, openURL)
+	bookingResp := rideRequestResponse(fmt.Sprintf(constants.Success_Info, "Request broadcasted"), requestId, openURL)
 
 	logger.LogInfo("Response returned from RideRequestHandler", sessionId)
 	logger.LogDebug2("Response returned from RideRequestHandler", sessionId, bookingResp)

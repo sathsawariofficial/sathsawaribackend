@@ -17,18 +17,21 @@ func bookSeatResponse(msg, uuid string) utils.APIResponse {
 	}
 }
 
-func filteredRidesResp(rides []postgress.RideRequest, totalRows int) utils.APIResponse {
+func filteredRidesResp(requests []postgress.RideRequest, totalRows int) utils.APIResponse {
 	var rideRequests []RideRequestDetails
-	for _, ride := range rides {
+	for _, request := range requests {
+		openUrl := utils.CreateOpenRideLink(constants.LIKE_TYPE_RIDE_URL, utils.GenerateShortCode(request.ID))
+
 		rideRequests = append(rideRequests, RideRequestDetails{
-			ID:                   ride.ID,
-			ContactNumber:        ride.ContactNumber,
-			StartDatetime:        ride.StartDatetime,
-			EstimatedEndDatetime: ride.EstimatedEndDatetime,
-			NumberOfSeats:        ride.NumberOfSeats,
-			StartLocation:        ride.StartLocation,
-			EndLocation:          ride.EndLocation,
-			RouteDetails:         ride.RouteDetails,
+			ID:                   request.ID,
+			ContactNumber:        request.ContactNumber,
+			StartDatetime:        request.StartDatetime,
+			EstimatedEndDatetime: request.EstimatedEndDatetime,
+			NumberOfSeats:        request.NumberOfSeats,
+			StartLocation:        request.StartLocation,
+			EndLocation:          request.EndLocation,
+			RouteDetails:         request.RouteDetails,
+			OpenURL:              openUrl,
 		})
 	}
 
@@ -45,6 +48,8 @@ func filteredRidesResp(rides []postgress.RideRequest, totalRows int) utils.APIRe
 }
 
 func rideRequestDetailsResp(rideRequest postgress.RideRequest) utils.APIResponse {
+	openUrl := utils.CreateOpenRideLink(constants.LIKE_TYPE_RIDE_URL, utils.GenerateShortCode(rideRequest.ID))
+
 	rideDetailsResp := utils.APIResponse{
 		Code:    http.StatusOK,
 		Message: constants.Success,
@@ -57,6 +62,7 @@ func rideRequestDetailsResp(rideRequest postgress.RideRequest) utils.APIResponse
 			StartLocation:        rideRequest.StartLocation,
 			EndLocation:          rideRequest.EndLocation,
 			RouteDetails:         rideRequest.RouteDetails,
+			OpenURL:              openUrl,
 		},
 	}
 
