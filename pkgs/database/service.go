@@ -76,6 +76,33 @@ func GetAllNotificationByUserId(orgCtx *gin.Context, userId string, page int) (n
 	return
 }
 
+func GetAnnouncements(orgCtx *gin.Context, page int) (announcements []postgress.AnnouncementRequests, totalRows int64, err error) {
+	pageSize := configuration.ConfigurationData.PageSize
+	offset := (page - 1) * pageSize
+
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	baseQuery := DatabaseConn.Postgres.WithContext(ctx).
+		Model(&postgress.AnnouncementRequests{})
+
+	// Count total rows BEFORE applying limit/offset
+	err = baseQuery.Count(&totalRows).Error
+	if err != nil {
+		return
+	}
+
+	// Apply pagination
+	err = baseQuery.
+		Limit(pageSize).
+		Offset(offset).
+		Order("created_at DESC").
+		Find(&announcements).Error
+
+	return
+}
+
 func SaveMissingLocation(orgCtx context.Context, request postgress.MissingLocations) (err error) {
 	var cancel context.CancelFunc
 	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)

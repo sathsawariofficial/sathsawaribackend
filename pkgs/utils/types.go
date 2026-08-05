@@ -136,3 +136,5 @@ type SMSResponseDetails struct {
 	Status      string `json:"status"`
 	Description string `json:"description"`
 }
+
+type AnnouncementType string

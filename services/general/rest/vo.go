@@ -39,6 +39,31 @@ func getNotificationsResp(notifications []postgress.NotificationRequest, totalRo
 	return userNotificationResp
 }
 
+func getAnnouncementsResp(announcements []postgress.AnnouncementRequests, totalRows int64) utils.APIResponse {
+	var userAnnouncements []AnnouncementRequests
+	for _, annoucement := range announcements {
+		data := AnnouncementRequests{
+			ID:        annoucement.ID,
+			Title:     annoucement.Title,
+			Message:   annoucement.Message,
+			CreatedAt: annoucement.CreatedAt,
+		}
+
+		userAnnouncements = append(userAnnouncements, data)
+	}
+
+	userNotificationResp := utils.APIResponse{
+		Code:    http.StatusOK,
+		Message: constants.Success,
+		Data: &GetAnnouncementsResponse{
+			TotalPages:    utils.CalculatePagesize(totalRows),
+			Announcements: userAnnouncements,
+		},
+	}
+
+	return userNotificationResp
+}
+
 func createApprochResp(approchId string) utils.APIResponse {
 	rideResp := utils.APIResponse{
 		Code:    http.StatusOK,

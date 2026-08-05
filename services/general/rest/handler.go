@@ -61,6 +61,43 @@ func GetNotificationsHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, userNotificationResp)
 }
 
+func GetAnnouncementsHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetAnnouncementsHandler", sessionId)
+
+	page, err := utils.GetPageNumber(ctx)
+
+	announcements, totalPages, err := GetAnnuncements(ctx, sessionId, page)
+	if err != nil {
+		logger.LogError(sessionId, "announcements error: "+err.Error())
+		if err.Error() == constants.Ride_Not_Found {
+			ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+				Code:    http.StatusNoContent,
+				Message: err.Error(),
+				Data: GetAnnouncementsResponse{
+					Announcements: []AnnouncementRequests{},
+				},
+			})
+		} else {
+			ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+				Code:    http.StatusBadRequest,
+				Message: err.Error(),
+				Data: GetAnnouncementsResponse{
+					Announcements: []AnnouncementRequests{},
+				},
+			})
+		}
+		return
+	}
+
+	userAnnouncementResp := getAnnouncementsResp(announcements, totalPages)
+
+	logger.LogInfo("Response returned from GetAnnouncementsHandler", sessionId)
+	logger.LogDebug2("Response returned from GetAnnouncementsHandler", sessionId, userAnnouncementResp)
+
+	ctx.JSON(http.StatusOK, userAnnouncementResp)
+}
+
 func GetHomePage(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in GetHomePage", sessionId)

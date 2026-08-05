@@ -17,6 +17,20 @@ type NotificationRequest struct {
 	CreatedAt time.Time      `json:"createdAt"`
 }
 
+type GetAnnouncementsResponse struct {
+	TotalPages    int                    `json:"totalPages"`
+	Announcements []AnnouncementRequests `json:"announcements"`
+}
+
+type AnnouncementRequests struct {
+	ID        string    `json:"id""`
+	Title     string    `json:"title"`
+	Message   string    `json:"message"`
+	Type      string    `json:"type"`
+	Processed bool      `json:"processed"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type SMSFCMRequest struct {
 	FCM     string `json:"fcm"`
 	App     string `json:"app"`

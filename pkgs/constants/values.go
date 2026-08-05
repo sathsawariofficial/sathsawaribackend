@@ -36,6 +36,19 @@ const (
 	NOTIFICATION_TYPE_MARKETING             = "marketing"
 )
 
+const (
+	ANNOUNCEMENT_TYPE_GENERAL = "general"
+)
+
+func NewAnnouncementType(msg string) bool {
+	switch msg {
+	case ANNOUNCEMENT_TYPE_GENERAL:
+		return true
+	default:
+		return false
+	}
+}
+
 func NewNotificationType(notificationType string) bool {
 	switch notificationType {
 	case NOTIFICATION_TYPE_RIDE_CREATED,

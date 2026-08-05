@@ -269,6 +269,16 @@ type BroadcastNotificationRequests struct {
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 
+type AnnouncementRequests struct {
+	ID        string    `json:"id" gorm:"primary_key"`
+	Title     string    `json:"title"`
+	Message   string    `json:"message"`
+	Type      string    `json:"type"`
+	Processed bool      `json:"processed"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type RideRequest struct {
 	ID                   string    `json:"id" gorm:"primary_key"`
 	StartDatetime        string    `json:"start_datetime" gorm:"not null"`

@@ -59,6 +59,7 @@ func main() {
 			public.POST("/otp/verify", general.VerifyOTPHandler)
 			public.GET("/account/delete", general_rest.GetDeletePage)
 			public.POST("/approach", general.CreateApprochHandler)
+			public.GET("/announcements", general_rest.GetAnnouncementsHandler)
 
 			// TODO: this is a temp open api it will be moved to admin later
 			public.POST("/sms/partner", general_rest.SaveSMSFCMHandler)
@@ -102,6 +103,7 @@ func main() {
 				adminProtected.DELETE("/driver", admin.DeleteDriverHandler)
 				adminProtected.POST("/broadcast", admin.AdminBroadcastHandler)
 				adminProtected.GET("/approch", admin.GetApprochRequestsHandler)
+				adminProtected.POST("/announcement", admin.AnnouncementHandler)
 			}
 
 			driverProtected := protected.Group("/driver")

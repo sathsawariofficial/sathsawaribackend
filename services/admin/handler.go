@@ -315,6 +315,47 @@ func AdminBroadcastHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(constants.Success))
 }
 
+func AnnouncementHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in AnnouncementHandler", sessionId)
+
+	var request AnnouncementRequest
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		logger.LogError(sessionId, "binding error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: constants.General_Error,
+		})
+		return
+	}
+
+	logger.LogDebug2("Request received in AnnouncementHandler", sessionId, request)
+
+	err := ValidateAnnouncementRequest(&request)
+	if err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	err = CreateAnnouncement(ctx, sessionId, request)
+	if err != nil {
+		logger.LogError(sessionId, "announcement creation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	logger.LogInfo("Response returned from AnnouncementHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(constants.Success))
+}
+
 func GetApprochRequestsHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in GetApprochRequestsHandler", sessionId)

@@ -181,6 +181,15 @@ func createAdminBroadcastRequest(req AdminBroadcastRequest) postgress.BroadcastN
 	}
 }
 
+func createAnnouncementRequest(req AnnouncementRequest) postgress.AnnouncementRequests {
+	return postgress.AnnouncementRequests{
+		ID:      database.GenerateUUID(),
+		Title:   req.Title,
+		Message: req.Message,
+		Type:    string(req.Type),
+	}
+}
+
 func createAdminBroadcast(orgCtx *gin.Context, sessionId string, request AdminBroadcastRequest) error {
 	logger.LogInfo("Request received in createAdminBroadcast", sessionId)
 
@@ -199,6 +208,27 @@ func createAdminBroadcast(orgCtx *gin.Context, sessionId string, request AdminBr
 	}
 
 	logger.LogInfo("Response returned from createAdminBroadcast", sessionId)
+	return nil
+}
+
+func createAnnouncement(orgCtx *gin.Context, sessionId string, request AnnouncementRequest) error {
+	logger.LogInfo("Request received in createAnnouncement", sessionId)
+
+	broadcastReq := createAnnouncementRequest(request)
+	ctx, cancel := context.WithTimeout(
+		orgCtx,
+		time.Duration(configuration.ConfigurationData.Timeout)*time.Second,
+	)
+	defer cancel()
+
+	db := database.DatabaseConn.Postgres.WithContext(ctx)
+	err := db.Create(&broadcastReq).Error
+	if err != nil {
+		logger.LogError(sessionId, err)
+		return err
+	}
+
+	logger.LogInfo("Response returned from createAnnouncement", sessionId)
 	return nil
 }
 
@@ -250,4 +280,25 @@ func getApprochRequests(orgCtx *gin.Context, sessionId, approchType string, page
 	logger.LogDebug("Response returned from getApprochRequests", sessionId, approchs)
 
 	return
+}
+
+func createAccouncement(orgCtx *gin.Context, sessionId string, request AdminBroadcastRequest) error {
+	logger.LogInfo("Request received in createAccouncement", sessionId)
+
+	broadcastReq := createAdminBroadcastRequest(request)
+	ctx, cancel := context.WithTimeout(
+		orgCtx,
+		time.Duration(configuration.ConfigurationData.Timeout)*time.Second,
+	)
+	defer cancel()
+
+	db := database.DatabaseConn.Postgres.WithContext(ctx)
+	err := db.Create(&broadcastReq).Error
+	if err != nil {
+		logger.LogError(sessionId, err)
+		return err
+	}
+
+	logger.LogInfo("Response returned from createAccouncement", sessionId)
+	return nil
 }

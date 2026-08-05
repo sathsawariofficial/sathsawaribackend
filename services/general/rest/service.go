@@ -29,6 +29,23 @@ func GetNotifications(ctx *gin.Context, sessionId, driverId string, page int) (n
 	return
 }
 
+func GetAnnuncements(ctx *gin.Context, sessionId string, page int) (annoucements []postgress.AnnouncementRequests, totalRows int64, err error) {
+	logger.LogInfo("Request received in GetAnnuncements", sessionId)
+	logger.LogDebug("Request received in GetAnnuncements", sessionId, fmt.Sprintf("page: %d", page))
+
+	annoucements, totalRows, err = database.GetAnnouncements(ctx, page)
+	if err != nil {
+		logger.LogError(sessionId, " get annoucements error: "+err.Error())
+		err = errors.New(constants.Unknown_Error)
+		return
+	}
+
+	logger.LogInfo("Response returned from GetAnnuncements", sessionId)
+	logger.LogDebug2("Response returned from GetAnnuncements", sessionId, fmt.Sprintf("annoucement count: %v, total rows: %v", len(annoucements), totalRows))
+
+	return
+}
+
 func SaveSMSFCM(ctx *gin.Context, sessionId string, request SMSFCMRequest) (err error) {
 	logger.LogInfo("Request received in SaveSMSFCM", sessionId)
 
