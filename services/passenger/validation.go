@@ -42,8 +42,7 @@ func ValidateRideRequest(sessionId string, request RideRequest) error {
 	if utils.IsStringEmptyWithKey(request.StartDatetime, "StartDatetime", &errMessage) ||
 		utils.IsStringEmptyWithKey(request.EstimatedEndDatetime, "EstimatedEndDatetime", &errMessage) ||
 		utils.IsStringEmptyWithKey(request.StartLocation, "StartLocation", &errMessage) ||
-		utils.IsStringEmptyWithKey(request.EndLocation, "EndLocation", &errMessage) ||
-		utils.IsStringEmptyWithKey(request.RouteDetails, "RouteDetails", &errMessage) {
+		utils.IsStringEmptyWithKey(request.EndLocation, "EndLocation", &errMessage) {
 		logger.LogError(sessionId, errMessage)
 		return fmt.Errorf(constants.Missing_Data, errMessage)
 	}
@@ -74,7 +73,7 @@ func ValidateRideRequest(sessionId string, request RideRequest) error {
 	if endLocationLen < constants.General_Min_Len || endLocationLen > constants.General_Max_Len {
 		return fmt.Errorf("length of the end location should be between %v and %v characters", constants.General_Min_Len, constants.General_Max_Len)
 	}
-	if routeDetailsLen < constants.RouteDetails_Min_Len || routeDetailsLen > constants.RouteDetails_Max_Len {
+	if !utils.IsStringEmpty(request.RouteDetails) && (routeDetailsLen < constants.RouteDetails_Min_Len || routeDetailsLen > constants.RouteDetails_Max_Len) {
 		return fmt.Errorf("length of the route details should be between %v and %v characters", constants.RouteDetails_Min_Len, constants.RouteDetails_Max_Len)
 	}
 

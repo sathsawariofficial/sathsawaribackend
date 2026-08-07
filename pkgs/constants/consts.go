@@ -129,7 +129,7 @@ const (
 	Page_Max_Value            = 1000
 	Number_Of_Seats_Min_Value = 1
 	Number_Of_Seats_Max_Value = 80
-	RouteDetails_Min_Len      = 1
+	RouteDetails_Min_Len      = 3
 	RouteDetails_Max_Len      = 200
 	RoutePoints_Max_Len       = 5
 	Fare_Min_Len              = 0
