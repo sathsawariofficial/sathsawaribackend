@@ -19,11 +19,11 @@ func ValidateRideCreation(sessionId, driverId string, request *RideCreationReque
 	}
 
 	var errMessage string
-	if utils.IsStringEmptyWithKey(request.StartDatetime, "StartDatetime", &errMessage) ||
-		utils.IsStringEmptyWithKey(request.EstimatedEndDatetime, "EstimatedEndDatetime", &errMessage) ||
-		utils.IsStringEmptyWithKey(request.StartLocation, "StartLocation", &errMessage) ||
-		utils.IsStringEmptyWithKey(request.EndLocation, "EndLocation", &errMessage) ||
-		utils.IsStringEmptyWithKey(request.RouteDetails, "RouteDetails", &errMessage) {
+	if utils.IsStringEmptyWithKey(request.StartDatetime, "Start Date", &errMessage) ||
+		utils.IsStringEmptyWithKey(request.EstimatedEndDatetime, "Estimated End Date", &errMessage) ||
+		utils.IsStringEmptyWithKey(request.StartLocation, "Start Location", &errMessage) ||
+		utils.IsStringEmptyWithKey(request.EndLocation, "End Location", &errMessage) ||
+		utils.IsStringEmptyWithKey(request.RouteDetails, "Route Details", &errMessage) {
 		logger.LogError(sessionId, errMessage)
 		return fmt.Errorf(constants.Missing_Data, errMessage)
 	}

@@ -39,10 +39,10 @@ func ValidateRideRequest(sessionId string, request RideRequest) error {
 	logger.LogInfo("Request received in ValidateRideRequest", sessionId)
 
 	var errMessage string
-	if utils.IsStringEmptyWithKey(request.StartDatetime, "StartDatetime", &errMessage) ||
-		utils.IsStringEmptyWithKey(request.EstimatedEndDatetime, "EstimatedEndDatetime", &errMessage) ||
-		utils.IsStringEmptyWithKey(request.StartLocation, "StartLocation", &errMessage) ||
-		utils.IsStringEmptyWithKey(request.EndLocation, "EndLocation", &errMessage) {
+	if utils.IsStringEmptyWithKey(request.StartDatetime, "Start Date", &errMessage) ||
+		utils.IsStringEmptyWithKey(request.EstimatedEndDatetime, "Estimated End Date", &errMessage) ||
+		utils.IsStringEmptyWithKey(request.StartLocation, "Start Location", &errMessage) ||
+		utils.IsStringEmptyWithKey(request.EndLocation, "End Location", &errMessage) {
 		logger.LogError(sessionId, errMessage)
 		return fmt.Errorf(constants.Missing_Data, errMessage)
 	}

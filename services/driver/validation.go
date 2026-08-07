@@ -82,7 +82,7 @@ func ValidateVehicleUpdate(request *VehicleUpdateRequest) error {
 
 func ValidateDriverLogin(request *DriverLoginRequest) error {
 	var errMessage string
-	if utils.IsStringEmptyWithKey(request.MobileNumber, "MobileNumber", &errMessage) ||
+	if utils.IsStringEmptyWithKey(request.MobileNumber, "Mobile Number", &errMessage) ||
 		utils.IsStringEmptyWithKey(request.Password, "Password", &errMessage) {
 		return fmt.Errorf(constants.Missing_Data, errMessage)
 	}
@@ -112,8 +112,8 @@ func ValidateDriverLogin(request *DriverLoginRequest) error {
 
 func ValidateRateDriver(request *RateDriverRequest) error {
 	var errMessage string
-	if utils.IsStringEmptyWithKey(request.MobileNumber, "MobileNumber", &errMessage) ||
-		utils.IsStringEmptyWithKey(request.DriverId, "DriverId", &errMessage) {
+	if utils.IsStringEmptyWithKey(request.MobileNumber, "Mobile Number", &errMessage) ||
+		utils.IsStringEmptyWithKey(request.DriverId, "Driver Id", &errMessage) {
 		return fmt.Errorf(constants.Missing_Data, errMessage)
 	}
 
