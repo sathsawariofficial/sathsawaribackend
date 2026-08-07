@@ -95,4 +95,5 @@ type AnnouncementRequest struct {
 	Title   string `json:"title"`
 	Message string `json:"message"`
 	Type    string `json:"type"`
+	Link    string `json:"link"`
 }

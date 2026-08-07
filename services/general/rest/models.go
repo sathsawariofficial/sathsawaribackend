@@ -23,10 +23,11 @@ type GetAnnouncementsResponse struct {
 }
 
 type AnnouncementRequests struct {
-	ID        string    `json:"id""`
+	ID        string    `json:"id"`
 	Title     string    `json:"title"`
 	Message   string    `json:"message"`
 	Type      string    `json:"type"`
+	Link      string    `json:"link"`
 	Processed bool      `json:"processed"`
 	CreatedAt time.Time `json:"created_at"`
 }

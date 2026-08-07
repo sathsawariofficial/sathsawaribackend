@@ -46,6 +46,7 @@ func getAnnouncementsResp(announcements []postgress.AnnouncementRequests, totalR
 			ID:        annoucement.ID,
 			Title:     annoucement.Title,
 			Message:   annoucement.Message,
+			Link:      annoucement.Link,
 			CreatedAt: annoucement.CreatedAt,
 		}
 
