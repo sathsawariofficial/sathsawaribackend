@@ -149,6 +149,8 @@ const (
 	Max_Daily_Frequency       = 30
 	Max_Weekly_Frequency      = 4
 	Max_Monthly_Frequency     = 3
+
+	Ride_Cancel_Min_Hours_Before_Start = 2
 )
 
 const (

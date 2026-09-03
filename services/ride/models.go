@@ -1,5 +1,7 @@
 package ride
 
+import "rideshare/pkgs/database/postgress"
+
 type RideCreationRequest struct {
 	VehicleId            string   `json:"vehicleId"`
 	StartDatetime        string   `json:"startDatetime"`
@@ -104,4 +106,32 @@ type RideTemplate struct {
 	EndLocation          string  `json:"endLocation"`
 	Fare                 float64 `json:"fare"`
 	RouteDetails         string  `json:"routeDetails"`
+}
+
+type SeriesRideInfo struct {
+	RideId               string `json:"rideId"`
+	StartDatetime        string `json:"startDatetime"`
+	EstimatedEndDatetime string `json:"estimatedEndDatetime"`
+	NumberOfSeats        int    `json:"numberOfSeats"`
+	SeatsTaken           int    `json:"seatsTaken"`
+}
+
+type SkippedRideInfo struct {
+	SeriesRideInfo
+	ReasonCode string `json:"reasonCode"`
+	Message    string `json:"message"`
+}
+
+type CancelRideSeriesResponse struct {
+	RootRideId   string            `json:"rootRideId"`
+	DeletedRides []SeriesRideInfo  `json:"deletedRides"`
+	SkippedRides []SkippedRideInfo `json:"skippedRides"`
+}
+
+// SkippedRide pairs a ride that was not deleted by CancelRideSeries with the
+// reason it was skipped.
+type SkippedRide struct {
+	Ride       postgress.Ride
+	ReasonCode string
+	Message    string
 }

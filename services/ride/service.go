@@ -244,6 +244,20 @@ func UpdateRide(orgCtx *gin.Context, sessionId, rideId string, request UpdateRid
 
 	// Archive and delete if ride is being deactivated
 	if request.Status != nil && strings.EqualFold(*request.Status, constants.Ride_Status_InActive) {
+		driverId := orgCtx.GetString(constants.User_KEY)
+		if ride.DriverID != driverId {
+			tx.Rollback()
+			err := errors.New(constants.Operation_Not_Permitted)
+			logger.LogError(sessionId, "driver is not the owner of this ride error: "+err.Error())
+			return err
+		}
+
+		if blocked, _, message := checkRideDeletionGuards(ride, time.Now()); blocked {
+			tx.Rollback()
+			logger.LogError(sessionId, "ride cancellation blocked: "+message)
+			return errors.New(message)
+		}
+
 		delRide := postgress.DELRide{
 			ID:                   ride.ID,
 			DriverID:             ride.DriverID,
@@ -427,6 +441,122 @@ func DeleteRideTemplate(ctx *gin.Context, sessionId, rideTemplateId string) (err
 	}
 
 	logger.LogInfo("Response returned from DeleteRideTemplate", sessionId)
+
+	return
+}
+
+// CancelRideSeries bulk-deletes a recurring ride series identified by
+// rideId (either the series' root ride id, or any child's id, in which
+// case it's resolved up to the true root). Each remaining ride in the
+// series is evaluated against checkRideDeletionGuards; rides that pass are
+// archived to DELRide and hard-deleted, rides that don't are reported back
+// as skipped along with the reason.
+func CancelRideSeries(orgCtx *gin.Context, sessionId, rideId string) (rootId string, deletedRides []postgress.Ride, skippedRides []SkippedRide, err error) {
+	logger.LogInfo("Request received in CancelRideSeries", sessionId)
+
+	driverId := orgCtx.GetString(constants.User_KEY)
+
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	tx := database.DatabaseConn.Postgres.WithContext(ctx).Begin()
+
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	var anchor postgress.Ride
+	if e := tx.Where("id = ?", rideId).Where("is_active = ?", true).First(&anchor).Error; e != nil {
+		tx.Rollback()
+		logger.LogError(sessionId, e)
+		err = errors.New(constants.Ride_Not_Found)
+		return
+	}
+
+	if anchor.DriverID != driverId {
+		tx.Rollback()
+		err = errors.New(constants.Operation_Not_Permitted)
+		logger.LogError(sessionId, "driver is not the owner of this ride series error: "+err.Error())
+		return
+	}
+
+	rootId = anchor.ID
+	if !utils.IsStringEmpty(anchor.ParentRideId) {
+		rootId = anchor.ParentRideId
+	}
+
+	seriesRides, e := getRideSeriesByRootId(tx, driverId, rootId)
+	if e != nil {
+		tx.Rollback()
+		logger.LogError(sessionId, e)
+		err = errors.New(constants.Unknown_Error)
+		return
+	}
+
+	now := time.Now()
+	for _, ride := range seriesRides {
+		if blocked, reasonCode, message := checkRideDeletionGuards(ride, now); blocked {
+			skippedRides = append(skippedRides, SkippedRide{Ride: ride, ReasonCode: reasonCode, Message: message})
+			continue
+		}
+
+		delRide := postgress.DELRide{
+			ID:                   ride.ID,
+			DriverID:             ride.DriverID,
+			VehicleID:            ride.VehicleID,
+			StartDatetime:        ride.StartDatetime,
+			EstimatedEndDatetime: ride.EstimatedEndDatetime,
+			NumberOfSeats:        ride.NumberOfSeats,
+			SeatsTaken:           ride.SeatsTaken,
+			StartLocation:        ride.StartLocation,
+			EndLocation:          ride.EndLocation,
+			RoutePoints:          ride.RoutePoints,
+			Fare:                 ride.Fare,
+			RouteDetails:         ride.RouteDetails,
+			IsActive:             false,
+			ParentRideId:         ride.ParentRideId,
+			Code:                 ride.Code,
+			CreatedAt:            ride.CreatedAt,
+			UpdatedAt:            time.Now(),
+		}
+
+		if e := tx.Create(&delRide).Error; e != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, e)
+			err = errors.New(constants.General_Error)
+			deletedRides = nil
+			return
+		}
+
+		if e := tx.Delete(&postgress.Ride{}, "id = ?", ride.ID).Error; e != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, e)
+			err = errors.New(constants.General_Error)
+			deletedRides = nil
+			return
+		}
+
+		deletedRides = append(deletedRides, ride)
+	}
+
+	if e := tx.Commit().Error; e != nil {
+		logger.LogError(sessionId, e)
+		err = errors.New(constants.Unknown_Error)
+		deletedRides = nil
+		return
+	}
+
+	for _, ride := range deletedRides {
+		if e := redis.DeleteRedisValue(database.DatabaseConn.RedisConn, utils.GenerateShortCode(ride.ID)); e != nil {
+			logger.LogError(sessionId, e)
+		}
+	}
+
+	logger.LogInfo("Response returned from CancelRideSeries", sessionId)
+	logger.LogDebug2("Response returned from CancelRideSeries", sessionId, fmt.Sprintf("deleted: %d, skipped: %d", len(deletedRides), len(skippedRides)))
 
 	return
 }

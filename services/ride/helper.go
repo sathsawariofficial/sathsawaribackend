@@ -17,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lib/pq"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func mapRideData(
@@ -122,6 +123,22 @@ func getRideById(orgCtx *gin.Context, rideId string) (ride postgress.Ride, err e
 	defer cancel()
 
 	err = database.DatabaseConn.Postgres.WithContext(ctx).Where(`id = ?`, rideId).Where(`is_active = ?`, true).Find(&ride).Error
+	return
+}
+
+// getRideSeriesByRootId returns the root ride (if it still exists) plus all
+// of its remaining children, scoped to the owning driver, row-locked so a
+// concurrent booking on any of these rides is blocked until the caller's
+// transaction commits or rolls back. Must be called with tx already inside
+// an open transaction on the same rows it is about to delete.
+func getRideSeriesByRootId(tx *gorm.DB, driverId, rootId string) (rides []postgress.Ride, err error) {
+	err = tx.
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("driver_id = ?", driverId).
+		Where("(id = ? OR parent_ride_id = ?)", rootId, rootId).
+		Where("is_active = ?", true).
+		Order("start_datetime ASC").
+		Find(&rides).Error
 	return
 }
 
@@ -569,4 +586,31 @@ func deleteRideTemplate(orgCtx *gin.Context, sessionId, rideTemplateId string) (
 
 	logger.LogInfo("Response returned from deleteRideTemplate", sessionId)
 	return
+}
+
+// checkRideDeletionGuards evaluates the two ride-cancellation safety rules
+// against a single ride row: it must not already have a seat booked, and it
+// must not start within Ride_Cancel_Min_Hours_Before_Start hours from now.
+// `now` is passed in rather than computed internally so a whole batch of
+// rides can be judged against one consistent timestamp snapshot.
+// Returns blocked=false when the ride is safe to cancel/delete.
+func checkRideDeletionGuards(ride postgress.Ride, now time.Time) (blocked bool, reasonCode string, message string) {
+	if ride.SeatsTaken > 0 {
+		return true, Ride_Cancel_Skip_Reason_Booked,
+			fmt.Sprintf(Ride_Cancel_Skip_Message_Booked, ride.SeatsTaken)
+	}
+
+	startDate, err := time.ParseInLocation(constants.DateTimeLayout, ride.StartDatetime, time.Local)
+	if err != nil {
+		// fail closed: never delete a ride whose start time we can't verify
+		return true, Ride_Cancel_Skip_Reason_Invalid, Ride_Cancel_Skip_Message_Invalid
+	}
+
+	cutoff := now.Add(time.Duration(constants.Ride_Cancel_Min_Hours_Before_Start) * time.Hour)
+	if startDate.Before(cutoff) {
+		return true, Ride_Cancel_Skip_Reason_Imminent,
+			fmt.Sprintf(Ride_Cancel_Skip_Message_Imminent, constants.Ride_Cancel_Min_Hours_Before_Start)
+	}
+
+	return false, "", ""
 }

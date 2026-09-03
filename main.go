@@ -145,6 +145,7 @@ func main() {
 				rideProtected.POST("/create", ride.CreateRideHandler)
 				rideProtected.GET("/templates", ride.GetRideTemplatesHandler)
 				rideProtected.DELETE("/template", ride.DeleteRideTemplatesHandler)
+				rideProtected.DELETE("/series", ride.CancelRideSeriesHandler)
 			}
 
 			userProtected := protected.Group("/user")

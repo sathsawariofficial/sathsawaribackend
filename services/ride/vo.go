@@ -248,3 +248,41 @@ func getRideTemplatesResp(sessionId string, templates []postgress.RideTemplate) 
 		Data:    rideTemplates,
 	}
 }
+
+func cancelRideSeriesResp(rootId string, deletedRides []postgress.Ride, skippedRides []SkippedRide) utils.APIResponse {
+	deleted := make([]SeriesRideInfo, 0, len(deletedRides))
+	for _, ride := range deletedRides {
+		deleted = append(deleted, SeriesRideInfo{
+			RideId:               ride.ID,
+			StartDatetime:        ride.StartDatetime,
+			EstimatedEndDatetime: ride.EstimatedEndDatetime,
+			NumberOfSeats:        ride.NumberOfSeats,
+			SeatsTaken:           ride.SeatsTaken,
+		})
+	}
+
+	skipped := make([]SkippedRideInfo, 0, len(skippedRides))
+	for _, s := range skippedRides {
+		skipped = append(skipped, SkippedRideInfo{
+			SeriesRideInfo: SeriesRideInfo{
+				RideId:               s.Ride.ID,
+				StartDatetime:        s.Ride.StartDatetime,
+				EstimatedEndDatetime: s.Ride.EstimatedEndDatetime,
+				NumberOfSeats:        s.Ride.NumberOfSeats,
+				SeatsTaken:           s.Ride.SeatsTaken,
+			},
+			ReasonCode: s.ReasonCode,
+			Message:    s.Message,
+		})
+	}
+
+	return utils.APIResponse{
+		Code:    http.StatusOK,
+		Message: constants.Success,
+		Data: CancelRideSeriesResponse{
+			RootRideId:   rootId,
+			DeletedRides: deleted,
+			SkippedRides: skipped,
+		},
+	}
+}

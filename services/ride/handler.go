@@ -439,6 +439,40 @@ func GetRideTemplatesHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, templateResp)
 }
 
+func CancelRideSeriesHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in CancelRideSeriesHandler", sessionId)
+
+	rideId := ctx.Query(constants.Ride_Key)
+
+	err := utils.ValidateId(rideId)
+	if err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	rootId, deletedRides, skippedRides, err := CancelRideSeries(ctx, sessionId, rideId)
+	if err != nil {
+		logger.LogError(sessionId, "cancel ride series error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	resp := cancelRideSeriesResp(rootId, deletedRides, skippedRides)
+
+	logger.LogInfo("Response returned from CancelRideSeriesHandler", sessionId)
+	logger.LogDebug2("Response returned from CancelRideSeriesHandler", sessionId, resp)
+
+	ctx.JSON(http.StatusOK, resp)
+}
+
 func DeleteRideTemplatesHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in DeleteRideTemplatesHandler", sessionId)
