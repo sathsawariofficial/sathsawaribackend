@@ -190,6 +190,7 @@ func getAllRidesByDriver(orgCtx *gin.Context, page int, driverId, startTime, end
 			rides.vehicle_id,
 			rides.code,
 			rides.route_details,
+			rides.parent_ride_id,
 			rides.is_active,
 			rides.created_at,
 			rides.updated_at

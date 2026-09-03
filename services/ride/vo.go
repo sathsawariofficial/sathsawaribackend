@@ -47,6 +47,7 @@ func getDriverRidesResp(rides []postgress.RideDetails, totalPages int, driverId 
 			Code:                 ride.Code,
 			Fare:                 ride.Fare,
 			RouteDetails:         ride.RouteDetails,
+			ParentRideId:         ride.ParentRideId,
 			IsActive:             ride.IsActive,
 			OpenURL:              openURL,
 		})
