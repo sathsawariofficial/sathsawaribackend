@@ -1,0 +1,384 @@
+#!/usr/bin/env bash
+#
+# sath — one command line tool for this backend.
+#
+#   ./sath "add an endpoint that lets a manager swap two shifts"
+#
+# Anything that is not a known subcommand is treated as a prompt and handed to
+# Claude together with this project's standing rules, so the conventions and the
+# "always update the collection and the diagrams" rules travel with every request
+# instead of having to be repeated each time.
+#
+# Run ./sath help for the subcommands.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORK="$ROOT/.sath"
+CONFIG="${SATH_CONFIG:-$ROOT/pkgs/configuration/configuration.json}"
+BASE="${SATH_BASE:-http://localhost:5000}"
+LOG="$WORK/server.log"
+PIDFILE="$WORK/server.pid"
+COLLECTION="$ROOT/SathSawari-ShiftManagement.postman_collection.json"
+
+mkdir -p "$WORK"
+
+# ---------------------------------------------------------------- output ----
+
+if [ -t 1 ]; then
+  B=$'\033[1m'; DIM=$'\033[2m'; R=$'\033[31m'; G=$'\033[32m'; Y=$'\033[33m'; C=$'\033[36m'; N=$'\033[0m'
+else
+  B=""; DIM=""; R=""; G=""; Y=""; C=""; N=""
+fi
+
+say()  { printf '%s\n' "${B}${C}==>${N} ${B}$*${N}"; }
+ok()   { printf '%s\n' "  ${G}ok${N} $*"; }
+warn() { printf '%s\n' "  ${Y}!!${N} $*"; }
+die()  { printf '%s\n' "  ${R}xx${N} $*" >&2; exit 1; }
+note() { printf '%s\n' "  ${DIM}$*${N}"; }
+
+# ------------------------------------------------------------- the rules ----
+# Everything this project has settled on. Kept in one place so a prompt never has
+# to restate it, and so updating a rule updates it for every future request.
+
+project_rules() {
+  cat <<'RULES'
+You are working on the SathSawari ride sharing backend (Go, gin, gorm, postgres).
+These are the project's standing rules. They are not suggestions.
+
+FILE LAYOUT — the owner has corrected past work over this, do not break it:
+- A service package under services/<name>/ has exactly these files: handler.go,
+  service.go, helper.go, models.go, vo.go, validation.go, and optionally
+  constants.go. Never create another file inside a service package.
+- models.go holds request/response DTOs only. Database models live centrally in
+  pkgs/database/postgress/models.go and are migrated in that package's
+  bootstrap.go.
+- handler.go binds and validates then calls service.go. helper.go holds the
+  unexported database queries and mapping. vo.go builds utils.APIResponse values.
+  validation.go holds the exported Validate* functions.
+- Helpers shared across services go in pkgs/database/, never in a service package,
+  because services must not import each other.
+
+HOUSE STYLE:
+- Handlers open with sessionId := xid.New().String() and log entry, every error and
+  the response through logger.
+- Client facing errors are built from the constants in pkgs/constants.
+- Database calls go through database.DatabaseConn.Postgres.WithContext(ctx) with a
+  context.WithTimeout from configuration.ConfigurationData.Timeout.
+- Any write touching more than one row runs in a transaction with rollback on
+  every error path.
+- Notifications are sent with utils.SendUserNotification AFTER the transaction
+  commits, never inside it.
+
+DELETION — the owner is explicit about this:
+- Anything that matters is copied into its own DEL* archive table before the row
+  is deleted. Follow del_drivers, del_vehicles, del_rides, del_passengers,
+  del_passenger_location_preferences and del_roles.
+- A deletion must never leave a dangling reference. Free the seats, end the
+  memberships, or refuse the deletion and say what has to be sorted out first.
+- Prefer a status change over a delete where the history is worth keeping. Shifts
+  and memberships are never hard deleted.
+
+PERFORMANCE:
+- No N+1 queries. One joined query or one IN (...) query, never one per item.
+- Bulk endpoints use bulk inserts and grouped updates.
+- Every list endpoint is paginated.
+- Count on a cloned session (query.Session(&gorm.Session{})), never on the same
+  chain that is about to page.
+
+ALWAYS, WITHOUT BEING ASKED — this is the part most often forgotten:
+1. If anything about an API changes (new route, changed body, renamed param, new
+   required field, different auth), update the Postman collection in the SAME
+   change. It is generated: edit tools/gen_postman_collection.py and run
+   ./sath collection. Never hand edit the json.
+2. If behaviour or structure changes, update the diagrams and the explainer at
+   docs/fleet-shifts.html so it stays true. Run ./sath docs.
+3. Run ./sath check before you finish. Fix what it reports.
+4. If the change is testable against a running server, extend tools/flow_test.py
+   to cover it, including the refusal that proves the rule, then run
+   ./sath test so the collection picks up the real response.
+
+COMMIT MESSAGES:
+- Lower case subject, no trailing full stop, explaining what changed and why in
+  plain prose. No bullet lists, no conventional-commit prefixes.
+RULES
+}
+
+# --------------------------------------------------------------- helpers ----
+
+server_pid() {
+  ss -lptnH "sport = :${BASE##*:}" 2>/dev/null | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2
+}
+
+require_server() {
+  local pid; pid="$(server_pid || true)"
+  [ -n "$pid" ] || die "no server on $BASE — run ./sath serve first"
+}
+
+mint_token() {
+  local dir="$WORK/mint"
+  mkdir -p "$dir"
+  cat > "$dir/main.go" <<'GOEOF'
+package main
+
+import (
+	"os"
+	"rideshare/pkgs/constants"
+	"rideshare/pkgs/utils"
+)
+
+func main() {
+	token, err := utils.CreateJWT("sath", map[string]string{"tokenType": constants.OPEN_TOKEN})
+	if err != nil {
+		panic(err)
+	}
+	os.WriteFile(os.Getenv("OUT"), []byte(token), 0o644)
+}
+GOEOF
+  ( cd "$ROOT" && OUT="$WORK/open_token.txt" go run "$dir/main.go" -config "$CONFIG" >/dev/null 2>&1 )
+  [ -s "$WORK/open_token.txt" ] || die "could not mint an open token"
+}
+
+# -------------------------------------------------------------- commands ----
+
+cmd_check() {
+  say "build, vet, format"
+  ( cd "$ROOT" && go build ./... ) || die "build failed"
+  ok "builds"
+
+  local vet; vet="$( cd "$ROOT" && go vet ./... 2>&1 | grep -v '^#' || true )"
+  [ -z "$vet" ] && ok "vet clean" || { printf '%s\n' "$vet"; die "vet found problems"; }
+
+  local fmt; fmt="$( cd "$ROOT" && gofmt -l services/ pkgs/ worker/ main.go 2>/dev/null || true )"
+  [ -z "$fmt" ] && ok "gofmt clean" || { printf '%s\n' "$fmt"; die "run gofmt -w on those"; }
+
+  local dupes
+  dupes="$( cd "$ROOT" && python3 - <<'PY'
+import re
+groups, routes = {}, []
+for ln in open('main.go'):
+    m = re.search(r'(\w+)\s*:?=\s*(\w+)\.Group\("([^"]*)"\)', ln)
+    if m:
+        v, p, path = m.groups(); groups[v] = groups.get(p, '') + path; continue
+    m = re.search(r'(\w+)\.(GET|POST|PUT|PATCH|DELETE)\("([^"]*)"', ln)
+    if m:
+        v, meth, path = m.groups()
+        if v in groups: routes.append((meth, groups[v] + path))
+        elif v == 'router': routes.append((meth, path))
+seen, dup = set(), []
+for r in routes:
+    if r in seen: dup.append(f"{r[0]} {r[1]}")
+    seen.add(r)
+print("\n".join(dup))
+PY
+)"
+  [ -z "$dupes" ] && ok "no duplicate routes" || { printf '%s\n' "$dupes"; die "duplicate routes would panic gin at startup"; }
+}
+
+cmd_serve() {
+  case "${1:-start}" in
+    stop)
+      local pid; pid="$(server_pid || true)"
+      [ -n "$pid" ] && { kill "$pid" 2>/dev/null || true; sleep 1; ok "stopped"; } || note "nothing running"
+      ;;
+    restart)
+      cmd_serve stop; cmd_serve start
+      ;;
+    log)
+      tail -n "${2:-40}" "$LOG"
+      ;;
+    *)
+      local pid; pid="$(server_pid || true)"
+      [ -n "$pid" ] && { warn "already running (pid $pid)"; return 0; }
+      say "starting server on $BASE"
+      ( cd "$ROOT" && nohup go run main.go -config "$CONFIG" > "$LOG" 2>&1 & echo $! > "$PIDFILE" )
+      local n=0
+      until curl -sf -o /dev/null "$BASE/" 2>/dev/null || [ $n -ge 60 ]; do sleep 1; n=$((n+1)); done
+      if grep -qi panic "$LOG" 2>/dev/null; then
+        grep -i -m3 panic "$LOG"; die "server panicked — see ./sath serve log"
+      fi
+      [ $n -ge 60 ] && die "server did not come up, see $LOG"
+      ok "up after ${n}s"
+      ;;
+  esac
+}
+
+cmd_test() {
+  require_server
+  say "minting an open token"
+  mint_token; ok "minted"
+  say "driving the whole product end to end"
+  ( cd "$ROOT" && SATH_BASE="$BASE" python3 tools/flow_test.py )
+}
+
+cmd_collection() {
+  say "regenerating the postman collection"
+  [ -s "$WORK/responses.json" ] || warn "no recorded responses yet — run ./sath test first, or the examples will be empty"
+  ( cd "$ROOT" && python3 tools/gen_postman_collection.py )
+  python3 - "$COLLECTION" <<'PY'
+import json, sys
+c = json.load(open(sys.argv[1]))
+tot = sum(len(f["item"]) for f in c["item"])
+ex  = sum(len(i["response"]) for f in c["item"] for i in f["item"])
+miss = [i["name"] for f in c["item"] for i in f["item"] if not i["response"]]
+print(f"  ok {tot} requests, {ex} saved examples")
+if miss:
+    print(f"  !! {len(miss)} without an example: {', '.join(miss[:6])}")
+PY
+}
+
+cmd_docs() {
+  say "rebuilding the explainer"
+  local src="$ROOT/docs/fleet-shifts.html"
+  [ -f "$src" ] || die "docs/fleet-shifts.html is missing"
+  python3 - "$src" <<'PY'
+import re, sys
+p = sys.argv[1]
+s = open(p).read()
+figs = len(re.findall(r'<figure', s))
+rows = len(re.findall(r'<tr>', s))
+print(f"  ok {figs} diagrams, {rows} reference rows")
+if 'data-theme="dark"' not in s:
+    print("  !! the dark theme block is missing, the page will be unreadable for half your readers")
+PY
+  note "the page is generated by hand — ask sath to update it when behaviour changes:"
+  note "  ./sath \"update the diagrams for <what changed>\""
+}
+
+cmd_db() {
+  local q="${1:-summary}"
+  local dsn_user dsn_db dsn_host
+  dsn_user="$(python3 -c "import json;print(json.load(open('$CONFIG'))['database']['postgres']['user'])")"
+  dsn_db="$(python3 -c "import json;print(json.load(open('$CONFIG'))['database']['postgres']['name'])")"
+  dsn_host="$(python3 -c "import json;print(json.load(open('$CONFIG'))['database']['postgres']['host'])")"
+  local pw; pw="$(python3 -c "import json;print(json.load(open('$CONFIG'))['database']['postgres']['password'])")"
+
+  case "$q" in
+    summary)
+      say "database"
+      PGPASSWORD="$pw" psql -h "$dsn_host" -U "$dsn_user" -d "$dsn_db" -tAc "
+        SELECT 'drivers', count(*) FROM drivers
+        UNION ALL SELECT 'passengers', count(*) FROM passengers
+        UNION ALL SELECT 'vehicles', count(*) FROM vehicles
+        UNION ALL SELECT 'groups', count(*) FROM groups
+        UNION ALL SELECT 'shifts', count(*) FROM shifts
+        UNION ALL SELECT 'rides', count(*) FROM rides;" | sed 's/|/: /' | sed 's/^/  /'
+      ;;
+    archives)
+      say "what has been kept from deletions"
+      PGPASSWORD="$pw" psql -h "$dsn_host" -U "$dsn_user" -d "$dsn_db" -tAc "
+        SELECT 'del_drivers', count(*) FROM del_drivers
+        UNION ALL SELECT 'del_vehicles', count(*) FROM del_vehicles
+        UNION ALL SELECT 'del_rides', count(*) FROM del_rides
+        UNION ALL SELECT 'del_passengers', count(*) FROM del_passengers
+        UNION ALL SELECT 'del_passenger_location_preferences', count(*) FROM del_passenger_location_preferences
+        UNION ALL SELECT 'del_roles', count(*) FROM del_roles;" | sed 's/|/: /' | sed 's/^/  /'
+      ;;
+    dangling)
+      say "references left pointing at something deleted"
+      PGPASSWORD="$pw" psql -h "$dsn_host" -U "$dsn_user" -d "$dsn_db" -tAc "
+        SELECT 'seats holding a missing passenger', count(*) FROM shift_seats s
+          WHERE s.passenger_id <> '' AND NOT EXISTS (SELECT 1 FROM passengers p WHERE p.id = s.passenger_id)
+        UNION ALL
+        SELECT 'shifts on a missing vehicle', count(*) FROM shifts sh
+          WHERE NOT EXISTS (SELECT 1 FROM vehicles v WHERE v.id = sh.vehicle_id)
+        UNION ALL
+        SELECT 'groups with a missing owner', count(*) FROM groups g
+          WHERE NOT EXISTS (SELECT 1 FROM drivers d WHERE d.id = g.owner_driver_id);" | sed 's/|/: /' | sed 's/^/  /'
+      ;;
+    *)
+      PGPASSWORD="$pw" psql -h "$dsn_host" -U "$dsn_user" -d "$dsn_db" -c "$q"
+      ;;
+  esac
+}
+
+cmd_all() {
+  say "full pass: check, serve, test, collection, docs"
+  cmd_check
+  cmd_serve start
+  cmd_test
+  cmd_collection
+  cmd_docs
+  cmd_db dangling
+  say "done"
+}
+
+cmd_rules() { project_rules; }
+
+cmd_help() {
+  cat <<EOF
+${B}sath${N} — one tool for the SathSawari backend
+
+${B}ask it to do something${N}
+  ./sath "add an endpoint that cancels every shift of a group"
+  ./sath "the seat swap should notify the old passenger too"
+  ./sath "update the diagrams for the new admin endpoints"
+
+  Anything that is not a subcommand below is sent to Claude with this project's
+  standing rules attached, so it already knows the file layout, the archive rule,
+  and that it must update the collection and the diagrams.
+
+${B}subcommands${N}
+  check              build, vet, gofmt, and look for duplicate routes
+  serve [start|stop|restart|log]
+                     run the API on $BASE
+  test               drive the whole product end to end and record every response
+  collection         regenerate the postman collection from the recorded run
+  docs               sanity check the explainer and its diagrams
+  db [summary|archives|dangling|<sql>]
+                     look at the database
+  all                check, serve, test, collection, docs, dangling — the lot
+  rules              print the standing rules that get attached to every prompt
+  help               this
+
+${B}usual loop${N}
+  ./sath "<what you want>"     make the change
+  ./sath all                   prove it still works end to end
+
+${B}environment${N}
+  SATH_CONFIG   config file        (now: $CONFIG)
+  SATH_BASE     server address     (now: $BASE)
+EOF
+}
+
+# ------------------------------------------------------------ the prompt ----
+
+cmd_prompt() {
+  local request="$*"
+  [ -n "$request" ] || { cmd_help; exit 1; }
+  command -v claude >/dev/null 2>&1 || die "the claude cli is not on PATH"
+
+  say "asking claude"
+  note "$request"
+  echo
+
+  local prompt
+  prompt="$(project_rules)
+
+────────────────────────────────────────────────────────────────────────
+WHAT I WANT
+
+$request
+
+────────────────────────────────────────────────────────────────────────
+Work in $ROOT. Follow the rules above without being reminded of them again,
+including updating the postman collection and the diagrams if what you change
+touches either."
+
+  ( cd "$ROOT" && claude "$prompt" )
+}
+
+# ------------------------------------------------------------------ main ----
+
+case "${1:-help}" in
+  check)      shift; cmd_check "$@" ;;
+  serve)      shift; cmd_serve "$@" ;;
+  test)       shift; cmd_test "$@" ;;
+  collection) shift; cmd_collection "$@" ;;
+  docs)       shift; cmd_docs "$@" ;;
+  db)         shift; cmd_db "$@" ;;
+  all)        shift; cmd_all "$@" ;;
+  rules)      shift; cmd_rules "$@" ;;
+  help|-h|--help) cmd_help ;;
+  *)          cmd_prompt "$@" ;;
+esac

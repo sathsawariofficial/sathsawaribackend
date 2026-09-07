@@ -6,11 +6,15 @@ import json
 import urllib.request
 import urllib.error
 import sys
+import os
 from urllib.parse import quote
 from datetime import datetime, timedelta
 
 BASE = "http://localhost:5000"
-OPEN_TOKEN = open("/tmp/claude-1000/-home-raotalha-Code-PersonalCode-sathsawaribackend/461379a6-41df-48ee-a93f-36ece93a6803/scratchpad/open_token.txt").read().strip()
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+WORK = os.path.join(ROOT, ".sath")
+OPEN_TOKEN = open(os.path.join(WORK, "open_token.txt")).read().strip()
+BASE = os.environ.get("SATH_BASE", "http://localhost:5000")
 RESULTS = []                  # every call, for the collection
 ENV = {}
 
@@ -150,6 +154,9 @@ for key, mob, name, gender, dev in (("psg1", PSG1_M, "Ayesha", "female", "p1"),
     ENV[key + "_id"] = data(r, "passenger", "id")
 
 call("Passenger profile", "GET", "/api/v1/passenger/info", ENV["psg1"])
+call("Passenger reset password", "POST", "/api/v1/passenger/password/reset", ENV["psg1"],
+     {"oldPassword": "Golang@12122", "newPassword": "AbC!123456"},
+     note="the new password is parked against the otp, confirm it on /otp/verify with PASSENGER_UPDATE_PASSWORD")
 call("Passenger forgot password", "GET", f"/api/v1/passenger/password/forgot?mobile_number={quote(PSG1_M)}", OPEN_TOKEN)
 
 print("=" * 100)
@@ -418,7 +425,7 @@ if FAILS:
         print(f"  - {f[0]}: {f[1]} {f[2]} → got {f[3]}, expected {f[4]}")
         print(f"      {f[5]}")
 
-out = "/tmp/claude-1000/-home-raotalha-Code-PersonalCode-sathsawaribackend/461379a6-41df-48ee-a93f-36ece93a6803/scratchpad/responses.json"
+out = os.path.join(WORK, "responses.json")
 with open(out, "w") as f:
     json.dump({"results": RESULTS, "env": ENV}, f, indent=2)
 print(f"\nrecorded {len(RESULTS)} calls → {out}")

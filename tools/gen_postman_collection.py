@@ -1,7 +1,10 @@
 import json
 
 BASE = "{{base-url}}"
-RECORDED_PATH = "/tmp/claude-1000/-home-raotalha-Code-PersonalCode-sathsawaribackend/461379a6-41df-48ee-a93f-36ece93a6803/scratchpad/responses.json"
+import os
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# the responses captured by tools/flow_test.py against a live server
+RECORDED_PATH = os.path.join(ROOT, ".sath", "responses.json")
 
 
 def url(path, query=None):
@@ -910,7 +913,7 @@ collection = {
     ],
 }
 
-out = "/home/raotalha/Code/PersonalCode/sathsawaribackend/SathSawari-ShiftManagement.postman_collection.json"
+out = os.path.join(ROOT, "SathSawari-ShiftManagement.postman_collection.json")
 with open(out, "w") as f:
     json.dump(collection, f, indent=2)
 
