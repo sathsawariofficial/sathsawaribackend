@@ -1,0 +1,1035 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SathSawari Fleet Shifts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+  :root {
+    --paper:      #F2F5F4;
+    --surface:    #FFFFFF;
+    --surface-2:  #E7ECEB;
+    --ink:        #0F1F1E;
+    --ink-soft:   #334745;
+    --muted:      #5A6B6A;
+    --rule:       #C9D4D2;
+    --rule-soft:  #DDE5E4;
+
+    --pickup:     #1D5FA8;
+    --drop:       #0E7C57;
+    --signal:     #C0392B;
+    --pickup-wash:#DCE8F6;
+    --drop-wash:  #D8EDE4;
+    --signal-wash:#F7DEDB;
+
+    --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+    --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+    --s--1: 0.8125rem;
+    --s-0:  1.0625rem;
+    --s-1:  1.3rem;
+    --s-2:  1.7rem;
+    --s-3:  2.3rem;
+    --s-4:  3rem;
+
+    --measure: 68ch;
+    --gutter: clamp(1.25rem, 4vw, 3rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #0D1615;
+      --surface:    #131F1E;
+      --surface-2:  #1B2A28;
+      --ink:        #E8EFEE;
+      --ink-soft:   #BCCBC9;
+      --muted:      #8DA09E;
+      --rule:       #2C403D;
+      --rule-soft:  #223330;
+
+      --pickup:     #7FA8F0;
+      --drop:       #4FC49A;
+      --signal:     #F08A80;
+      --pickup-wash:#1A2B42;
+      --drop-wash:  #14322A;
+      --signal-wash:#3A211F;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #0D1615;
+    --surface:    #131F1E;
+    --surface-2:  #1B2A28;
+    --ink:        #E8EFEE;
+    --ink-soft:   #BCCBC9;
+    --muted:      #8DA09E;
+    --rule:       #2C403D;
+    --rule-soft:  #223330;
+
+    --pickup:     #7FA8F0;
+    --drop:       #4FC49A;
+    --signal:     #F08A80;
+    --pickup-wash:#1A2B42;
+    --drop-wash:  #14322A;
+    --signal-wash:#3A211F;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: var(--s-0);
+    line-height: 1.6;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 var(--gutter) 6rem;
+  }
+
+  .col {
+    max-width: var(--measure);
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    border-bottom: 2px solid var(--ink);
+    padding: 3.5rem 0 1.25rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .eyebrow {
+    font-family: var(--display);
+    font-size: var(--s--1);
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 0.5rem;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-size: var(--s-4);
+    font-weight: 700;
+    line-height: 0.98;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0 0 0.75rem;
+  }
+
+  .standfirst {
+    font-size: var(--s-1);
+    line-height: 1.45;
+    color: var(--ink-soft);
+    max-width: 54ch;
+    margin: 0 0 1.75rem;
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 2.5rem;
+    font-family: var(--mono);
+    font-size: var(--s--1);
+    color: var(--muted);
+    margin: 0;
+  }
+  .facts div { display: flex; gap: 0.5rem; align-items: baseline; }
+  .facts b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* ---------- toc ---------- */
+
+  .toc {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 0;
+    border-top: 1px solid var(--rule);
+    border-left: 1px solid var(--rule);
+    margin-bottom: 4rem;
+  }
+  .toc a {
+    display: block;
+    padding: 0.85rem 1rem;
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    text-decoration: none;
+    color: var(--ink);
+    font-family: var(--display);
+    font-size: 1.05rem;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+  .toc a span {
+    display: block;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 400;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 0.3rem;
+  }
+  .toc a:hover { background: var(--surface-2); }
+  .toc a:focus-visible { outline: 2px solid var(--pickup); outline-offset: -2px; }
+
+  /* ---------- sections ---------- */
+
+  section { margin-bottom: 4.5rem; scroll-margin-top: 1.5rem; }
+
+  h2 {
+    font-family: var(--display);
+    font-size: var(--s-3);
+    font-weight: 700;
+    line-height: 1.05;
+    text-wrap: balance;
+    margin: 0 0 0.4rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--rule);
+  }
+  h2 .num {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 0.55rem;
+  }
+
+  h3 {
+    font-family: var(--display);
+    font-size: var(--s-1);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    margin: 2.25rem 0 0.5rem;
+  }
+
+  p { margin: 0 0 1rem; }
+  .col > p:last-child { margin-bottom: 0; }
+
+  strong { font-weight: 600; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--surface-2);
+    padding: 0.1em 0.35em;
+    border-radius: 2px;
+  }
+
+  .lede {
+    font-size: var(--s-1);
+    line-height: 1.45;
+    color: var(--ink-soft);
+    margin-bottom: 1.5rem;
+  }
+
+  /* ---------- figures ---------- */
+
+  figure {
+    margin: 2rem 0;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+  }
+  .fig-scroll { overflow-x: auto; padding: 1.5rem; }
+  figure svg { display: block; max-width: 100%; height: auto; min-width: 620px; margin: 0 auto; }
+  figcaption {
+    border-top: 1px solid var(--rule-soft);
+    padding: 0.85rem 1.25rem;
+    font-size: var(--s--1);
+    line-height: 1.5;
+    color: var(--muted);
+  }
+  figcaption b { color: var(--ink-soft); font-weight: 600; }
+
+  /* ---------- tables ---------- */
+
+  .table-scroll { overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--rule); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: var(--s--1); }
+  th, td {
+    text-align: left;
+    padding: 0.6rem 0.9rem;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+  }
+  th {
+    font-family: var(--display);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+    border-bottom: 1px solid var(--rule);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.mono, th.mono { font-family: var(--mono); font-size: 0.8rem; white-space: nowrap; }
+  td.mono b { font-weight: 600; }
+
+  .verb {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    padding: 0.12em 0.4em;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    color: var(--ink-soft);
+  }
+
+  .yes { color: var(--drop); font-weight: 600; }
+  .no  { color: var(--muted); }
+
+  /* ---------- flow list ---------- */
+
+  ol.flow {
+    counter-reset: step;
+    list-style: none;
+    padding: 0;
+    margin: 1.5rem 0 0;
+    border-top: 1px solid var(--rule);
+  }
+  ol.flow > li {
+    counter-increment: step;
+    display: grid;
+    grid-template-columns: 3.25rem 1fr;
+    gap: 0 1rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  ol.flow > li::before {
+    content: counter(step, decimal-leading-zero);
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--muted);
+    padding-top: 0.28rem;
+    font-variant-numeric: tabular-nums;
+  }
+  ol.flow h4 {
+    font-family: var(--display);
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin: 0 0 0.2rem;
+  }
+  ol.flow p { margin: 0; font-size: 0.97rem; color: var(--ink-soft); }
+  ol.flow .ep {
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    color: var(--muted);
+    margin-top: 0.35rem;
+    display: block;
+  }
+
+  /* ---------- callout ---------- */
+
+  .note {
+    border-left: 3px solid var(--signal);
+    background: var(--signal-wash);
+    padding: 0.9rem 1.1rem;
+    margin: 1.5rem 0;
+    font-size: 0.97rem;
+  }
+  .note p { margin: 0; }
+  .note p + p { margin-top: 0.6rem; }
+  .note .label {
+    font-family: var(--display);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--signal);
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+
+  ul.plain { padding-left: 1.1rem; margin: 0 0 1rem; }
+  ul.plain li { margin-bottom: 0.45rem; }
+
+  footer {
+    border-top: 2px solid var(--ink);
+    padding-top: 1.25rem;
+    font-size: var(--s--1);
+    color: var(--muted);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">SathSawari · backend feature</p>
+    <h1>Fleet Shifts</h1>
+    <p class="standfirst">A group is a fleet of vehicles and drivers. A shift is one vehicle taking one driver and a set of passengers along an ordered route, on one day, in one direction.</p>
+    <div class="facts">
+      <div>branch <b>feature/shift-management</b></div>
+      <div>tables <b>14 new</b></div>
+      <div>endpoints <b>43 new</b></div>
+      <div>packages <b>group · shift</b></div>
+    </div>
+  </header>
+
+  <nav class="toc">
+    <a href="#model"><span>01</span>The model</a>
+    <a href="#shift"><span>02</span>What a shift is</a>
+    <a href="#directions"><span>03</span>Two directions</a>
+    <a href="#roles"><span>04</span>Who may do what</a>
+    <a href="#rules"><span>05</span>Enforced rules</a>
+    <a href="#flow"><span>06</span>Test flow</a>
+    <a href="#reference"><span>07</span>Endpoints</a>
+  </nav>
+
+  <!-- ================================================== 1 -->
+  <section id="model">
+    <div class="col">
+      <h2><span class="num">01 / the model</span>What the system is made of</h2>
+      <p class="lede">Drivers and their vehicles already existed for carpooling. Everything to the right of them is new.</p>
+      <p>A driver creates a group and becomes its owner, which in this product is the same thing as its manager. Other drivers ask to join, bringing vehicles, offering only to drive, or only lending a vehicle. Passengers ask to join too. Nothing is granted on request — the manager decides.</p>
+      <p>Once the fleet exists, the manager builds shifts out of it. Each shift pins one vehicle and one driver to a window of time and hangs an ordered list of stops off it, with every seat of the vehicle accounted for.</p>
+    </div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 940 560" role="img" aria-label="Entity map: drivers, vehicles and passengers join a group through three membership tables; the group owns shifts, which own ordered stops and gender-locked seats; roles and permissions govern who may act.">
+          <defs>
+            <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <!-- column headers -->
+          <text x="30" y="26" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1.6" fill="currentColor" opacity="0.55">EXISTING</text>
+          <text x="320" y="26" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1.6" fill="currentColor" opacity="0.55">THE FLEET</text>
+          <text x="670" y="26" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1.6" fill="currentColor" opacity="0.55">THE WORK</text>
+
+          <!-- existing column -->
+          <rect x="30" y="46" width="180" height="58" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
+          <text x="44" y="70" font-family="JetBrains Mono, monospace" font-size="13" font-weight="600" fill="currentColor">Driver</text>
+          <text x="44" y="90" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">mobile · gender</text>
+
+          <rect x="30" y="130" width="180" height="72" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
+          <text x="44" y="154" font-family="JetBrains Mono, monospace" font-size="13" font-weight="600" fill="currentColor">Vehicle</text>
+          <text x="44" y="174" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">seats · a/c · heating</text>
+          <text x="44" y="191" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">+3 new columns</text>
+
+          <rect x="30" y="300" width="180" height="72" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
+          <text x="44" y="324" font-family="JetBrains Mono, monospace" font-size="13" font-weight="600" fill="currentColor">Passenger</text>
+          <text x="44" y="344" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">account · gender</text>
+          <text x="44" y="361" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">brand new table</text>
+
+          <rect x="30" y="400" width="180" height="72" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.55"/>
+          <text x="44" y="424" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">Travel form</text>
+          <text x="44" y="443" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">per day, per</text>
+          <text x="44" y="460" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">direction</text>
+          <line x1="120" y1="372" x2="120" y2="398" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)" opacity="0.75"/>
+
+          <!-- fleet column -->
+          <rect x="290" y="46" width="270" height="58" fill="var(--surface-2)" stroke="currentColor" stroke-width="2"/>
+          <text x="306" y="70" font-family="JetBrains Mono, monospace" font-size="13" font-weight="600" fill="currentColor">Group</text>
+          <text x="306" y="90" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">owner = manager</text>
+
+          <rect x="290" y="130" width="270" height="42" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
+          <text x="306" y="156" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">GroupMember · role, join type</text>
+
+          <rect x="290" y="182" width="270" height="42" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
+          <text x="306" y="208" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">GroupVehicle</text>
+
+          <rect x="290" y="234" width="270" height="42" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
+          <text x="306" y="260" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">GroupPassenger</text>
+
+          <text x="290" y="298" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1" fill="currentColor" opacity="0.55">EVERY ROW: pending → approved / rejected / removed</text>
+
+          <!-- rbac -->
+          <rect x="290" y="330" width="270" height="100" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.55"/>
+          <text x="306" y="354" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">Role → RolePermission → Permission</text>
+          <text x="306" y="376" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">group_owner · group_submanager</text>
+          <text x="306" y="395" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">seeded at boot, admin may add more</text>
+          <text x="306" y="416" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">GroupMember.role_id points here</text>
+          <line x1="425" y1="172" x2="425" y2="328" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#a1)" opacity="0.5"/>
+
+          <!-- work column -->
+          <rect x="640" y="46" width="270" height="58" fill="var(--surface-2)" stroke="currentColor" stroke-width="2"/>
+          <text x="656" y="70" font-family="JetBrains Mono, monospace" font-size="13" font-weight="600" fill="currentColor">Shift</text>
+          <text x="656" y="90" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">vehicle · driver · direction · window</text>
+
+          <rect x="640" y="130" width="270" height="42" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
+          <text x="656" y="156" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">ShiftStop · sequence 1..n</text>
+
+          <rect x="640" y="182" width="270" height="60" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
+          <text x="656" y="206" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">ShiftSeat · gender locked</text>
+          <text x="656" y="226" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">→ passenger, → stop</text>
+
+          <rect x="640" y="330" width="270" height="60" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.55"/>
+          <text x="656" y="354" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">ShiftTemplate</text>
+          <text x="656" y="374" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">+ stops + seat plan</text>
+          <line x1="775" y1="242" x2="775" y2="328" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#a1)" opacity="0.5"/>
+          <text x="785" y="290" font-family="Barlow Condensed, sans-serif" font-size="12" letter-spacing="0.5" fill="currentColor" opacity="0.6">saved from</text>
+
+          <!-- joins -->
+          <line x1="210" y1="75" x2="288" y2="75" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+          <text x="216" y="66" font-family="Barlow Condensed, sans-serif" font-size="12.5" letter-spacing="0.5" fill="currentColor">creates</text>
+
+          <line x1="210" y1="151" x2="288" y2="151" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+          <text x="214" y="142" font-family="Barlow Condensed, sans-serif" font-size="12.5" letter-spacing="0.5" fill="currentColor">asks to join</text>
+
+          <line x1="210" y1="196" x2="288" y2="203" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+          <text x="212" y="188" font-family="Barlow Condensed, sans-serif" font-size="12.5" letter-spacing="0.5" fill="currentColor">offered</text>
+
+          <line x1="210" y1="320" x2="288" y2="262" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+          <text x="212" y="300" font-family="Barlow Condensed, sans-serif" font-size="12.5" letter-spacing="0.5" fill="currentColor">asks to join</text>
+
+          <line x1="560" y1="75" x2="638" y2="75" stroke="currentColor" stroke-width="2" marker-end="url(#a1)"/>
+          <text x="566" y="66" font-family="Barlow Condensed, sans-serif" font-size="12.5" letter-spacing="0.5" fill="currentColor">runs</text>
+
+          <line x1="775" y1="104" x2="775" y2="128" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+          <line x1="700" y1="104" x2="700" y2="180" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+
+          <!-- form feeds the manager -->
+          <path d="M 210 436 L 250 436 L 250 500 L 700 500 L 700 246" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#a1)" opacity="0.8"/>
+          <text x="330" y="493" font-family="Barlow Condensed, sans-serif" font-size="12.5" letter-spacing="0.5" fill="currentColor" opacity="0.85">the manager reads the forms, then seats people by hand</text>
+        </svg>
+      </div>
+      <figcaption><b>Solid boxes are tables, dashed boxes are the supporting ones.</b> The travel form never creates a shift — it is only the sheet a manager reads while deciding who to seat. Every membership row moves through the same four states, which is why one endpoint can settle drivers, vehicles and passengers in a single call.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ================================================== 2 -->
+  <section id="shift">
+    <div class="col">
+      <h2><span class="num">02 / anatomy</span>What a shift actually is</h2>
+      <p class="lede">One vehicle, one driver, one day, one direction — and a route the manager arranges by hand.</p>
+      <p>The stops are sent in the order they should be driven, and each seat hangs off the stop its passenger waits at. Every physical seat of the vehicle gets a row, so an empty seat is just as visible as a taken one and the manager can see the gaps left to fill.</p>
+      <p>A seat carries the gender it is kept for. The seat's gender and the person sitting in it must always agree, so nobody ever lands in a seat reserved for the other gender. The manager can re-declare that gender while swapping the occupant, which is how a male rider is exchanged for a female one in a single request.</p>
+    </div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 900 400" role="img" aria-label="A pickup shift: three ordered stops along a route, with each vehicle seat drawn below and linked to the stop where its passenger boards. Two of seven seats are taken, five are free.">
+          <defs>
+            <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--pickup)"/>
+            </marker>
+          </defs>
+
+          <text x="40" y="30" font-family="Barlow Condensed, sans-serif" font-size="14" font-weight="600" letter-spacing="1.6" fill="var(--pickup)">PICKUP · MON 14 SEP · FLEET-001 · 7 SEATS</text>
+
+          <!-- route line -->
+          <line x1="80" y1="105" x2="830" y2="105" stroke="var(--pickup)" stroke-width="3" marker-end="url(#a2)"/>
+
+          <!-- stops -->
+          <circle cx="120" cy="105" r="11" fill="var(--pickup)"/>
+          <text x="120" y="110" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600" fill="var(--surface)">1</text>
+          <text x="120" y="76" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">Bahria Phase 4</text>
+          <text x="120" y="58" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="var(--pickup)">07:15</text>
+
+          <circle cx="430" cy="105" r="11" fill="var(--pickup)"/>
+          <text x="430" y="110" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600" fill="var(--surface)">2</text>
+          <text x="430" y="76" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">DHA Phase 2</text>
+          <text x="430" y="58" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="var(--pickup)">07:35</text>
+
+          <circle cx="740" cy="105" r="11" fill="none" stroke="var(--pickup)" stroke-width="3"/>
+          <text x="740" y="76" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">Roots School F-8</text>
+          <text x="740" y="58" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="var(--pickup)">08:20 · destination</text>
+
+          <!-- boarding links -->
+          <path d="M 120 116 L 120 210 L 155 210" fill="none" stroke="var(--pickup)" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <path d="M 430 116 L 430 250 L 255 250" fill="none" stroke="var(--pickup)" stroke-width="1.5" stroke-dasharray="4 3"/>
+
+          <!-- seat map -->
+          <text x="40" y="200" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1.4" fill="currentColor" opacity="0.55">SEATS</text>
+
+          <!-- seat 1 -->
+          <rect x="160" y="188" width="92" height="62" fill="var(--pickup-wash)" stroke="var(--pickup)" stroke-width="1.5"/>
+          <text x="170" y="206" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.7">seat 1</text>
+          <text x="170" y="224" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">Ayesha</text>
+          <rect x="170" y="230" width="20" height="15" fill="none" stroke="currentColor" stroke-width="1"/>
+          <text x="180" y="242" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" font-weight="600" fill="currentColor">F</text>
+          <text x="196" y="242" font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor" opacity="0.6">stop 1</text>
+
+          <!-- seat 2 -->
+          <rect x="264" y="188" width="92" height="62" fill="var(--pickup-wash)" stroke="var(--pickup)" stroke-width="1.5"/>
+          <text x="274" y="206" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.7">seat 2</text>
+          <text x="274" y="224" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">Bilal</text>
+          <rect x="274" y="230" width="20" height="15" fill="none" stroke="currentColor" stroke-width="1"/>
+          <text x="284" y="242" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" font-weight="600" fill="currentColor">M</text>
+          <text x="300" y="242" font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor" opacity="0.6">stop 2</text>
+
+          <!-- empty seats -->
+          <rect x="368" y="188" width="92" height="62" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.5"/>
+          <text x="378" y="206" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.55">seat 3</text>
+          <text x="378" y="226" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" opacity="0.5">free</text>
+
+          <rect x="472" y="188" width="92" height="62" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.5"/>
+          <text x="482" y="206" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.55">seat 4</text>
+          <text x="482" y="226" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" opacity="0.5">free</text>
+
+          <rect x="576" y="188" width="92" height="62" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.5"/>
+          <text x="586" y="206" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.55">seat 5</text>
+          <text x="586" y="226" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" opacity="0.5">free</text>
+
+          <rect x="680" y="188" width="92" height="62" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.5"/>
+          <text x="690" y="206" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.55">seat 6</text>
+          <text x="690" y="226" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" opacity="0.5">free</text>
+
+          <rect x="784" y="188" width="92" height="62" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.5"/>
+          <text x="794" y="206" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.55">seat 7</text>
+          <text x="794" y="226" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" opacity="0.5">free</text>
+
+          <!-- notified -->
+          <line x1="40" y1="300" x2="860" y2="300" stroke="currentColor" stroke-width="1" opacity="0.25"/>
+          <text x="40" y="330" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1.4" fill="currentColor" opacity="0.55">ON COMMIT, EVERYONE IS TOLD</text>
+          <text x="40" y="356" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">driver → route, seat count, stop count</text>
+          <text x="40" y="376" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">each passenger → their stop, their time, the driver's number, the manager's number</text>
+        </svg>
+      </div>
+      <figcaption><b>Seat 3 to 7 exist as rows even though nobody sits in them.</b> The dashed links show which stop a seat boards at — that is what <code>stopSequence</code> refers to when seats are reassigned later. Every message carries both the driver's number and the number of the manager who built the shift, so anyone with a problem on the day knows who to call.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ================================================== 3 -->
+  <section id="directions">
+    <div class="col">
+      <h2><span class="num">03 / directions</span>Going and coming back are two shifts</h2>
+      <p class="lede">The passenger experiences one journey. The system holds two entirely separate objects.</p>
+      <p>A pickup and a drop-off are never linked. They have their own routes, their own stop order, their own seat assignments, and they are cancelled independently. That is deliberate: the evening rarely retraces the morning, and somebody who rides in one direction often does not ride in the other.</p>
+    </div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 900 330" role="img" aria-label="Two independent shifts on the same day: the morning pickup runs Bahria to DHA to the school, the evening drop runs the school to F-8 Markaz to DHA. The drop points differ from the morning pickup points and the stop order is reversed.">
+          <defs>
+            <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--pickup)"/>
+            </marker>
+            <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--drop)"/>
+            </marker>
+          </defs>
+
+          <!-- morning -->
+          <rect x="30" y="30" width="840" height="110" fill="var(--pickup-wash)" opacity="0.45"/>
+          <text x="48" y="58" font-family="Barlow Condensed, sans-serif" font-size="15" font-weight="700" letter-spacing="1.6" fill="var(--pickup)">SHIFT A · DIRECTION = PICKUP</text>
+          <line x1="110" y1="105" x2="800" y2="105" stroke="var(--pickup)" stroke-width="3" marker-end="url(#a3)"/>
+          <circle cx="140" cy="105" r="9" fill="var(--pickup)"/>
+          <text x="140" y="128" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">Bahria · 07:15</text>
+          <circle cx="420" cy="105" r="9" fill="var(--pickup)"/>
+          <text x="420" y="128" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">DHA · 07:35</text>
+          <circle cx="710" cy="105" r="9" fill="none" stroke="var(--pickup)" stroke-width="3"/>
+          <text x="710" y="128" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">School · 08:20</text>
+
+          <!-- evening -->
+          <rect x="30" y="170" width="840" height="110" fill="var(--drop-wash)" opacity="0.45"/>
+          <text x="48" y="198" font-family="Barlow Condensed, sans-serif" font-size="15" font-weight="700" letter-spacing="1.6" fill="var(--drop)">SHIFT B · DIRECTION = DROP</text>
+          <line x1="110" y1="245" x2="800" y2="245" stroke="var(--drop)" stroke-width="3" marker-end="url(#a4)"/>
+          <circle cx="140" cy="245" r="9" fill="var(--drop)"/>
+          <text x="140" y="268" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">School · 17:00</text>
+          <circle cx="420" cy="245" r="9" fill="var(--drop)"/>
+          <text x="420" y="268" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">F-8 Markaz · 17:30</text>
+          <circle cx="710" cy="245" r="9" fill="none" stroke="var(--drop)" stroke-width="3"/>
+          <text x="710" y="268" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">DHA · 18:10</text>
+
+          <!-- the point -->
+          <text x="30" y="308" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" opacity="0.75">no foreign key joins these two · different stops · different order · cancelled separately</text>
+        </svg>
+      </div>
+      <figcaption><b>Ayesha rides in both, and is dropped at F-8 Markaz rather than picked up from Bahria.</b> Her travel form records that asymmetry per day and per direction — which is also how she switches off the evening leg on a Tuesday while keeping the morning one.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ================================================== 4 -->
+  <section id="roles">
+    <div class="col">
+      <h2><span class="num">04 / authority</span>Who may do what</h2>
+      <p class="lede">Nothing in the code tests a role by name. Every check asks the database what the caller's role is allowed to do.</p>
+      <p>That is what makes the system extensible: an admin can invent a new role and map permissions onto it, and the group and shift endpoints honour it immediately without a deploy. A sub-manager exists to take the shift-building load off the manager, and holds none of the membership permissions.</p>
+    </div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 900 190" role="img" aria-label="Permission resolution: a caller's driver id and group id find their group member row, which points at a role, which maps through role permissions to a permission code. An admin edits the middle two links without any code change.">
+          <defs>
+            <marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <rect x="20" y="52" width="150" height="56" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <text x="95" y="76" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">caller + group</text>
+          <text x="95" y="94" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">from the token</text>
+
+          <rect x="210" y="52" width="160" height="56" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <text x="290" y="76" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">group_members</text>
+          <text x="290" y="94" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">must be approved</text>
+
+          <rect x="410" y="52" width="160" height="56" fill="var(--pickup-wash)" stroke="var(--pickup)" stroke-width="2"/>
+          <text x="490" y="76" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" font-weight="600" fill="currentColor">role_permissions</text>
+          <text x="490" y="94" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.7">admin edits this</text>
+
+          <rect x="610" y="52" width="160" height="56" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <text x="690" y="76" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">permissions.code</text>
+          <text x="690" y="94" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">shift.create …</text>
+
+          <rect x="810" y="52" width="70" height="56" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <text x="845" y="84" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">allow</text>
+
+          <line x1="170" y1="80" x2="208" y2="80" stroke="currentColor" stroke-width="1.5" marker-end="url(#a5)"/>
+          <line x1="370" y1="80" x2="408" y2="80" stroke="currentColor" stroke-width="1.5" marker-end="url(#a5)"/>
+          <line x1="570" y1="80" x2="608" y2="80" stroke="currentColor" stroke-width="1.5" marker-end="url(#a5)"/>
+          <line x1="770" y1="80" x2="808" y2="80" stroke="currentColor" stroke-width="1.5" marker-end="url(#a5)"/>
+
+          <text x="20" y="150" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" opacity="0.75">one joined query · a member with no role resolves to no permissions · a rejected member resolves to none either</text>
+        </svg>
+      </div>
+      <figcaption><b>The blue link is the only one an admin touches.</b> Adding a role, or handing an existing role a permission it did not have, changes behaviour with no deploy — the code only ever asks whether a permission code resolves.</figcaption>
+    </figure>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Permission</th>
+            <th>Owner / manager</th>
+            <th>Sub-manager</th>
+            <th>Joined driver</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">group.manage_members</td><td class="yes">yes</td><td class="no">no</td><td class="no">no</td></tr>
+          <tr><td class="mono">group.manage_vehicles</td><td class="yes">yes</td><td class="no">no</td><td class="no">no</td></tr>
+          <tr><td class="mono">group.manage_submanagers</td><td class="yes">yes</td><td class="no">no</td><td class="no">no</td></tr>
+          <tr><td class="mono">group.delete</td><td class="yes">yes</td><td class="no">no</td><td class="no">no</td></tr>
+          <tr><td class="mono">shift.create</td><td class="yes">yes</td><td class="yes">yes</td><td class="no">no</td></tr>
+          <tr><td class="mono">shift.assign_seats</td><td class="yes">yes</td><td class="yes">yes</td><td class="no">no</td></tr>
+          <tr><td class="mono">shift.cancel</td><td class="yes">yes</td><td class="yes">yes</td><td class="no">no</td></tr>
+          <tr><td class="mono">shift.manage_templates</td><td class="yes">yes</td><td class="yes">yes</td><td class="no">no</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="col">
+      <div class="note">
+        <span class="label">The rule you insisted on</span>
+        <p>A sub-manager can only be promoted from somebody who is <strong>already an approved driver-member of that same fleet</strong>. Anyone else comes back in the <code>skipped</code> list with a reason, never promoted. The owner can never be demoted — that would leave the fleet with nobody in charge.</p>
+      </div>
+      <p>A role's default permissions are written only the first time that role is created. If an admin later strips <code>shift.cancel</code> from sub-managers, a restart will not quietly hand it back.</p>
+    </div>
+  </section>
+
+  <!-- ================================================== 5 -->
+  <section id="rules">
+    <div class="col">
+      <h2><span class="num">05 / safety</span>What the system refuses to do</h2>
+      <p class="lede">Every rule is checked before a single row is written, and the whole shift is written in one transaction.</p>
+      <p>The clash rules are the ones with teeth. A vehicle and a driver can each be in one place at a time, and the check spans both fleet shifts <em>and</em> the existing carpool rides — because a driver is the same person in both halves of the product.</p>
+    </div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 900 300" role="img" aria-label="A timeline for one vehicle and its driver across a day. The morning shift, an afternoon carpool ride and the evening shift occupy the vehicle. A proposed shift overlapping the morning is refused, and so is a carpool ride overlapping the evening shift.">
+          <!-- axis -->
+          <line x1="90" y1="255" x2="860" y2="255" stroke="currentColor" stroke-width="1.5"/>
+          <g font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6" text-anchor="middle">
+            <text x="120" y="275">06:00</text>
+            <text x="245" y="275">09:00</text>
+            <text x="370" y="275">12:00</text>
+            <text x="495" y="275">15:00</text>
+            <text x="620" y="275">18:00</text>
+            <text x="745" y="275">21:00</text>
+          </g>
+          <g stroke="currentColor" stroke-width="1" opacity="0.2">
+            <line x1="120" y1="60" x2="120" y2="255"/>
+            <line x1="245" y1="60" x2="245" y2="255"/>
+            <line x1="370" y1="60" x2="370" y2="255"/>
+            <line x1="495" y1="60" x2="495" y2="255"/>
+            <line x1="620" y1="60" x2="620" y2="255"/>
+            <line x1="745" y1="60" x2="745" y2="255"/>
+          </g>
+
+          <!-- committed row -->
+          <text x="20" y="105" font-family="Barlow Condensed, sans-serif" font-size="13.5" font-weight="600" letter-spacing="1" fill="currentColor">COMMITTED</text>
+          <rect x="162" y="82" width="62" height="34" fill="var(--pickup-wash)" stroke="var(--pickup)" stroke-width="1.5"/>
+          <text x="193" y="104" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor">shift</text>
+
+          <rect x="412" y="82" width="83" height="34" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <text x="453" y="104" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor">carpool ride</text>
+
+          <rect x="578" y="82" width="62" height="34" fill="var(--drop-wash)" stroke="var(--drop)" stroke-width="1.5"/>
+          <text x="609" y="104" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor">shift</text>
+
+          <!-- refused row -->
+          <text x="20" y="175" font-family="Barlow Condensed, sans-serif" font-size="13.5" font-weight="600" letter-spacing="1" fill="var(--signal)">REFUSED</text>
+          <rect x="183" y="152" width="83" height="34" fill="var(--signal-wash)" stroke="var(--signal)" stroke-width="1.5" stroke-dasharray="5 3"/>
+          <text x="224" y="174" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="var(--signal)">new shift</text>
+          <line x1="183" y1="186" x2="266" y2="152" stroke="var(--signal)" stroke-width="1.2"/>
+
+          <rect x="599" y="152" width="83" height="34" fill="var(--signal-wash)" stroke="var(--signal)" stroke-width="1.5" stroke-dasharray="5 3"/>
+          <text x="640" y="174" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="var(--signal)">new ride</text>
+          <line x1="599" y1="186" x2="682" y2="152" stroke="var(--signal)" stroke-width="1.2"/>
+
+          <text x="277" y="174" font-family="JetBrains Mono, monospace" font-size="11" fill="var(--signal)">overlaps a shift</text>
+          <text x="693" y="174" font-family="JetBrains Mono, monospace" font-size="11" fill="var(--signal)">overlaps a shift → the ride is refused too</text>
+
+          <!-- the four checks -->
+          <text x="20" y="222" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1.2" fill="currentColor" opacity="0.55">FOUR CHECKS RUN BEFORE ANY SHIFT IS WRITTEN</text>
+          <text x="20" y="242" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">vehicle vs shifts · vehicle vs rides · driver vs shifts · driver vs rides</text>
+        </svg>
+      </div>
+      <figcaption><b>The check runs in both directions.</b> Creating a carpool ride now also asks whether that driver or vehicle is on a shift — the single change made to the existing ride code, twenty-four lines in <code>CreateRide</code>.</figcaption>
+    </figure>
+
+    <div class="col">
+      <h3>Everything else that is refused</h3>
+      <ul class="plain">
+        <li>A seat whose declared gender does not match the passenger being put in it.</li>
+        <li>The same passenger holding two seats on one shift — judged against the shift as it will look after the change, not just the seats in the request.</li>
+        <li>A seat number the vehicle does not have.</li>
+        <li>A driver, vehicle or passenger who is not an approved member of that fleet.</li>
+        <li>A vehicle joining a fleet without declaring how many seats it has.</li>
+        <li>A group created with no vehicle at all.</li>
+        <li>Cancelling a shift that starts within two hours — the same guard carpool rides already use.</li>
+        <li>Deleting a fleet that still has shifts ahead of it.</li>
+        <li>Deleting a role that is still held by a member, or renaming a system role.</li>
+        <li>A driver leaving a fleet while shifts still expect them behind the wheel.</li>
+        <li>The owner leaving their own fleet — they delete it instead.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ================================================== 6 -->
+  <section id="flow">
+    <div class="col">
+      <h2><span class="num">06 / test flow</span>The order to call things in</h2>
+      <p class="lede">The Postman collection is arranged in exactly this order, and chains the ids for you through test scripts.</p>
+      <p>These steps really are sequential — each one depends on state the previous one created, which is why they are numbered.</p>
+    </div>
+
+    <ol class="flow">
+      <li>
+        <div>
+          <h4>Register and activate the owner driver</h4>
+          <p>Register, verify the OTP with <code>ACTIVATE_DRIVER</code>, log in, set a pin. The fleet's owner is an ordinary driver.</p>
+          <span class="ep">POST /driver/register → POST /otp/verify → POST /driver/login → POST /driver/pin</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h4>Register a vehicle with its seats</h4>
+          <p>This is the step that did not exist before. A vehicle must declare <code>numberOfSeats</code> before it can ever join a fleet; AC and heating ride along with it.</p>
+          <span class="ep">POST /vehicle/register → POST /otp/verify (ACTIVATE_VEHICLE)</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h4>Do the same for a second driver and two passengers</h4>
+          <p>Use one passenger of each gender — the seat rules only become visible with both. Passengers activate with <code>ACTIVATE_PASSENGER</code>, their own operation.</p>
+          <span class="ep">POST /passenger/register → POST /otp/verify → POST /passenger/login</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h4>Have each passenger file their weekly travel form</h4>
+          <p>One call carries the whole week, one row per day per direction. Switch off Tuesday's drop leg to see a passenger who rides in only in the morning.</p>
+          <span class="ep">PUT /passenger/schedule</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h4>Create the group</h4>
+          <p>The owner's vehicle goes in at creation. The owner's membership row is written at the same time, carrying the <code>group_owner</code> role.</p>
+          <span class="ep">POST /group</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h4>Everyone else finds the fleet, then asks to join</h4>
+          <p>Search returns the joinable fleets with your own request status on each row — this is the only way to learn a group id. Then the second driver requests with <code>joinType: both</code> and their vehicle, and both passengers request on their own tokens.</p>
+          <span class="ep">GET /group/search → POST /group/request/driver · POST /passenger/group/request</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h4>Approve the queue in one call</h4>
+          <p>List the pending requests to get the membership row ids, then approve drivers, vehicles and passengers together. The response separates what applied from what was skipped and why.</p>
+          <span class="ep">GET /group/requests → PATCH /group/requests</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h4>Promote the second driver to sub-manager</h4>
+          <p>Only works because they are already inside the fleet. Try it with a driver who never joined and watch it land in <code>skipped</code>.</p>
+          <span class="ep">PATCH /group/submanagers</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h4>Read the travel forms, then build the morning shift</h4>
+          <p>Pull the forms for Monday pickup, then send the stops in route order with the passengers seated under them. Set <code>makeTemplate</code> to save the shape.</p>
+          <span class="ep">GET /group/passengers/schedules → POST /shift</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h4>Build the evening drop shift separately</h4>
+          <p>Different route, reversed stop order, different drop points. Nothing links it to the morning.</p>
+          <span class="ep">POST /shift</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h4>Prove the clash rule</h4>
+          <p>Try a second shift on the same vehicle overlapping the morning window. It should fail with “Vehicle already has a ride or a shift scheduled for this duration”.</p>
+          <span class="ep">POST /shift — expected to fail</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h4>Swap the riders and reshuffle seats</h4>
+          <p>Move the female passenger into the male's seat and vice versa in one request, re-declaring each seat's gender as you go. Then free a seat by sending an empty <code>passengerId</code>.</p>
+          <span class="ep">PUT /shift/seats</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h4>Look at it from every side</h4>
+          <p>The manager's roster, the driver's own shifts, and the passenger's own shifts — the last two are the same handler seen through different tokens.</p>
+          <span class="ep">GET /shift · GET /shift/mine · GET /passenger/shifts · GET /shift/detail</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h4>Push the departure back without losing the seats</h4>
+          <p>Move the window and the individual stop times in one call. Stops are matched by sequence, so the seats stay attached and the clash check re-runs ignoring this shift's own row.</p>
+          <span class="ep">PATCH /shift</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h4>Have somebody leave</h4>
+          <p>A passenger leaving has their upcoming seats freed automatically. A driver is refused while shifts still expect them at the wheel.</p>
+          <span class="ep">DELETE /passenger/group/leave · DELETE /group/leave</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h4>Reuse the template, then clean up</h4>
+          <p>Fetch the template, prefill the create form with it, change the date and post it back to the same create endpoint. Then cancel the shifts and delete the fleet.</p>
+          <span class="ep">GET /shift/templates → POST /shift → DELETE /shift → DELETE /group</span>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ================================================== 7 -->
+  <section id="reference">
+    <div class="col">
+      <h2><span class="num">07 / reference</span>Every new endpoint</h2>
+      <p class="lede">Thirty-seven routes across four packages. Bulk wherever the domain allows it.</p>
+    </div>
+
+    <h3>Group · driver token</h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>What it does</th><th>Needs</th></tr></thead>
+        <tbody>
+          <tr><td><span class="verb">POST</span></td><td class="mono">/group</td><td>Create a fleet with its first vehicle</td><td class="mono">—</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/group/mine</td><td>Fleets you own or belong to</td><td class="mono">—</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/group/search</td><td>Find a fleet to ask to join</td><td class="mono">—</td></tr>
+          <tr><td><span class="verb">DELETE</span></td><td class="mono">/group/leave</td><td>Walk out of a fleet</td><td class="mono">membership</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/group</td><td>One fleet with its three rosters</td><td class="mono">membership</td></tr>
+          <tr><td><span class="verb">POST</span></td><td class="mono">/group/request/driver</td><td>Ask to join, with or without vehicles</td><td class="mono">—</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/group/requests</td><td>Everyone still waiting</td><td class="mono">manage_members</td></tr>
+          <tr><td><span class="verb">PATCH</span></td><td class="mono">/group/requests</td><td>Approve, reject or remove in bulk</td><td class="mono">manage_members</td></tr>
+          <tr><td><span class="verb">PATCH</span></td><td class="mono">/group/submanagers</td><td>Promote and demote in bulk</td><td class="mono">manage_submanagers</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/group/passengers/schedules</td><td>The travel forms you build shifts from</td><td class="mono">assign_seats</td></tr>
+          <tr><td><span class="verb">DELETE</span></td><td class="mono">/group</td><td>Close the fleet down</td><td class="mono">group.delete</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Shift · driver token</h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>What it does</th><th>Needs</th></tr></thead>
+        <tbody>
+          <tr><td><span class="verb">POST</span></td><td class="mono">/shift</td><td>Build a shift, optionally saving a template</td><td class="mono">shift.create</td></tr>
+          <tr><td><span class="verb">PATCH</span></td><td class="mono">/shift</td><td>Move the time or route, keeping the seat plan</td><td class="mono">shift.create</td></tr>
+          <tr><td><span class="verb">PUT</span></td><td class="mono">/shift/seats</td><td>Reseat the vehicle in bulk</td><td class="mono">assign_seats</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/shift/detail</td><td>Shift, stops in order, every seat</td><td class="mono">membership or a seat</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/shift</td><td>The manager's roster, filtered</td><td class="mono">membership</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/shift/mine</td><td>What you drive or ride</td><td class="mono">—</td></tr>
+          <tr><td><span class="verb">DELETE</span></td><td class="mono">/shift</td><td>Cancel and tell everyone</td><td class="mono">shift.cancel</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/shift/templates</td><td>Saved shapes, with stops and seat plan</td><td class="mono">membership</td></tr>
+          <tr><td><span class="verb">DELETE</span></td><td class="mono">/shift/template</td><td>Delete a template</td><td class="mono">manage_templates</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Passenger</h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>What it does</th><th>Token</th></tr></thead>
+        <tbody>
+          <tr><td><span class="verb">POST</span></td><td class="mono">/passenger/register</td><td>Create an account</td><td class="mono">open</td></tr>
+          <tr><td><span class="verb">POST</span></td><td class="mono">/passenger/login</td><td>Issue a passenger token</td><td class="mono">open</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/password/forgot</td><td>Send a reset OTP</td><td class="mono">open</td></tr>
+          <tr><td><span class="verb">POST</span></td><td class="mono">/passenger/password/reset</td><td>Change the password</td><td class="mono">passenger</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/info</td><td>Profile</td><td class="mono">passenger</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/logout</td><td>Drop the session</td><td class="mono">passenger</td></tr>
+          <tr><td><span class="verb">DELETE</span></td><td class="mono">/passenger/delete</td><td>Archive and remove the account</td><td class="mono">passenger</td></tr>
+          <tr><td><span class="verb">PUT</span></td><td class="mono">/passenger/schedule</td><td>Write the whole weekly form at once</td><td class="mono">passenger</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/schedule</td><td>Read it back</td><td class="mono">passenger</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/groups/search</td><td>Find a fleet to ask to join</td><td class="mono">passenger</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/groups</td><td>Fleets you are in or waiting on</td><td class="mono">passenger</td></tr>
+          <tr><td><span class="verb">POST</span></td><td class="mono">/passenger/group/request</td><td>Ask to join a fleet</td><td class="mono">passenger</td></tr>
+          <tr><td><span class="verb">DELETE</span></td><td class="mono">/passenger/group/leave</td><td>Walk out, freeing your upcoming seats</td><td class="mono">passenger</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/shifts</td><td>Shifts you hold a seat on</td><td class="mono">passenger</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/shift/detail</td><td>One of them, with contacts</td><td class="mono">passenger</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/notifications</td><td>Your notifications</td><td class="mono">passenger</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Admin · roles and permissions</h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td><span class="verb">POST</span></td><td class="mono">/admin/role</td><td>Create a role</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/admin/roles</td><td>Roles with their permissions, two queries, no N+1</td></tr>
+          <tr><td><span class="verb">PATCH</span></td><td class="mono">/admin/role</td><td>Edit it — a system role keeps its name</td></tr>
+          <tr><td><span class="verb">DELETE</span></td><td class="mono">/admin/role</td><td>Delete it, unless it is system or still held</td></tr>
+          <tr><td><span class="verb">POST</span></td><td class="mono">/admin/permission</td><td>Create a permission code</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/admin/permissions</td><td>List them</td></tr>
+          <tr><td><span class="verb">PUT</span></td><td class="mono">/admin/role/permissions</td><td>Replace a role's whole permission set</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <div class="col">
+      <p><strong>Not yet verified against a live database.</strong> The code builds, vets and formats clean, but the migration of the fourteen new tables and the boot-time seeding of roles and permissions have never been run against Postgres. That is the next thing worth doing.</p>
+      <p>One pre-existing typo left untouched, because changing it would alter responses your app may already match on: <code>Deleted_Successfully</code> and <code>DELETE_Failed</code> both read “updated”, so every delete endpoint — old and new — replies “updated successfully”.</p>
+    </div>
+  </footer>
+
+</div>
+
+</body>
+</html>
