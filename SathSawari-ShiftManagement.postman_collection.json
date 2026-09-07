@@ -1,0 +1,2753 @@
+{
+  "info": {
+    "_postman_id": "b7c41f02-5e6a-4d38-9c11-3a7f0e2b4d91",
+    "name": "SathSawari \u00b7 Shift Management",
+    "description": "Every endpoint added by the group / fleet shift management feature, in the order you would actually exercise them.\n\nSETUP\n1. Use the same environment as your existing Rideshare collection, it needs base-url and open_token.\n2. Run the folders top to bottom. Almost every id is captured into an environment variable by a test script, so the flow chains on its own.\n3. The OTPs come back in the response as tempOTP while you are not on production, so the verify steps chain automatically too.\n\nTOKENS USED\n  open_token          public endpoints\n  admin_session       admin, roles and permissions\n  owner_session       the driver who owns the fleet, ie the manager\n  driver2_session     a second driver, later a sub manager\n  passenger_session   a female passenger\n  passenger2_session  a male passenger\n\nFolder 4 contains two requests that are MEANT to fail, they are the proof of the clash and gender rules. Each one says so in its description.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "0 \u00b7 Admin & Roles (RBAC)",
+      "item": [
+        {
+          "name": "Admin Login",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{open_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/admin/login",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"twssawari\",\n    \"password\": \"vR7!xK2@pQ9#Lm4$Zw8^Ty1&Nc5*Hs3%Df6!Ba\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Saves admin_session. Run this first if you want to touch roles or permissions."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && (r.data.sessionId) !== undefined && (r.data.sessionId) !== null) {",
+                  "    pm.environment.set(\"admin_session\", r.data.sessionId);",
+                  "    console.log(\"admin_session saved:\", r.data.sessionId);",
+                  "} else {",
+                  "    console.error(\"admin_session not found in response\");",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Roles",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/admin/roles?page=1",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "roles"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "group_owner and group_submanager are seeded at boot with their permissions already mapped. This also saves their ids."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && r.data.roles) {",
+                  "    const owner = r.data.roles.find(x => x.name === \"group_owner\");",
+                  "    const sub = r.data.roles.find(x => x.name === \"group_submanager\");",
+                  "    if (owner) pm.environment.set(\"owner_role_id\", owner.id);",
+                  "    if (sub) pm.environment.set(\"submanager_role_id\", sub.id);",
+                  "    console.log(\"seeded roles:\", r.data.roles.map(x => x.name));",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Permissions",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/admin/permissions?page=1",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "permissions"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "The eight seeded permission codes. Saves a code -> id map you can use when remapping a role."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && r.data.permissions) {",
+                  "    const byCode = {};",
+                  "    r.data.permissions.forEach(p => byCode[p.code] = p.id);",
+                  "    pm.environment.set(\"permission_ids_json\", JSON.stringify(byCode));",
+                  "    console.log(\"permissions:\", Object.keys(byCode));",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Role",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/admin/role",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "role"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"group_dispatcher\",\n    \"description\": \"Can build shifts but not cancel them\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Proves point 14: a brand new role can be added with no code change."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && (r.data.id) !== undefined && (r.data.id) !== null) {",
+                  "    pm.environment.set(\"custom_role_id\", r.data.id);",
+                  "    console.log(\"custom_role_id saved:\", r.data.id);",
+                  "} else {",
+                  "    console.error(\"custom_role_id not found in response\");",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Set Role Permissions (bulk)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/admin/role/permissions",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "role",
+                "permissions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"roleId\": \"{{custom_role_id}}\",\n    \"permissionIds\": [\n        \"{{permission_create_shift_id}}\"\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Replaces the whole permission set of a role in one call. Read permission_ids_json from Get Permissions and paste the ids you want. Sending an empty list strips the role back to nothing."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Role",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/admin/role?role_id={{custom_role_id}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "role"
+              ],
+              "query": [
+                {
+                  "key": "role_id",
+                  "value": "{{custom_role_id}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"description\": \"Builds shifts for a fleet\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "A system role can have its description changed but never its name, because the group checks look those roles up by name."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Role",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/admin/role?role_id={{custom_role_id}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "role"
+              ],
+              "query": [
+                {
+                  "key": "role_id",
+                  "value": "{{custom_role_id}}"
+                }
+              ]
+            },
+            "description": "Refused for a system role, and refused while any member still holds the role."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1 \u00b7 Accounts & Vehicles",
+      "item": [
+        {
+          "name": "Owner Driver \u00b7 Register",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{open_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/driver/register",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "driver",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"deviceId\": \"post_man\",\n    \"mobile\": \"+923405421301\",\n    \"name\": \"Owner Driver\",\n    \"password\": \"Golang@12122\",\n    \"gender\": \"male\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Step 1 of the flow. The owner of the fleet is an ordinary driver."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && (r.data.tempOTP) !== undefined && (r.data.tempOTP) !== null) {",
+                  "    pm.environment.set(\"owner_otp\", r.data.tempOTP);",
+                  "    console.log(\"owner_otp saved:\", r.data.tempOTP);",
+                  "} else {",
+                  "    console.error(\"owner_otp not found in response\");",
+                  "}",
+                  "pm.environment.set(\"owner_mobile\", \"+923405421301\");"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Owner Driver \u00b7 Verify OTP",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{open_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/otp/verify",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "otp",
+                "verify"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"mobile\": \"{{owner_mobile}}\",\n    \"otp\": \"{{owner_otp}}\",\n    \"operation\": \"ACTIVATE_DRIVER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Owner Driver \u00b7 Login",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{open_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/driver/login",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "driver",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"deviceId\": \"post_man\",\n    \"mobile\": \"{{owner_mobile}}\",\n    \"password\": \"Golang@12122\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Saves owner_session and owner_driver_id."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && (r.data.sessionId) !== undefined && (r.data.sessionId) !== null) {",
+                  "    pm.environment.set(\"owner_session\", r.data.sessionId);",
+                  "    console.log(\"owner_session saved:\", r.data.sessionId);",
+                  "} else {",
+                  "    console.error(\"owner_session not found in response\");",
+                  "}",
+                  "if (r.data && r.data.driver) pm.environment.set(\"owner_driver_id\", r.data.driver.id);"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Owner Driver \u00b7 Set Pin",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/driver/pin?pin=121212",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "driver",
+                "pin"
+              ],
+              "query": [
+                {
+                  "key": "pin",
+                  "value": "121212"
+                }
+              ]
+            },
+            "description": "The pin is needed to register a vehicle."
+          },
+          "response": []
+        },
+        {
+          "name": "Owner Driver \u00b7 Register Vehicle (7 seats, AC)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/vehicle/register",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "vehicle",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"vehicleNumber\": \"FLEET-001\",\n    \"vehicleInfo\": \"Hiace van\",\n    \"numberOfSeats\": 7,\n    \"hasAC\": true,\n    \"hasHeating\": false,\n    \"pin\": \"121212\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "numberOfSeats, hasAC and hasHeating are what let this vehicle join a fleet. Seats are counted excluding the driver, so this van seats 7 passengers."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && (r.data.vehicleId) !== undefined && (r.data.vehicleId) !== null) {",
+                  "    pm.environment.set(\"owner_vehicle_id\", r.data.vehicleId);",
+                  "    console.log(\"owner_vehicle_id saved:\", r.data.vehicleId);",
+                  "} else {",
+                  "    console.error(\"owner_vehicle_id not found in response\");",
+                  "}",
+                  "pm.environment.set(\"vehicle_otp\", r.data.tempOTP);"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Owner Driver \u00b7 Verify Vehicle OTP",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{open_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/otp/verify",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "otp",
+                "verify"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"mobile\": \"{{owner_mobile}}\",\n    \"otp\": \"{{vehicle_otp}}\",\n    \"operation\": \"ACTIVATE_VEHICLE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Second Driver \u00b7 Register",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{open_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/driver/register",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "driver",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"deviceId\": \"post_man_2\",\n    \"mobile\": \"+923405421302\",\n    \"name\": \"Second Driver\",\n    \"password\": \"Golang@12122\",\n    \"gender\": \"male\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "This driver will ask to join the fleet and later be made a sub manager."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && (r.data.tempOTP) !== undefined && (r.data.tempOTP) !== null) {",
+                  "    pm.environment.set(\"driver2_otp\", r.data.tempOTP);",
+                  "    console.log(\"driver2_otp saved:\", r.data.tempOTP);",
+                  "} else {",
+                  "    console.error(\"driver2_otp not found in response\");",
+                  "}",
+                  "pm.environment.set(\"driver2_mobile\", \"+923405421302\");"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Second Driver \u00b7 Verify OTP",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{open_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/otp/verify",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "otp",
+                "verify"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"mobile\": \"{{driver2_mobile}}\",\n    \"otp\": \"{{driver2_otp}}\",\n    \"operation\": \"ACTIVATE_DRIVER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Second Driver \u00b7 Login",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{open_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/driver/login",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "driver",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"deviceId\": \"post_man_2\",\n    \"mobile\": \"{{driver2_mobile}}\",\n    \"password\": \"Golang@12122\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && (r.data.sessionId) !== undefined && (r.data.sessionId) !== null) {",
+                  "    pm.environment.set(\"driver2_session\", r.data.sessionId);",
+                  "    console.log(\"driver2_session saved:\", r.data.sessionId);",
+                  "} else {",
+                  "    console.error(\"driver2_session not found in response\");",
+                  "}",
+                  "if (r.data && r.data.driver) pm.environment.set(\"driver2_id\", r.data.driver.id);"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Second Driver \u00b7 Set Pin",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{driver2_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/driver/pin?pin=131313",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "driver",
+                "pin"
+              ],
+              "query": [
+                {
+                  "key": "pin",
+                  "value": "131313"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Second Driver \u00b7 Register Vehicle (4 seats)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{driver2_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/vehicle/register",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "vehicle",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"vehicleNumber\": \"FLEET-002\",\n    \"vehicleInfo\": \"Corolla\",\n    \"numberOfSeats\": 4,\n    \"hasAC\": true,\n    \"hasHeating\": true,\n    \"pin\": \"131313\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && (r.data.vehicleId) !== undefined && (r.data.vehicleId) !== null) {",
+                  "    pm.environment.set(\"driver2_vehicle_id\", r.data.vehicleId);",
+                  "    console.log(\"driver2_vehicle_id saved:\", r.data.vehicleId);",
+                  "} else {",
+                  "    console.error(\"driver2_vehicle_id not found in response\");",
+                  "}",
+                  "pm.environment.set(\"vehicle2_otp\", r.data.tempOTP);"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Second Driver \u00b7 Verify Vehicle OTP",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{open_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/otp/verify",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "otp",
+                "verify"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"mobile\": \"{{driver2_mobile}}\",\n    \"otp\": \"{{vehicle2_otp}}\",\n    \"operation\": \"ACTIVATE_VEHICLE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Vehicle (seats / AC / heating)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/vehicle/update",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "vehicle",
+                "update"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"vehicleId\": \"{{owner_vehicle_id}}\",\n    \"numberOfSeats\": 7,\n    \"hasAC\": true,\n    \"hasHeating\": true,\n    \"pin\": \"121212\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "hasAC and hasHeating are pointers on update, so leaving one out is different from switching it off."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Vehicles",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/vehicle",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "vehicle"
+              ]
+            },
+            "description": "Now returns numberOfSeats, hasAC and hasHeating."
+          },
+          "response": []
+        },
+        {
+          "name": "Passenger \u00b7 Register (female)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{open_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/passenger/register",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"deviceId\": \"post_man_p1\",\n    \"mobile\": \"+923405421401\",\n    \"name\": \"Ayesha\",\n    \"gender\": \"female\",\n    \"password\": \"Golang@12122\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Passengers had no account at all before this feature. Gender matters because seats are gender locked."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && (r.data.tempOTP) !== undefined && (r.data.tempOTP) !== null) {",
+                  "    pm.environment.set(\"passenger1_otp\", r.data.tempOTP);",
+                  "    console.log(\"passenger1_otp saved:\", r.data.tempOTP);",
+                  "} else {",
+                  "    console.error(\"passenger1_otp not found in response\");",
+                  "}",
+                  "pm.environment.set(\"passenger1_mobile\", \"+923405421401\");",
+                  "if (r.data) pm.environment.set(\"passenger1_id\", r.data.passengerId);"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Passenger \u00b7 Verify OTP",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{open_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/otp/verify",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "otp",
+                "verify"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"mobile\": \"{{passenger1_mobile}}\",\n    \"otp\": \"{{passenger1_otp}}\",\n    \"operation\": \"ACTIVATE_PASSENGER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "ACTIVATE_PASSENGER is its own operation, separate from ACTIVATE_DRIVER, so one number can hold both kinds of account."
+          },
+          "response": []
+        },
+        {
+          "name": "Passenger \u00b7 Login",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{open_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/passenger/login",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"deviceId\": \"post_man_p1\",\n    \"mobile\": \"{{passenger1_mobile}}\",\n    \"password\": \"Golang@12122\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Issues a passenger_token, a different token type from a driver's."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && (r.data.sessionId) !== undefined && (r.data.sessionId) !== null) {",
+                  "    pm.environment.set(\"passenger_session\", r.data.sessionId);",
+                  "    console.log(\"passenger_session saved:\", r.data.sessionId);",
+                  "} else {",
+                  "    console.error(\"passenger_session not found in response\");",
+                  "}",
+                  "if (r.data && r.data.passenger) pm.environment.set(\"passenger1_id\", r.data.passenger.id);"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Passenger 2 \u00b7 Register (male)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{open_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/passenger/register",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"deviceId\": \"post_man_p2\",\n    \"mobile\": \"+923405421402\",\n    \"name\": \"Bilal\",\n    \"gender\": \"male\",\n    \"password\": \"Golang@12122\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "A second passenger of the other gender, used later to show the gender swap on a seat."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && (r.data.tempOTP) !== undefined && (r.data.tempOTP) !== null) {",
+                  "    pm.environment.set(\"passenger2_otp\", r.data.tempOTP);",
+                  "    console.log(\"passenger2_otp saved:\", r.data.tempOTP);",
+                  "} else {",
+                  "    console.error(\"passenger2_otp not found in response\");",
+                  "}",
+                  "pm.environment.set(\"passenger2_mobile\", \"+923405421402\");",
+                  "if (r.data) pm.environment.set(\"passenger2_id\", r.data.passengerId);"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Passenger 2 \u00b7 Verify OTP",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{open_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/otp/verify",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "otp",
+                "verify"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"mobile\": \"{{passenger2_mobile}}\",\n    \"otp\": \"{{passenger2_otp}}\",\n    \"operation\": \"ACTIVATE_PASSENGER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Passenger 2 \u00b7 Login",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{open_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/passenger/login",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"deviceId\": \"post_man_p2\",\n    \"mobile\": \"{{passenger2_mobile}}\",\n    \"password\": \"Golang@12122\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && (r.data.sessionId) !== undefined && (r.data.sessionId) !== null) {",
+                  "    pm.environment.set(\"passenger2_session\", r.data.sessionId);",
+                  "    console.log(\"passenger2_session saved:\", r.data.sessionId);",
+                  "} else {",
+                  "    console.error(\"passenger2_session not found in response\");",
+                  "}",
+                  "if (r.data && r.data.passenger) pm.environment.set(\"passenger2_id\", r.data.passenger.id);"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Passenger \u00b7 Profile",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{passenger_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/passenger/info",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "info"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Passenger \u00b7 Forgot Password",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{open_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/passenger/password/forgot?mobile_number={{passenger1_mobile}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "password",
+                "forgot"
+              ],
+              "query": [
+                {
+                  "key": "mobile_number",
+                  "value": "{{passenger1_mobile}}"
+                }
+              ]
+            },
+            "description": "Verify with operation PASSENGER_FORGOT_PASSWORD and send the new password in the same body."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && (r.data.tempOTP) !== undefined && (r.data.tempOTP) !== null) {",
+                  "    pm.environment.set(\"passenger_reset_otp\", r.data.tempOTP);",
+                  "    console.log(\"passenger_reset_otp saved:\", r.data.tempOTP);",
+                  "} else {",
+                  "    console.error(\"passenger_reset_otp not found in response\");",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Passenger \u00b7 Reset Password (change)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{passenger_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/passenger/password/reset",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "password",
+                "reset"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"oldPassword\": \"Golang@12122\",\n    \"newPassword\": \"AbC!123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Parks the new password against the otp. Confirm it with operation PASSENGER_UPDATE_PASSWORD on /otp/verify."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && (r.data.tempOTP) !== undefined && (r.data.tempOTP) !== null) {",
+                  "    pm.environment.set(\"passenger_change_otp\", r.data.tempOTP);",
+                  "    console.log(\"passenger_change_otp saved:\", r.data.tempOTP);",
+                  "} else {",
+                  "    console.error(\"passenger_change_otp not found in response\");",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Passenger \u00b7 Logout",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{passenger_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/passenger/logout",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "logout"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2 \u00b7 Passenger Travel Form (point 7)",
+      "item": [
+        {
+          "name": "Set Weekly Form (bulk)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{passenger_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/passenger/schedule",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "schedule"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"preferences\": [\n        {\n            \"dayOfWeek\": 1,\n            \"direction\": \"pickup\",\n            \"isEnabled\": true,\n            \"location\": \"Bahria Town Phase 4\",\n            \"lat\": 33.5121,\n            \"lng\": 73.0951,\n            \"scheduledTime\": \"07:15:00\"\n        },\n        {\n            \"dayOfWeek\": 1,\n            \"direction\": \"drop\",\n            \"isEnabled\": true,\n            \"location\": \"F-8 Markaz\",\n            \"lat\": 33.7101,\n            \"lng\": 73.0441,\n            \"scheduledTime\": \"17:30:00\"\n        },\n        {\n            \"dayOfWeek\": 2,\n            \"direction\": \"pickup\",\n            \"isEnabled\": true,\n            \"location\": \"Bahria Town Phase 4\",\n            \"lat\": 33.5121,\n            \"lng\": 73.0951,\n            \"scheduledTime\": \"07:15:00\"\n        },\n        {\n            \"dayOfWeek\": 2,\n            \"direction\": \"drop\",\n            \"isEnabled\": false,\n            \"location\": \"\",\n            \"lat\": 0,\n            \"lng\": 0,\n            \"scheduledTime\": \"\"\n        },\n        {\n            \"dayOfWeek\": 3,\n            \"direction\": \"pickup\",\n            \"isEnabled\": true,\n            \"location\": \"Gulberg Greens\",\n            \"lat\": 33.618,\n            \"lng\": 73.156,\n            \"scheduledTime\": \"07:40:00\"\n        },\n        {\n            \"dayOfWeek\": 3,\n            \"direction\": \"drop\",\n            \"isEnabled\": true,\n            \"location\": \"Blue Area\",\n            \"lat\": 33.718,\n            \"lng\": 73.064,\n            \"scheduledTime\": \"18:00:00\"\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "The whole week in one call, one row per day per direction.\n\nTuesday shows requirement 17.2: pickup is on, drop is off, so this passenger rides in the morning and makes their own way home.\n\nWednesday shows requirement 17.3: picked up from Gulberg Greens but dropped at Blue Area, a different place from the morning.\n\nThis form never creates a shift. It is only the sheet the manager reads while building one."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Weekly Form",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{passenger_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/passenger/schedule",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "schedule"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Passenger 2 \u00b7 Set Weekly Form",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{passenger2_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/passenger/schedule",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "schedule"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"preferences\": [\n        {\n            \"dayOfWeek\": 1,\n            \"direction\": \"pickup\",\n            \"isEnabled\": true,\n            \"location\": \"DHA Phase 2\",\n            \"lat\": 33.535,\n            \"lng\": 73.135,\n            \"scheduledTime\": \"07:20:00\"\n        },\n        {\n            \"dayOfWeek\": 1,\n            \"direction\": \"drop\",\n            \"isEnabled\": true,\n            \"location\": \"F-8 Markaz\",\n            \"lat\": 33.7101,\n            \"lng\": 73.0441,\n            \"scheduledTime\": \"17:30:00\"\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3 \u00b7 Group (Fleet)",
+      "item": [
+        {
+          "name": "Create Group",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/group",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "group"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Morning School Fleet\",\n    \"description\": \"Islamabad school run\",\n    \"vehicleIds\": [\n        \"{{owner_vehicle_id}}\"\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "The creating driver becomes the owner, which in this product is the same thing as the manager. A group must be born with at least one vehicle, and every vehicle must already have declared its seats."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && (r.data.groupId) !== undefined && (r.data.groupId) !== null) {",
+                  "    pm.environment.set(\"group_id\", r.data.groupId);",
+                  "    console.log(\"group_id saved:\", r.data.groupId);",
+                  "} else {",
+                  "    console.error(\"group_id not found in response\");",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "My Groups",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/group/mine?page=1",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "group",
+                "mine"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Driver \u00b7 Request To Join (driver + vehicle)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{driver2_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/group/request/driver",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "group",
+                "request",
+                "driver"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"groupId\": \"{{group_id}}\",\n    \"joinType\": \"both\",\n    \"vehicleIds\": [\n        \"{{driver2_vehicle_id}}\"\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "joinType is one of both, driver_only or vehicle_only (requirement 3).\n\ndriver_only must carry no vehicles. vehicle_only and both must carry at least one.\n\nNothing is granted here, the owner still decides. A driver who was turned down before can simply ask again."
+          },
+          "response": []
+        },
+        {
+          "name": "Passenger \u00b7 Request To Join",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{passenger_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/passenger/group/request",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "group",
+                "request"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"groupId\": \"{{group_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Requirement 23. Note this runs on a passenger token, not a driver one."
+          },
+          "response": []
+        },
+        {
+          "name": "Passenger 2 \u00b7 Request To Join",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{passenger2_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/passenger/group/request",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "group",
+                "request"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"groupId\": \"{{group_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Pending Requests",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/group/requests?group_id={{group_id}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "group",
+                "requests"
+              ],
+              "query": [
+                {
+                  "key": "group_id",
+                  "value": "{{group_id}}"
+                }
+              ]
+            },
+            "description": "Needs group.manage_members. Saves the membership row ids the next call decides on."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data) {",
+                  "    if (r.data.members && r.data.members.length) pm.environment.set(\"member_request_id\", r.data.members[0].id);",
+                  "    if (r.data.vehicles && r.data.vehicles.length) pm.environment.set(\"vehicle_request_id\", r.data.vehicles[0].id);",
+                  "    if (r.data.passengers && r.data.passengers.length) {",
+                  "        pm.environment.set(\"passenger_request_id\", r.data.passengers[0].id);",
+                  "        if (r.data.passengers.length > 1) pm.environment.set(\"passenger2_request_id\", r.data.passengers[1].id);",
+                  "    }",
+                  "    console.log(\"pending:\", (r.data.members||[]).length, \"drivers,\", (r.data.vehicles||[]).length, \"vehicles,\", (r.data.passengers||[]).length, \"passengers\");",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Decide Requests (bulk)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/group/requests",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "group",
+                "requests"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"groupId\": \"{{group_id}}\",\n    \"decisions\": [\n        {\n            \"memberType\": \"driver\",\n            \"memberId\": \"{{member_request_id}}\",\n            \"action\": \"approve\"\n        },\n        {\n            \"memberType\": \"vehicle\",\n            \"memberId\": \"{{vehicle_request_id}}\",\n            \"action\": \"approve\"\n        },\n        {\n            \"memberType\": \"passenger\",\n            \"memberId\": \"{{passenger_request_id}}\",\n            \"action\": \"approve\"\n        },\n        {\n            \"memberType\": \"passenger\",\n            \"memberId\": \"{{passenger2_request_id}}\",\n            \"action\": \"approve\"\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "One call settles the whole queue. memberId is the id of the membership row, not of the driver or passenger behind it.\n\naction is approve, reject or remove. approve and reject only act on somebody still waiting, remove only on somebody already inside.\n\nThe response splits into applied and skipped, and every skipped line says why, so a half valid batch still tells you exactly what happened. Deciding on a vehicle additionally needs group.manage_vehicles."
+          },
+          "response": []
+        },
+        {
+          "name": "Promote Sub Manager (bulk)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/group/submanagers",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "group",
+                "submanagers"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"groupId\": \"{{group_id}}\",\n    \"promote\": [\n        \"{{driver2_id}}\"\n    ],\n    \"demote\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Requirement 16. The rule you insisted on is enforced here: a driver can only be promoted if they are ALREADY an approved member of this same fleet. Anybody else comes back in skipped with the reason, never promoted.\n\nThe owner can never be demoted, that would leave the fleet with nobody in charge.\n\nA sub manager gets the four shift permissions and none of the membership ones."
+          },
+          "response": []
+        },
+        {
+          "name": "Group Details (rosters)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/group?group_id={{group_id}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "group"
+              ],
+              "query": [
+                {
+                  "key": "group_id",
+                  "value": "{{group_id}}"
+                }
+              ]
+            },
+            "description": "The fleet with its driver, vehicle and passenger rosters. Only somebody already inside the fleet may look."
+          },
+          "response": []
+        },
+        {
+          "name": "Passenger Travel Forms (manager view)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/group/passengers/schedules?group_id={{group_id}}&day_of_week=1&direction=pickup&page=1",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "group",
+                "passengers",
+                "schedules"
+              ],
+              "query": [
+                {
+                  "key": "group_id",
+                  "value": "{{group_id}}"
+                },
+                {
+                  "key": "day_of_week",
+                  "value": "1"
+                },
+                {
+                  "key": "direction",
+                  "value": "pickup"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "This is the sheet requirement 10 describes: who wants to travel on this day in this direction, from where, at what time, and which gender seat they need.\n\nLeave day_of_week and direction off to get the whole week.\n\nGated on shift.assign_seats rather than plain membership, since it carries home addresses, so the owner and sub managers see it and an ordinary joined driver does not."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Group",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/group?group_id={{group_id}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "group"
+              ],
+              "query": [
+                {
+                  "key": "group_id",
+                  "value": "{{group_id}}"
+                }
+              ]
+            },
+            "description": "Refused while the fleet still has shifts ahead of it. Cancel those first. Run this last, it ends the flow."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4 \u00b7 Shifts",
+      "item": [
+        {
+          "name": "Create Morning PICKUP Shift (+ template)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/shift",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shift"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"groupId\": \"{{group_id}}\",\n    \"vehicleId\": \"{{owner_vehicle_id}}\",\n    \"driverId\": \"{{owner_driver_id}}\",\n    \"direction\": \"pickup\",\n    \"startDatetime\": \"2026-09-14 07:00:00\",\n    \"estimatedEndDatetime\": \"2026-09-14 08:30:00\",\n    \"startLocation\": \"Bahria Town Phase 4\",\n    \"endLocation\": \"Roots School F-8\",\n    \"routeDetails\": \"Via Expressway\",\n    \"makeTemplate\": true,\n    \"templateName\": \"Monday morning pickup\",\n    \"daysOfWeek\": [\n        1,\n        2,\n        3,\n        4,\n        5\n    ],\n    \"stops\": [\n        {\n            \"location\": \"Bahria Town Phase 4\",\n            \"lat\": 33.5121,\n            \"lng\": 73.0951,\n            \"scheduledTime\": \"07:15:00\",\n            \"seats\": [\n                {\n                    \"seatNumber\": 1,\n                    \"gender\": \"female\",\n                    \"passengerId\": \"{{passenger1_id}}\"\n                }\n            ]\n        },\n        {\n            \"location\": \"DHA Phase 2\",\n            \"lat\": 33.535,\n            \"lng\": 73.135,\n            \"scheduledTime\": \"07:35:00\",\n            \"seats\": [\n                {\n                    \"seatNumber\": 2,\n                    \"gender\": \"male\",\n                    \"passengerId\": \"{{passenger2_id}}\"\n                }\n            ]\n        },\n        {\n            \"location\": \"Roots School F-8\",\n            \"lat\": 33.7101,\n            \"lng\": 73.0441,\n            \"scheduledTime\": \"08:20:00\",\n            \"seats\": []\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "The stops are the route, in the order you send them, and each seat hangs off the stop its passenger waits at (your ordered stop requirement). The last stop here is the destination and carries nobody.\n\nEvery seat of the vehicle gets a row, so this 7 seat van comes back with 2 assigned and 5 empty seats a manager can fill later.\n\nmakeTemplate saves the shape for reuse, exactly like ride templates. There is no separate build from template api, the app refetches a template and posts it back here.\n\nRejected if the vehicle or the driver is already promised at that hour, on another shift OR on a carpool ride (requirements 19 to 22)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && (r.data.shiftId) !== undefined && (r.data.shiftId) !== null) {",
+                  "    pm.environment.set(\"shift_id\", r.data.shiftId);",
+                  "    console.log(\"shift_id saved:\", r.data.shiftId);",
+                  "} else {",
+                  "    console.error(\"shift_id not found in response\");",
+                  "}",
+                  "if (r.data) pm.environment.set(\"template_id\", r.data.templateId);"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Evening DROP Shift",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/shift",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shift"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"groupId\": \"{{group_id}}\",\n    \"vehicleId\": \"{{owner_vehicle_id}}\",\n    \"driverId\": \"{{owner_driver_id}}\",\n    \"direction\": \"drop\",\n    \"startDatetime\": \"2026-09-14 17:00:00\",\n    \"estimatedEndDatetime\": \"2026-09-14 18:30:00\",\n    \"startLocation\": \"Roots School F-8\",\n    \"endLocation\": \"Bahria Town Phase 4\",\n    \"routeDetails\": \"Via Kashmir Highway\",\n    \"makeTemplate\": false,\n    \"daysOfWeek\": [\n        1,\n        2,\n        3,\n        4,\n        5\n    ],\n    \"stops\": [\n        {\n            \"location\": \"Roots School F-8\",\n            \"lat\": 33.7101,\n            \"lng\": 73.0441,\n            \"scheduledTime\": \"17:00:00\",\n            \"seats\": []\n        },\n        {\n            \"location\": \"F-8 Markaz\",\n            \"lat\": 33.7101,\n            \"lng\": 73.0441,\n            \"scheduledTime\": \"17:30:00\",\n            \"seats\": [\n                {\n                    \"seatNumber\": 1,\n                    \"gender\": \"female\",\n                    \"passengerId\": \"{{passenger1_id}}\"\n                }\n            ]\n        },\n        {\n            \"location\": \"DHA Phase 2\",\n            \"lat\": 33.535,\n            \"lng\": 73.135,\n            \"scheduledTime\": \"18:10:00\",\n            \"seats\": [\n                {\n                    \"seatNumber\": 2,\n                    \"gender\": \"male\",\n                    \"passengerId\": \"{{passenger2_id}}\"\n                }\n            ]\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "The same people going home is a COMPLETELY SEPARATE shift with its own route (requirements 12, 13 and 17.4). Note the stop order is reversed and the drop points differ from the morning pickup points.\n\nIt does not clash with the morning shift because the time windows do not overlap."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && (r.data.shiftId) !== undefined && (r.data.shiftId) !== null) {",
+                  "    pm.environment.set(\"drop_shift_id\", r.data.shiftId);",
+                  "    console.log(\"drop_shift_id saved:\", r.data.shiftId);",
+                  "} else {",
+                  "    console.error(\"drop_shift_id not found in response\");",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Shift Detail",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/shift/detail?shift_id={{shift_id}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shift",
+                "detail"
+              ],
+              "query": [
+                {
+                  "key": "shift_id",
+                  "value": "{{shift_id}}"
+                }
+              ]
+            },
+            "description": "Returns the shift, its stops in order, and every seat.\n\nThe shift carries both the driver's number and the number of the manager who built it, which is the contact information you asked to be on every shift.\n\nVisible to any approved member of the fleet, and to a passenger holding a seat on it."
+          },
+          "response": []
+        },
+        {
+          "name": "Group Shift Roster",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/shift?group_id={{group_id}}&direction=pickup&status=active&page=1",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shift"
+              ],
+              "query": [
+                {
+                  "key": "group_id",
+                  "value": "{{group_id}}"
+                },
+                {
+                  "key": "direction",
+                  "value": "pickup"
+                },
+                {
+                  "key": "status",
+                  "value": "active"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "driver_id",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "start_time",
+                  "value": "2026-09-14 00:00:00",
+                  "disabled": true
+                },
+                {
+                  "key": "estimated_end_time",
+                  "value": "2026-09-20 23:59:59",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "The manager's roster view. Every filter is optional."
+          },
+          "response": []
+        },
+        {
+          "name": "My Shifts (driver)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/shift/mine?page=1",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shift",
+                "mine"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "What this driver is driving."
+          },
+          "response": []
+        },
+        {
+          "name": "My Shifts (passenger)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{passenger_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/passenger/shifts?page=1",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "shifts"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "The same handler seen through a passenger token: the shifts they hold a seat on, morning and evening both."
+          },
+          "response": []
+        },
+        {
+          "name": "Passenger \u00b7 Shift Detail",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{passenger_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/passenger/shift/detail?shift_id={{shift_id}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "shift",
+                "detail"
+              ],
+              "query": [
+                {
+                  "key": "shift_id",
+                  "value": "{{shift_id}}"
+                }
+              ]
+            },
+            "description": "A passenger can open a shift they are seated on, and gets the driver and manager contacts with it."
+          },
+          "response": []
+        },
+        {
+          "name": "Swap Male Rider For Female (one call)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/shift/seats",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shift",
+                "seats"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"shiftId\": \"{{shift_id}}\",\n    \"seats\": [\n        {\n            \"seatNumber\": 2,\n            \"gender\": \"female\",\n            \"passengerId\": \"{{passenger1_id}}\",\n            \"stopSequence\": 1\n        },\n        {\n            \"seatNumber\": 1,\n            \"gender\": \"male\",\n            \"passengerId\": \"{{passenger2_id}}\",\n            \"stopSequence\": 2\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "The swap you asked for. Seat 2 held a male rider and now holds a female one, and seat 1 goes the other way, in a single request.\n\nThe rule that still holds: a seat's declared gender and the person sitting in it must always agree, so nobody ever lands in a seat kept for the other gender. Try changing one gender field and leaving the passenger, it will be refused.\n\nstopSequence points at the stop that passenger now waits at, counting from 1.\n\nSend passengerId as \"\" to free a seat. Everybody whose place actually changed is notified, people who kept their seat are left alone."
+          },
+          "response": []
+        },
+        {
+          "name": "Free A Seat",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/shift/seats",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shift",
+                "seats"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"shiftId\": \"{{shift_id}}\",\n    \"seats\": [\n        {\n            \"seatNumber\": 2,\n            \"gender\": \"\",\n            \"passengerId\": \"\",\n            \"stopSequence\": 0\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "An empty passengerId frees the seat and clears the gender it was kept for. seatsTaken is recomputed."
+          },
+          "response": []
+        },
+        {
+          "name": "Sub Manager Builds A Shift",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{driver2_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/shift",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shift"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"groupId\": \"{{group_id}}\",\n    \"vehicleId\": \"{{driver2_vehicle_id}}\",\n    \"driverId\": \"{{driver2_id}}\",\n    \"direction\": \"pickup\",\n    \"startDatetime\": \"2026-09-15 07:00:00\",\n    \"estimatedEndDatetime\": \"2026-09-15 08:30:00\",\n    \"startLocation\": \"Gulberg Greens\",\n    \"endLocation\": \"Roots School F-8\",\n    \"routeDetails\": \"Via Islamabad Highway\",\n    \"makeTemplate\": false,\n    \"daysOfWeek\": [\n        2\n    ],\n    \"stops\": [\n        {\n            \"location\": \"Gulberg Greens\",\n            \"lat\": 33.618,\n            \"lng\": 73.156,\n            \"scheduledTime\": \"07:20:00\",\n            \"seats\": [\n                {\n                    \"seatNumber\": 1,\n                    \"gender\": \"female\",\n                    \"passengerId\": \"{{passenger1_id}}\"\n                }\n            ]\n        },\n        {\n            \"location\": \"Roots School F-8\",\n            \"lat\": 33.7101,\n            \"lng\": 73.0441,\n            \"scheduledTime\": \"08:20:00\",\n            \"seats\": []\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Requirement 16 end to end: the sub manager takes the shift building load off the owner. Same endpoint, different token.\n\nTry the group membership calls on this token and they will come back 'Operation is not permitted', because a sub manager holds the shift permissions and none of the membership ones."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && (r.data.shiftId) !== undefined && (r.data.shiftId) !== null) {",
+                  "    pm.environment.set(\"submanager_shift_id\", r.data.shiftId);",
+                  "    console.log(\"submanager_shift_id saved:\", r.data.shiftId);",
+                  "} else {",
+                  "    console.error(\"submanager_shift_id not found in response\");",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Clash Check \u00b7 Same Vehicle, Overlapping Time",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/shift",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shift"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"groupId\": \"{{group_id}}\",\n    \"vehicleId\": \"{{owner_vehicle_id}}\",\n    \"driverId\": \"{{owner_driver_id}}\",\n    \"direction\": \"pickup\",\n    \"startDatetime\": \"2026-09-14 07:30:00\",\n    \"estimatedEndDatetime\": \"2026-09-14 09:00:00\",\n    \"startLocation\": \"Somewhere else\",\n    \"endLocation\": \"Another school\",\n    \"routeDetails\": \"Overlaps the morning shift on purpose\",\n    \"makeTemplate\": false,\n    \"daysOfWeek\": [\n        1\n    ],\n    \"stops\": [\n        {\n            \"location\": \"Somewhere else\",\n            \"lat\": 33.6,\n            \"lng\": 73.1,\n            \"scheduledTime\": \"07:40:00\",\n            \"seats\": []\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "EXPECTED TO FAIL with 'Vehicle already has a ride or a shift scheduled for this duration'. This proves requirements 19 and 20.\n\nCreate a carpool ride on this same vehicle at this time and the shift is refused too, and the mirror holds: creating a carpool ride while a shift is on gets refused as well (requirements 21 and 22)."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Shift",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/shift?shift_id={{submanager_shift_id}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shift"
+              ],
+              "query": [
+                {
+                  "key": "shift_id",
+                  "value": "{{submanager_shift_id}}"
+                }
+              ]
+            },
+            "description": "Soft cancel. Refused when the shift starts within 2 hours, mirroring the carpool ride guard, so use a shift comfortably in the future.\n\nThe driver and every seated passenger are told, with the manager's contact in the message."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5 \u00b7 Templates",
+      "item": [
+        {
+          "name": "Get Shift Templates",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/shift/templates?group_id={{group_id}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shift",
+                "templates"
+              ],
+              "query": [
+                {
+                  "key": "group_id",
+                  "value": "{{group_id}}"
+                }
+              ]
+            },
+            "description": "A template comes back with its stops, its seat plan and its vehicle.\n\nThis is how a shift is rebuilt: the app fetches a template, prefills the create form with it, changes the date, and posts it to POST /api/v1/shift. Exactly the pattern your ride templates already use, which is why there is no build from template endpoint.\n\nTemplate seats point at their stop by sequence rather than by id, so a template stays valid for a brand new shift."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && r.data.templates && r.data.templates.length) {",
+                  "    pm.environment.set(\"template_id\", r.data.templates[0].id);",
+                  "    console.log(\"templates:\", r.data.templates.length);",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Shift Template",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/shift/template?shift_template_id={{template_id}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shift",
+                "template"
+              ],
+              "query": [
+                {
+                  "key": "shift_template_id",
+                  "value": "{{template_id}}"
+                }
+              ]
+            },
+            "description": "Deletes the template with its stops and seats. Needs shift.manage_templates."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base-url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    }
+  ]
+}
