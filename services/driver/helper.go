@@ -346,6 +346,36 @@ func updateVehicleInfo(orgCtx *gin.Context, sessionId, driverId string, request 
 
 	// Archive and delete if vehicle is being inactivated
 	if request.Status == constants.Status_InActive {
+		////////// FLEET TIES //////////
+		// retiring the vehicle deletes the row outright, so a shift still expecting
+		// it would be left pointing at nothing and would drop out of every roster
+		var upcomingShifts int64
+		if err := tx.Model(&postgress.Shift{}).
+			Where("vehicle_id = ?", request.VehicleId).
+			Where("is_active = ?", true).
+			Where("start_datetime > ?", time.Now().Format(constants.DateTimeLayout)).
+			Count(&upcomingShifts).Error; err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return errors.New(constants.General_Error)
+		}
+
+		if upcomingShifts > 0 {
+			tx.Rollback()
+			err := fmt.Errorf("this vehicle is on %d upcoming shift(s), cancel those before retiring it", upcomingShifts)
+			logger.LogError(sessionId, err)
+			return err
+		}
+
+		// the fleets it was lent to stop counting on it
+		if err := tx.Model(&postgress.GroupVehicle{}).
+			Where("vehicle_id = ?", request.VehicleId).
+			Update("status", constants.Membership_Status_Left).Error; err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return errors.New(constants.General_Error)
+		}
+
 		////////// DELETE TEMPLATES //////////
 		var templates []postgress.RideTemplate
 		err := tx.Where("vehicle_id = ?", request.VehicleId).Find(&templates).Error

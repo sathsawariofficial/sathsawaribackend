@@ -33,11 +33,14 @@ func CloseActiveRidesScheduler() {
 
 	// run once immediately on start
 	closeActiveRides()
+	closeCompletedShifts()
 
 	for {
 		select {
 		case <-ticker.C:
 			closeActiveRides()
+			// a finished shift is retired on the same cadence as a finished ride
+			closeCompletedShifts()
 		}
 	}
 }

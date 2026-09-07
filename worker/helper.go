@@ -284,3 +284,40 @@ func sendDriverBroadcast(ginCtx *gin.Context, sessionId string, req postgress.Br
 		offset += driverBatchSize
 	}
 }
+
+// closeCompletedShifts retires shifts whose window has passed. Rides have always
+// been closed this way and shifts were left running for ever, which left finished
+// trips sitting in every "upcoming" list.
+//
+// Unlike the ride sweep this is a single statement rather than a row at a time,
+// since a busy fleet produces far more shifts than one driver produces rides.
+func closeCompletedShifts() {
+	sessionId := constants.WROKER_SESSION
+	logger.LogInfo("Request received in closeCompletedShifts", sessionId)
+
+	defer func() {
+		if r := recover(); r != nil {
+			logger.LogError(sessionId, fmt.Errorf("panic recovered: %v", r))
+		}
+	}()
+
+	pkt := time.FixedZone("PKT", 5*60*60)
+	now := time.Now().In(pkt).Format(constants.DateTimeLayout)
+
+	result := database.DatabaseConn.Postgres.
+		Model(&postgress.Shift{}).
+		Where("is_active = ?", true).
+		Where("estimated_end_datetime <= ?", now).
+		Update("is_active", false)
+
+	if result.Error != nil {
+		logger.LogError(sessionId, result.Error)
+		return
+	}
+
+	if result.RowsAffected > 0 {
+		logger.LogDebug2("closed shifts", sessionId, result.RowsAffected)
+	}
+
+	logger.LogInfo("Response returned from closeCompletedShifts", sessionId)
+}
