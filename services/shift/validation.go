@@ -201,3 +201,45 @@ func validateShiftWindow(startDatetime, estimatedEndDatetime string) error {
 
 	return nil
 }
+
+// ValidateRescheduleShift checks a reschedule. Every field is optional except the
+// shift itself, but a time window has to be sent whole or not at all, half a window
+// cannot be judged against the clash rules.
+func ValidateRescheduleShift(request *RescheduleShiftRequest) error {
+	if err := ValidateShiftId(request.ShiftId); err != nil {
+		return err
+	}
+
+	startGiven := !utils.IsStringEmpty(request.StartDatetime)
+	endGiven := !utils.IsStringEmpty(request.EstimatedEndDatetime)
+
+	if startGiven != endGiven {
+		return fmt.Errorf(constants.Missing_Data, "Both the start and the estimated end date")
+	}
+
+	if startGiven {
+		if err := validateShiftWindow(request.StartDatetime, request.EstimatedEndDatetime); err != nil {
+			return err
+		}
+	}
+
+	if len(request.RouteDetails) > constants.RouteDetails_Max_Len {
+		return fmt.Errorf("length of the route details should not be more than %v characters", constants.RouteDetails_Max_Len)
+	}
+
+	if len(request.StopTimes) > constants.Shift_Stops_Max_Len {
+		return fmt.Errorf("a shift cannot have more than %v stops", constants.Shift_Stops_Max_Len)
+	}
+
+	for _, stop := range request.StopTimes {
+		if stop.SequenceNumber < 1 {
+			return fmt.Errorf(constants.Invalid_Data, "stop sequence")
+		}
+
+		if utils.IsStringEmpty(stop.ScheduledTime) {
+			return fmt.Errorf(constants.Missing_Data, "Scheduled time")
+		}
+	}
+
+	return nil
+}

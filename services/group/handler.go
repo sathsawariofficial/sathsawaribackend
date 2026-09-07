@@ -418,3 +418,113 @@ func GetGroupPassengerSchedulesHandler(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, schedulesResp)
 }
+
+// finds the fleets somebody could ask to join, this is how a group id is discovered
+// in the first place
+func SearchGroupsHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in SearchGroupsHandler", sessionId)
+
+	userId := ctx.GetString(constants.User_KEY)
+	search := ctx.DefaultQuery(constants.Search_Loc_Key, "")
+
+	page, err := utils.GetPageNumber(ctx)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get page number error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Invalid_Data, "page"),
+		})
+		return
+	}
+
+	groups, totalRows, err := SearchGroups(ctx, sessionId, userId, search, page)
+	if err != nil {
+		logger.LogError(sessionId, "search groups error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	searchResp := groupSearchResp(groups, totalRows)
+
+	logger.LogInfo("Response returned from SearchGroupsHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, searchResp)
+}
+
+// the fleets a passenger has been let into or is still waiting on
+func GetMyGroupsAsPassengerHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetMyGroupsAsPassengerHandler", sessionId)
+
+	passengerId := ctx.GetString(constants.User_KEY)
+
+	page, err := utils.GetPageNumber(ctx)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get page number error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Invalid_Data, "page"),
+		})
+		return
+	}
+
+	groups, totalRows, err := GetMyGroupsAsPassenger(ctx, sessionId, passengerId, page)
+	if err != nil {
+		logger.LogError(sessionId, "get groups error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	groupsResp := groupsResp(groups, passengerId, totalRows)
+
+	logger.LogInfo("Response returned from GetMyGroupsAsPassengerHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, groupsResp)
+}
+
+// a driver walks out of a fleet of their own accord
+func LeaveGroupAsDriverHandler(ctx *gin.Context) {
+	leaveGroupHandler(ctx, "LeaveGroupAsDriverHandler", false)
+}
+
+// a passenger walks out of a fleet of their own accord
+func LeaveGroupAsPassengerHandler(ctx *gin.Context) {
+	leaveGroupHandler(ctx, "LeaveGroupAsPassengerHandler", true)
+}
+
+func leaveGroupHandler(ctx *gin.Context, handlerName string, isPassenger bool) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in "+handlerName, sessionId)
+
+	userId := ctx.GetString(constants.User_KEY)
+	groupId := ctx.Query(constants.Group_Key)
+
+	if err := ValidateGroupId(groupId); err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	if err := LeaveGroup(ctx, sessionId, userId, groupId, isPassenger); err != nil {
+		logger.LogError(sessionId, "leave group error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	logger.LogInfo("Response returned from "+handlerName, sessionId)
+
+	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(fmt.Sprintf(constants.Success_Info, "Left the group")))
+}

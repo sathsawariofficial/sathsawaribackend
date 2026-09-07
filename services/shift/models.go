@@ -163,3 +163,23 @@ type seatPlan struct {
 	PassengerId string
 	StopIndex   int
 }
+
+// StopTimeUpdate nudges the clock on one stop of an existing route without touching
+// the stop's identity, so the seats hanging off it stay attached.
+type StopTimeUpdate struct {
+	SequenceNumber int    `json:"sequenceNumber"`
+	ScheduledTime  string `json:"scheduledTime"`
+}
+
+// RescheduleShiftRequest moves a shift in time or retitles its route. The vehicle
+// and the driver are deliberately not changeable here, swapping either would
+// invalidate the seat plan, so that is a cancel and rebuild.
+type RescheduleShiftRequest struct {
+	ShiftId              string           `json:"shiftId"`
+	StartDatetime        string           `json:"startDatetime"`
+	EstimatedEndDatetime string           `json:"estimatedEndDatetime"`
+	StartLocation        string           `json:"startLocation"`
+	EndLocation          string           `json:"endLocation"`
+	RouteDetails         string           `json:"routeDetails"`
+	StopTimes            []StopTimeUpdate `json:"stopTimes"`
+}

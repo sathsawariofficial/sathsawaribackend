@@ -160,3 +160,22 @@ type PassengerSchedulesResponse struct {
 	TotalPages int                      `json:"totalPages"`
 	Schedules  []PassengerScheduleEntry `json:"schedules"`
 }
+
+// GroupSummary is a fleet as it looks to somebody deciding whether to ask to join.
+// MyStatus is empty when they have never asked.
+type GroupSummary struct {
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	Description    string    `json:"description"`
+	OwnerId        string    `json:"ownerDriverId"`
+	OwnerName      string    `json:"ownerName"`
+	VehicleCount   int       `json:"vehicleCount"`
+	PassengerCount int       `json:"passengerCount"`
+	MyStatus       string    `json:"myStatus"`
+	CreatedAt      time.Time `json:"createdAt"`
+}
+
+type GroupSearchResponse struct {
+	TotalPages int            `json:"totalPages"`
+	Groups     []GroupSummary `json:"groups"`
+}

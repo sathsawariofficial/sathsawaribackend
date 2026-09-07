@@ -53,6 +53,7 @@ const (
 	Vehicle_Busy           = "Vehicle already has a ride or a shift scheduled for this duration"
 	Vehicle_Seats_Missing  = "Vehicle must have its number of seats set before it can join a group"
 	Not_System_Role        = "System roles cannot be deleted"
+	Owner_Cannot_Leave     = "The owner cannot leave their own group, delete it instead"
 )
 
 // keys
@@ -136,6 +137,7 @@ const (
 	NOTIFICATION_MESSAGE_GROUP_REMOVED      = "You have been removed from the group %s"
 	NOTIFICATION_MESSAGE_SUBMANAGER_ADDED   = "You are now a sub manager of the group %s"
 	NOTIFICATION_MESSAGE_SUBMANAGER_REMOVED = "You are no longer a sub manager of the group %s"
+	NOTIFICATION_MESSAGE_GROUP_LEFT         = "Someone has left your group %s"
 )
 
 // genders

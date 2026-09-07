@@ -1720,6 +1720,65 @@
           "response": []
         },
         {
+          "name": "Find Groups To Join (driver)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{driver2_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/group/search?page=1",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "group",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "This is how a group id is discovered at all. Without it a driver could never learn the id that the join request needs.\n\nEach row carries myStatus, so the app can tell 'ask to join' apart from 'waiting' without a second call. Empty means they have never asked.\n\nPass search to filter by name. Passengers hit the same thing at GET /api/v1/passenger/groups/search."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && r.data.groups && r.data.groups.length) {",
+                  "    pm.environment.set(\"group_id\", r.data.groups[0].id);",
+                  "    console.log(\"found:\", r.data.groups.map(g => g.name + \" [\" + (g.myStatus || \"not requested\") + \"]\"));",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
           "name": "Driver \u00b7 Request To Join (driver + vehicle)",
           "request": {
             "auth": {
@@ -2062,6 +2121,156 @@
               ]
             },
             "description": "This is the sheet requirement 10 describes: who wants to travel on this day in this direction, from where, at what time, and which gender seat they need.\n\nLeave day_of_week and direction off to get the whole week.\n\nGated on shift.assign_seats rather than plain membership, since it carries home addresses, so the owner and sub managers see it and an ordinary joined driver does not."
+          },
+          "response": []
+        },
+        {
+          "name": "Find Groups To Join (passenger)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{passenger_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/passenger/groups/search?page=1",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "groups",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "The same discovery list seen through a passenger token."
+          },
+          "response": []
+        },
+        {
+          "name": "My Groups (passenger)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{passenger_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/passenger/groups?page=1",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "groups"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "The fleets a passenger has been let into or is still waiting on, so they can see where their request stands."
+          },
+          "response": []
+        },
+        {
+          "name": "Driver Leaves The Group",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{driver2_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/group/leave?group_id={{group_id}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "group",
+                "leave"
+              ],
+              "query": [
+                {
+                  "key": "group_id",
+                  "value": "{{group_id}}"
+                }
+              ]
+            },
+            "description": "The brief says people can join AND leave, and until now only the manager could take somebody out.\n\nRefused while shifts are still expecting this driver behind the wheel, since a driver cannot be swapped out automatically. Cancel or reassign those first.\n\nTheir vehicles leave the fleet with them, and any sub manager role is dropped. The owner can never leave, they delete the group instead.\n\nRun this AFTER you have finished with the sub manager shift, or it will refuse."
+          },
+          "response": []
+        },
+        {
+          "name": "Passenger Leaves The Group",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{passenger_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/passenger/group/leave?group_id={{group_id}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "group",
+                "leave"
+              ],
+              "query": [
+                {
+                  "key": "group_id",
+                  "value": "{{group_id}}"
+                }
+              ]
+            },
+            "description": "A departing passenger's seats on upcoming shifts are freed automatically and each affected shift's taken count is put back in step, so they never leave a ghost sitting in a seat nobody can fill.\n\nThe same release happens when a manager removes a passenger through the bulk decide endpoint."
           },
           "response": []
         },
@@ -2606,6 +2815,45 @@
               }
             },
             "description": "EXPECTED TO FAIL with 'Vehicle already has a ride or a shift scheduled for this duration'. This proves requirements 19 and 20.\n\nCreate a carpool ride on this same vehicle at this time and the shift is refused too, and the mirror holds: creating a carpool ride while a shift is on gets refused as well (requirements 21 and 22)."
+          },
+          "response": []
+        },
+        {
+          "name": "Reschedule Shift (move the time)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/shift",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shift"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"shiftId\": \"{{shift_id}}\",\n    \"startDatetime\": \"2026-09-14 07:20:00\",\n    \"estimatedEndDatetime\": \"2026-09-14 08:50:00\",\n    \"routeDetails\": \"Via Expressway, delayed for roadworks\",\n    \"stopTimes\": [\n        {\n            \"sequenceNumber\": 1,\n            \"scheduledTime\": \"07:35:00\"\n        },\n        {\n            \"sequenceNumber\": 2,\n            \"scheduledTime\": \"07:55:00\"\n        },\n        {\n            \"sequenceNumber\": 3,\n            \"scheduledTime\": \"08:40:00\"\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Pushes the whole trip back twenty minutes WITHOUT losing the seat plan. Cancelling and rebuilding would throw the seats away, and is refused outright inside the two hour window.\n\nEvery field except shiftId is optional, but the time window has to be sent whole or not at all. stopTimes matches stops by their sequence number, so stop ids and the seats hanging off them survive.\n\nMoving the window re-runs the full clash check, ignoring this shift's own row. Everybody aboard is notified.\n\nThe vehicle and driver are deliberately NOT changeable here, swapping either can invalidate every seat, so that stays a cancel and rebuild."
           },
           "response": []
         },

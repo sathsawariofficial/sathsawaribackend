@@ -414,3 +414,67 @@ func DeleteShiftTemplate(ctx *gin.Context, sessionId, driverId, templateId strin
 
 	return
 }
+
+// RescheduleShift moves a shift that is already built. Without it, pushing a
+// departure back fifteen minutes would mean cancelling and rebuilding, which throws
+// away the seat plan and is refused outright inside the two hour window.
+//
+// The vehicle and the driver stay put on purpose: swapping either can invalidate
+// every seat, so that remains a cancel and rebuild. Moving the window re-runs the
+// full clash check, ignoring this shift's own row, and everybody aboard is told.
+func RescheduleShift(ctx *gin.Context, sessionId, driverId string, request RescheduleShiftRequest) (err error) {
+	logger.LogInfo("Request received in RescheduleShift", sessionId)
+
+	shift, err := getShiftById(ctx, request.ShiftId)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get shift error: "+err.Error())
+		err = errors.New(constants.Shift_Not_Found)
+		return
+	}
+
+	if err = requirePermission(ctx, sessionId, shift.GroupID, driverId, constants.PERMISSION_SHIFT_CREATE); err != nil {
+		return
+	}
+
+	updates := map[string]interface{}{}
+
+	if !utils.IsStringEmpty(request.StartDatetime) {
+		// the shift's own row is excluded, otherwise it would always clash with itself
+		if err = checkClashes(ctx, sessionId, shift.VehicleID, shift.DriverID,
+			request.StartDatetime, request.EstimatedEndDatetime, shift.ID); err != nil {
+			return
+		}
+
+		updates["start_datetime"] = request.StartDatetime
+		updates["estimated_end_datetime"] = request.EstimatedEndDatetime
+	}
+
+	if !utils.IsStringEmpty(request.StartLocation) {
+		updates["start_location"] = strings.TrimSpace(request.StartLocation)
+	}
+
+	if !utils.IsStringEmpty(request.EndLocation) {
+		updates["end_location"] = strings.TrimSpace(request.EndLocation)
+	}
+
+	if !utils.IsStringEmpty(request.RouteDetails) {
+		updates["route_details"] = request.RouteDetails
+	}
+
+	if len(updates) == 0 && len(request.StopTimes) == 0 {
+		logger.LogInfo("Response returned from RescheduleShift", sessionId)
+		return
+	}
+
+	if err = applyShiftReschedule(ctx, sessionId, shift.ID, updates, request.StopTimes); err != nil {
+		logger.LogError(sessionId, "failed to reschedule the shift error: "+err.Error())
+		err = fmt.Errorf(constants.Update_Failed, "shift")
+		return
+	}
+
+	notifyShift(ctx, sessionId, shift.ID, constants.NOTIFICATION_TYPE_SHIFT_UPDATED, constants.NOTIFICATION_TITLE_SHIFT_UPDATED)
+
+	logger.LogInfo("Response returned from RescheduleShift", sessionId)
+
+	return
+}

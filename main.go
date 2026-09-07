@@ -170,6 +170,10 @@ func main() {
 				groupProtected.POST("", group.CreateGroupHandler)
 				groupProtected.GET("/mine", group.GetMyGroupsHandler)
 				groupProtected.GET("", group.GetGroupDetailsHandler)
+
+				// how a fleet is found in the first place, and how somebody walks out
+				groupProtected.GET("/search", group.SearchGroupsHandler)
+				groupProtected.DELETE("/leave", group.LeaveGroupAsDriverHandler)
 				groupProtected.POST("/request/driver", group.RequestJoinGroupAsDriverHandler)
 				groupProtected.GET("/requests", group.GetGroupRequestsHandler)
 				groupProtected.PATCH("/requests", group.DecideGroupRequestsHandler)
@@ -185,6 +189,7 @@ func main() {
 			shiftProtected.Use(middleware.Authentication(constants.DRIVER_TOKEN))
 			{
 				shiftProtected.POST("", shift.CreateShiftHandler)
+				shiftProtected.PATCH("", shift.RescheduleShiftHandler)
 				shiftProtected.PUT("/seats", shift.UpdateShiftSeatsHandler)
 				shiftProtected.GET("/detail", shift.GetShiftHandler)
 				shiftProtected.GET("", shift.GetGroupShiftsHandler)
@@ -206,7 +211,10 @@ func main() {
 				passengerProtected.GET("/schedule", passenger.GetPassengerScheduleHandler)
 
 				// a passenger asks to join a fleet and follows the shifts they are on
+				passengerProtected.GET("/groups/search", group.SearchGroupsHandler)
+				passengerProtected.GET("/groups", group.GetMyGroupsAsPassengerHandler)
 				passengerProtected.POST("/group/request", group.RequestJoinGroupAsPassengerHandler)
+				passengerProtected.DELETE("/group/leave", group.LeaveGroupAsPassengerHandler)
 				passengerProtected.GET("/shifts", shift.GetMyShiftsHandler)
 				passengerProtected.GET("/shift/detail", shift.GetShiftHandler)
 				passengerProtected.GET("/notifications", general_rest.GetNotificationsHandler)

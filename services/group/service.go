@@ -350,6 +350,19 @@ func DecideMembership(ctx *gin.Context, sessionId, driverId string, request Deci
 		return
 	}
 
+	// a passenger who has been put out of the fleet must not go on holding a seat on
+	// its upcoming shifts, that seat has to go back to the manager to fill
+	removedPassengers := []string{}
+	for passengerId, status := range notifyPassengers {
+		if status == constants.Membership_Status_Removed {
+			removedPassengers = append(removedPassengers, passengerId)
+		}
+	}
+
+	if e := releaseRemovedPassengers(ctx, sessionId, request.GroupId, removedPassengers); e != nil {
+		logger.LogError(sessionId, "failed to release the seats of removed passengers error: "+e.Error())
+	}
+
 	notifyMembershipDecisions(ctx, sessionId, group, notifyDrivers, notifyPassengers)
 
 	logger.LogInfo("Response returned from DecideMembership", sessionId)
@@ -523,6 +536,109 @@ func GetPassengerSchedules(ctx *gin.Context, sessionId, driverId, groupId, direc
 	}
 
 	logger.LogInfo("Response returned from GetPassengerSchedules", sessionId)
+
+	return
+}
+
+// SearchGroups is how somebody finds a fleet in the first place. Without it a driver
+// or passenger would have no way to learn a group's id, and could never ask to join.
+// Open to any signed in driver or passenger, it only exposes what you would need to
+// decide whether to knock on the door.
+func SearchGroups(ctx *gin.Context, sessionId, userId, search string, page int) (groups []postgress.GroupSearchDetails, totalRows int64, err error) {
+	logger.LogInfo("Request received in SearchGroups", sessionId)
+
+	groups, totalRows, err = searchGroups(ctx, userId, search, page)
+	if err != nil {
+		logger.LogError(sessionId, "failed to search the groups error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "search the groups")
+		return
+	}
+
+	logger.LogInfo("Response returned from SearchGroups", sessionId)
+
+	return
+}
+
+func GetMyGroupsAsPassenger(ctx *gin.Context, sessionId, passengerId string, page int) (groups []postgress.Group, totalRows int64, err error) {
+	logger.LogInfo("Request received in GetMyGroupsAsPassenger", sessionId)
+
+	groups, totalRows, err = getGroupsByPassenger(ctx, passengerId, page)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get groups error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the groups")
+		return
+	}
+
+	logger.LogInfo("Response returned from GetMyGroupsAsPassenger", sessionId)
+
+	return
+}
+
+// LeaveGroup lets somebody walk out of a fleet of their own accord, which the brief
+// asks for and only the manager could do until now.
+//
+// A departing passenger's seats on upcoming shifts are freed, otherwise they would
+// go on occupying a place nobody could fill. A departing driver is refused while
+// shifts are still expecting them behind the wheel, since a driver cannot be
+// swapped out automatically and people are counting on that trip. The owner cannot
+// leave at all, that would strand the fleet with nobody in charge.
+func LeaveGroup(ctx *gin.Context, sessionId, userId, groupId string, isPassenger bool) (err error) {
+	logger.LogInfo("Request received in LeaveGroup", sessionId)
+
+	group, err := database.GetGroupById(ctx, groupId)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get group error: "+err.Error())
+		err = errors.New(constants.Group_Not_Found)
+		return
+	}
+
+	if isPassenger {
+		existing, e := getGroupPassenger(ctx, groupId, userId)
+		if e != nil || existing.Status != constants.Membership_Status_Approved {
+			err = errors.New(constants.Not_Group_Member)
+			logger.LogError(sessionId, err)
+			return
+		}
+	} else {
+		if group.OwnerDriverID == userId {
+			err = errors.New(constants.Owner_Cannot_Leave)
+			logger.LogError(sessionId, err)
+			return
+		}
+
+		existing, e := getGroupMember(ctx, groupId, userId)
+		if e != nil || existing.Status != constants.Membership_Status_Approved {
+			err = errors.New(constants.Not_Group_Member)
+			logger.LogError(sessionId, err)
+			return
+		}
+
+		count, e := countFutureDriverShifts(ctx, groupId, userId)
+		if e != nil {
+			logger.LogError(sessionId, "failed to count the shifts error: "+e.Error())
+			err = errors.New(constants.Unknown_Error)
+			return
+		}
+		if count > 0 {
+			err = fmt.Errorf("you are still driving %d upcoming shift(s) for this group, they have to be reassigned or cancelled first", count)
+			logger.LogError(sessionId, err)
+			return
+		}
+	}
+
+	if err = leaveGroup(ctx, sessionId, groupId, userId, isPassenger); err != nil {
+		logger.LogError(sessionId, "failed to leave the group error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "leave the group")
+		return
+	}
+
+	// the manager is told so the roster they are working from stays honest
+	utils.SendUserNotification(ctx, sessionId, constants.NOTIFICATION_TYPE_GROUP_DECISION, group.OwnerDriverID, constants.User_Driver,
+		constants.NOTIFICATION_TITLE_GROUP_DECISION, fmt.Sprintf(constants.NOTIFICATION_MESSAGE_GROUP_LEFT, group.Name), map[string]string{
+			constants.NOTIFICATION_KEY_GROUP_ID: group.ID,
+		})
+
+	logger.LogInfo("Response returned from LeaveGroup", sessionId)
 
 	return
 }

@@ -318,3 +318,45 @@ func getShiftQueryParams(ctx *gin.Context) (driverId, direction, startTime, endT
 
 	return
 }
+
+// moves a shift in time, or rewrites its route text, without losing the seat plan
+func RescheduleShiftHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in RescheduleShiftHandler", sessionId)
+
+	driverId := ctx.GetString(constants.User_KEY)
+
+	var request RescheduleShiftRequest
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		logger.LogError(sessionId, "binding error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Update_Failed, "shift"),
+		})
+		return
+	}
+
+	logger.LogDebug2("Request received in RescheduleShiftHandler", sessionId, request)
+
+	if err := ValidateRescheduleShift(&request); err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	if err := RescheduleShift(ctx, sessionId, driverId, request); err != nil {
+		logger.LogError(sessionId, "reschedule shift error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	logger.LogInfo("Response returned from RescheduleShiftHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(fmt.Sprintf(constants.Updated_Successfully, "Shift")))
+}

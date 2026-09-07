@@ -991,3 +991,49 @@ func notifyShiftCancelled(ctx *gin.Context, sessionId, shiftId string, seats []p
 			constants.NOTIFICATION_TITLE_SHIFT_CANCELLED, message, data)
 	}
 }
+
+// applyShiftReschedule writes the moved window, the route text and any nudged stop
+// times in one transaction. The stops are matched by sequence number so their ids,
+// and therefore the seats hanging off them, survive untouched.
+func applyShiftReschedule(orgCtx *gin.Context, sessionId, shiftId string, updates map[string]interface{}, stopTimes []StopTimeUpdate) (err error) {
+	logger.LogInfo("Request received in applyShiftReschedule", sessionId)
+
+	ctx, cancel := withTimeout(orgCtx)
+	defer cancel()
+
+	tx := database.DatabaseConn.Postgres.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	if len(updates) > 0 {
+		if err = tx.Model(&postgress.Shift{}).Where("id = ?", shiftId).Updates(updates).Error; err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return
+		}
+	}
+
+	for _, stop := range stopTimes {
+		if err = tx.Model(&postgress.ShiftStop{}).
+			Where("shift_id = ?", shiftId).
+			Where("sequence_number = ?", stop.SequenceNumber).
+			Update("scheduled_time", stop.ScheduledTime).Error; err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return
+		}
+	}
+
+	err = tx.Commit().Error
+
+	logger.LogInfo("Response returned from applyShiftReschedule", sessionId)
+
+	return
+}

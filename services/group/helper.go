@@ -10,6 +10,7 @@ import (
 	"rideshare/pkgs/database/postgress"
 	"rideshare/pkgs/logger"
 	"rideshare/pkgs/utils"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -820,4 +821,260 @@ func getGroupPassengerSchedules(orgCtx *gin.Context, groupId, direction string, 
 		Find(&schedules).Error
 
 	return
+}
+
+// searchGroups shows the fleets somebody could ask to join. It carries their own
+// request status on each row, so the app can tell "ask to join" apart from "waiting"
+// without a second call. Counts and status come back as subselects rather than as a
+// query per group.
+func searchGroups(orgCtx *gin.Context, userId, search string, page int) (groups []postgress.GroupSearchDetails, totalRows int64, err error) {
+	pageSize := configuration.ConfigurationData.PageSize
+	offset := (page - 1) * pageSize
+
+	ctx, cancel := withTimeout(orgCtx)
+	defer cancel()
+
+	db := database.DatabaseConn.Postgres.WithContext(ctx)
+
+	base := db.Table("groups").
+		Joins("JOIN drivers ON drivers.id = groups.owner_driver_id").
+		Where("groups.status = ?", constants.Status_Active)
+
+	if !utils.IsStringEmpty(search) {
+		base = base.Where("groups.name ILIKE ?", "%"+strings.TrimSpace(search)+"%")
+	}
+
+	countQuery := base.Session(&gorm.Session{})
+	if err = countQuery.Count(&totalRows).Error; err != nil {
+		return
+	}
+
+	// the caller is either a driver or a passenger, their id is looked for in both
+	// membership tables so one endpoint serves both kinds of token
+	err = base.
+		Select(`
+			groups.id,
+			groups.name,
+			groups.description,
+			groups.owner_driver_id,
+			drivers.driver_name AS owner_name,
+			(SELECT COUNT(*) FROM group_vehicles WHERE group_vehicles.group_id = groups.id AND group_vehicles.status = ?) AS vehicle_count,
+			(SELECT COUNT(*) FROM group_passengers WHERE group_passengers.group_id = groups.id AND group_passengers.status = ?) AS passenger_count,
+			COALESCE(
+				(SELECT status FROM group_members WHERE group_members.group_id = groups.id AND group_members.driver_id = ?),
+				(SELECT status FROM group_passengers WHERE group_passengers.group_id = groups.id AND group_passengers.passenger_id = ?),
+				''
+			) AS my_status,
+			groups.created_at
+		`, constants.Membership_Status_Approved, constants.Membership_Status_Approved, userId, userId).
+		Order("groups.created_at DESC").
+		Limit(pageSize).
+		Offset(offset).
+		Find(&groups).Error
+
+	return
+}
+
+// getGroupsByPassenger lists the fleets a passenger has been let into or is still
+// waiting on, so they can see where their request stands.
+func getGroupsByPassenger(orgCtx *gin.Context, passengerId string, page int) (groups []postgress.Group, totalRows int64, err error) {
+	pageSize := configuration.ConfigurationData.PageSize
+	offset := (page - 1) * pageSize
+
+	ctx, cancel := withTimeout(orgCtx)
+	defer cancel()
+
+	query := database.DatabaseConn.Postgres.WithContext(ctx).
+		Table("groups").
+		Where("groups.status = ?", constants.Status_Active).
+		Where(`
+			EXISTS (
+				SELECT 1 FROM group_passengers
+				WHERE group_passengers.group_id = groups.id
+				  AND group_passengers.passenger_id = ?
+				  AND group_passengers.status IN ?
+			)
+		`, passengerId, []string{constants.Membership_Status_Approved, constants.Membership_Status_Pending})
+
+	countQuery := query.Session(&gorm.Session{})
+	if err = countQuery.Count(&totalRows).Error; err != nil {
+		return
+	}
+
+	err = query.
+		Order("groups.created_at DESC").
+		Limit(pageSize).
+		Offset(offset).
+		Find(&groups).Error
+
+	return
+}
+
+// countFutureDriverShifts counts the shifts a driver is still expected to drive for
+// a fleet. Nobody can walk out on a shift people are counting on, and a driver
+// cannot be swapped out automatically, so leaving is refused until it is sorted.
+func countFutureDriverShifts(orgCtx *gin.Context, groupId, driverId string) (count int64, err error) {
+	ctx, cancel := withTimeout(orgCtx)
+	defer cancel()
+
+	err = database.DatabaseConn.Postgres.WithContext(ctx).
+		Model(&postgress.Shift{}).
+		Where("group_id = ?", groupId).
+		Where("driver_id = ?", driverId).
+		Where("is_active = ?", true).
+		Where("start_datetime > ?", time.Now().Format(constants.DateTimeLayout)).
+		Count(&count).Error
+
+	return
+}
+
+// releasePassengerSeats frees the seats a departing passenger still holds on the
+// fleet's upcoming shifts and puts each affected shift's taken count back in step.
+// Without this a passenger who left would go on occupying a seat nobody could fill.
+func releasePassengerSeats(tx *gorm.DB, groupId string, passengerIds []string) error {
+	if len(passengerIds) == 0 {
+		return nil
+	}
+
+	var shiftIds []string
+	if err := tx.Model(&postgress.Shift{}).
+		Where("group_id = ?", groupId).
+		Where("is_active = ?", true).
+		Where("start_datetime > ?", time.Now().Format(constants.DateTimeLayout)).
+		Pluck("id", &shiftIds).Error; err != nil {
+		return err
+	}
+
+	if len(shiftIds) == 0 {
+		return nil
+	}
+
+	if err := tx.Model(&postgress.ShiftSeat{}).
+		Where("shift_id IN ?", shiftIds).
+		Where("passenger_id IN ?", passengerIds).
+		Updates(map[string]interface{}{
+			"passenger_id": "",
+			"stop_id":      "",
+			"gender":       "",
+			"status":       constants.Seat_Status_Empty,
+		}).Error; err != nil {
+		return err
+	}
+
+	return tx.Exec(`
+		UPDATE shifts
+		SET seats_taken = (
+			SELECT COUNT(*) FROM shift_seats
+			WHERE shift_seats.shift_id = shifts.id
+			  AND shift_seats.status = ?
+		)
+		WHERE shifts.id IN ?
+	`, constants.Seat_Status_Assigned, shiftIds).Error
+}
+
+// leaveGroup takes somebody out of a fleet at their own request, releasing whatever
+// they were still holding.
+func leaveGroup(orgCtx *gin.Context, sessionId, groupId, userId string, isPassenger bool) (err error) {
+	logger.LogInfo("Request received in leaveGroup", sessionId)
+
+	ctx, cancel := withTimeout(orgCtx)
+	defer cancel()
+
+	tx := database.DatabaseConn.Postgres.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	now := time.Now()
+
+	if isPassenger {
+		if err = releasePassengerSeats(tx, groupId, []string{userId}); err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return
+		}
+
+		if err = tx.Model(&postgress.GroupPassenger{}).
+			Where("group_id = ?", groupId).
+			Where("passenger_id = ?", userId).
+			Updates(map[string]interface{}{
+				"status":     constants.Membership_Status_Left,
+				"decided_by": userId,
+				"decided_at": &now,
+			}).Error; err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return
+		}
+	} else {
+		// the vehicles they lent go out of the fleet with them
+		if err = tx.Model(&postgress.GroupVehicle{}).
+			Where("group_id = ?", groupId).
+			Where("driver_id = ?", userId).
+			Updates(map[string]interface{}{
+				"status":     constants.Membership_Status_Left,
+				"decided_by": userId,
+				"decided_at": &now,
+			}).Error; err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return
+		}
+
+		if err = tx.Model(&postgress.GroupMember{}).
+			Where("group_id = ?", groupId).
+			Where("driver_id = ?", userId).
+			Updates(map[string]interface{}{
+				"status":     constants.Membership_Status_Left,
+				"role_id":    "",
+				"decided_by": userId,
+				"decided_at": &now,
+			}).Error; err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return
+		}
+	}
+
+	err = tx.Commit().Error
+
+	logger.LogInfo("Response returned from leaveGroup", sessionId)
+
+	return
+}
+
+// releaseRemovedPassengers frees the seats of passengers the manager has just taken
+// out of the fleet, so a removal never leaves a ghost in a seat.
+func releaseRemovedPassengers(orgCtx *gin.Context, sessionId, groupId string, passengerIds []string) (err error) {
+	if len(passengerIds) == 0 {
+		return nil
+	}
+
+	ctx, cancel := withTimeout(orgCtx)
+	defer cancel()
+
+	tx := database.DatabaseConn.Postgres.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	if err = releasePassengerSeats(tx, groupId, passengerIds); err != nil {
+		tx.Rollback()
+		logger.LogError(sessionId, err)
+		return
+	}
+
+	return tx.Commit().Error
 }

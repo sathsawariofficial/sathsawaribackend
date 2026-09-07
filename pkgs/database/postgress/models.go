@@ -600,6 +600,20 @@ type GroupVehicleDetails struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
+// GroupSearchDetails is how a fleet looks to somebody who is not in it yet: enough
+// to decide whether to ask to join, plus where their own request currently stands.
+type GroupSearchDetails struct {
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	Description    string    `json:"description"`
+	OwnerDriverID  string    `json:"owner_driver_id"`
+	OwnerName      string    `json:"owner_name"`
+	VehicleCount   int       `json:"vehicle_count"`
+	PassengerCount int       `json:"passenger_count"`
+	MyStatus       string    `json:"my_status"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
 // GroupPassengerScheduleDetails is one leg of one passenger's standing travel form,
 // read by the manager while deciding who to seat on which shift. A passenger shows
 // up once per day and direction they asked to travel on.

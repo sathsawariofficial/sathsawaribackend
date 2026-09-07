@@ -207,3 +207,30 @@ func passengerSchedulesResp(schedules []postgress.GroupPassengerScheduleDetails,
 		},
 	}
 }
+
+func groupSearchResp(groups []postgress.GroupSearchDetails, totalRows int64) utils.APIResponse {
+	summaries := []GroupSummary{}
+
+	for _, group := range groups {
+		summaries = append(summaries, GroupSummary{
+			ID:             group.ID,
+			Name:           group.Name,
+			Description:    group.Description,
+			OwnerId:        group.OwnerDriverID,
+			OwnerName:      group.OwnerName,
+			VehicleCount:   group.VehicleCount,
+			PassengerCount: group.PassengerCount,
+			MyStatus:       group.MyStatus,
+			CreatedAt:      group.CreatedAt,
+		})
+	}
+
+	return utils.APIResponse{
+		Code:    http.StatusOK,
+		Message: constants.Success,
+		Data: GroupSearchResponse{
+			TotalPages: utils.CalculatePagesize(totalRows),
+			Groups:     summaries,
+		},
+	}
+}
