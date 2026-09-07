@@ -275,7 +275,7 @@ func UpdateRole(ctx *gin.Context, sessionId, roleId string, request AdminRoleUpd
 	return
 }
 
-func DeleteRole(ctx *gin.Context, sessionId, roleId string) (err error) {
+func DeleteRole(ctx *gin.Context, sessionId, adminId, roleId string) (err error) {
 	logger.LogInfo("Request received in DeleteRole", sessionId)
 
 	role, err := getRoleById(ctx, roleId)
@@ -303,7 +303,7 @@ func DeleteRole(ctx *gin.Context, sessionId, roleId string) (err error) {
 		return
 	}
 
-	if err = deleteRole(ctx, sessionId, roleId); err != nil {
+	if err = deleteRole(ctx, sessionId, adminId, role); err != nil {
 		logger.LogError(sessionId, "failed to delete role error: "+err.Error())
 		err = fmt.Errorf(constants.DELETE_Failed, "role")
 		return

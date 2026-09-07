@@ -82,6 +82,8 @@ func NewPortgress() (db *gorm.DB, err error) {
 		&DELRide{},
 		&DELDriver{},
 		&DELPassenger{},
+		&DELPassengerLocationPreference{},
+		&DELRole{},
 	)
 
 	if err != nil {
@@ -303,14 +305,19 @@ func seedRolesAndPermissions(db *gorm.DB) error {
 		permissionIds := map[string]string{}
 
 		for code, description := range systemPermissions {
-			permission := Permission{
-				ID:          uuid.New().String(),
-				Code:        code,
-				Description: description,
-				IsSystem:    true,
-			}
-
-			if err := tx.Where("code = ?", code).FirstOrCreate(&permission).Error; err != nil {
+			// the id and the description are Attrs, not part of the struct passed in,
+			// because gorm folds a populated struct's fields into the lookup: a fresh
+			// id in there matches nothing, so every boot after the first tried to
+			// insert a permission whose code already existed and brought the app down
+			var permission Permission
+			if err := tx.
+				Where(Permission{Code: code}).
+				Attrs(Permission{
+					ID:          uuid.New().String(),
+					Description: description,
+					IsSystem:    true,
+				}).
+				FirstOrCreate(&permission).Error; err != nil {
 				return err
 			}
 

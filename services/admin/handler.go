@@ -516,6 +516,7 @@ func DeleteRoleHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in DeleteRoleHandler", sessionId)
 
+	adminId := ctx.GetString(constants.User_KEY)
 	roleId := ctx.Query(constants.Role_Key)
 
 	if err := utils.ValidateId(roleId); err != nil {
@@ -527,7 +528,7 @@ func DeleteRoleHandler(ctx *gin.Context) {
 		return
 	}
 
-	if err := DeleteRole(ctx, sessionId, roleId); err != nil {
+	if err := DeleteRole(ctx, sessionId, adminId, roleId); err != nil {
 		logger.LogError(sessionId, "delete role error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,

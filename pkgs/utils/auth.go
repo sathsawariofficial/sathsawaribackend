@@ -102,6 +102,15 @@ func VerifyJWT(sessionId, tokenString string) (userId string, tokenType string, 
 			}
 
 			return
+		} else if tokenType == constants.PASSENGER_TOKEN {
+			userId, ok = claims["passengerId"].(string)
+			if !ok {
+				err = fmt.Errorf("passengerId not found or invalid")
+				logger.LogError(sessionId, err)
+				return
+			}
+
+			return
 		} else if tokenType == constants.OPEN_TOKEN {
 			return
 		} else {

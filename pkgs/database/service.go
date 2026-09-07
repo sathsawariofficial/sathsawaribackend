@@ -384,6 +384,40 @@ func DeletePassenger(orgCtx *gin.Context, passenger postgress.Passenger, updateB
 		return err
 	}
 
+	////////// ARCHIVE THE TRAVEL FORM //////////
+	// what this passenger had asked the fleet for is kept, the same way a deleted
+	// driver and their vehicles are kept
+	var preferences []postgress.PassengerLocationPreference
+	if err := tx.Where("passenger_id = ?", passenger.ID).Find(&preferences).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if len(preferences) > 0 {
+		archived := make([]postgress.DELPassengerLocationPreference, 0, len(preferences))
+		for _, preference := range preferences {
+			archived = append(archived, postgress.DELPassengerLocationPreference{
+				ID:            preference.ID,
+				PassengerID:   preference.PassengerID,
+				DayOfWeek:     preference.DayOfWeek,
+				Direction:     preference.Direction,
+				IsEnabled:     preference.IsEnabled,
+				Location:      preference.Location,
+				Lat:           preference.Lat,
+				Lng:           preference.Lng,
+				ScheduledTime: preference.ScheduledTime,
+				UpdateBy:      updateById,
+				CreatedAt:     preference.CreatedAt,
+				UpdatedAt:     time.Now(),
+			})
+		}
+
+		if err := tx.Create(&archived).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
 	if err := tx.Where("passenger_id = ?", passenger.ID).Delete(&postgress.PassengerLocationPreference{}).Error; err != nil {
 		tx.Rollback()
 		return err

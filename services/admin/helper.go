@@ -457,8 +457,10 @@ func countMembersUsingRole(orgCtx *gin.Context, roleId string) (count int64, err
 	return
 }
 
-func deleteRole(orgCtx *gin.Context, sessionId, roleId string) (err error) {
+func deleteRole(orgCtx *gin.Context, sessionId, adminId string, role postgress.Role) (err error) {
 	logger.LogInfo("Request received in deleteRole", sessionId)
+
+	roleId := role.ID
 
 	var cancel context.CancelFunc
 	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
@@ -474,6 +476,34 @@ func deleteRole(orgCtx *gin.Context, sessionId, roleId string) (err error) {
 			tx.Rollback()
 		}
 	}()
+
+	////////// ARCHIVE THE ROLE //////////
+	// who was allowed to do what is worth being able to answer later, so the role is
+	// kept with the permission codes it held at this moment, inline, so the record
+	// still reads correctly even after those permissions themselves change
+	var codes []string
+	if err = tx.Table("role_permissions").
+		Joins("JOIN permissions ON permissions.id = role_permissions.permission_id").
+		Where("role_permissions.role_id = ?", roleId).
+		Pluck("permissions.code", &codes).Error; err != nil {
+		tx.Rollback()
+		logger.LogError(sessionId, err)
+		return
+	}
+
+	if err = tx.Create(&postgress.DELRole{
+		ID:              role.ID,
+		Name:            role.Name,
+		Description:     role.Description,
+		PermissionCodes: codes,
+		UpdateBy:        adminId,
+		CreatedAt:       role.CreatedAt,
+		UpdatedAt:       time.Now(),
+	}).Error; err != nil {
+		tx.Rollback()
+		logger.LogError(sessionId, err)
+		return
+	}
 
 	if err = tx.Where("role_id = ?", roleId).Delete(&postgress.RolePermission{}).Error; err != nil {
 		tx.Rollback()

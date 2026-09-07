@@ -326,6 +326,38 @@ type DELPassenger struct {
 // the morning but not in the evening, or be picked from one place and dropped at
 // another. It is reference data the manager reads while building a shift, it does
 // not create any shift by itself.
+// DELPassengerLocationPreference keeps the travel form of a deleted passenger, the
+// same way a deleted driver and their vehicles are kept. The form is the record of
+// what that person had actually asked the fleet for.
+type DELPassengerLocationPreference struct {
+	ID            string    `json:"id" gorm:"primary_key"`
+	PassengerID   string    `json:"passenger_id" gorm:"index;not null"`
+	DayOfWeek     int       `json:"day_of_week"`
+	Direction     string    `json:"direction"`
+	IsEnabled     bool      `json:"is_enabled"`
+	Location      string    `json:"location"`
+	Lat           float64   `json:"lat"`
+	Lng           float64   `json:"lng"`
+	ScheduledTime string    `json:"scheduled_time"`
+	UpdateBy      string    `json:"update_by"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// DELRole keeps a role an admin deleted, together with the permission codes it held
+// at that moment. Who was allowed to do what is worth being able to answer later,
+// and the codes are kept inline so the record stands on its own even after the
+// permissions themselves change.
+type DELRole struct {
+	ID              string         `json:"id" gorm:"primary_key"`
+	Name            string         `json:"name" gorm:"not null"`
+	Description     string         `json:"description"`
+	PermissionCodes pq.StringArray `json:"permission_codes" gorm:"type:text[]"`
+	UpdateBy        string         `json:"update_by"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+}
+
 type PassengerLocationPreference struct {
 	ID            string    `json:"id" gorm:"primary_key"`
 	PassengerID   string    `json:"passenger_id" gorm:"index:idx_passenger_day_direction,unique;not null"`
