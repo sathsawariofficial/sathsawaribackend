@@ -383,7 +383,9 @@ func DeletePassengerProfile(ctx *gin.Context, sessionId, passengerId string) (er
 		return
 	}
 
-	if err = deletePassengerProfile(ctx, sessionId, passenger); err != nil {
+	// the shared helper also frees the seats they hold on upcoming shifts and ends
+	// their fleet memberships, so nothing is left pointing at a deleted account
+	if err = database.DeletePassenger(ctx, passenger, passengerId); err != nil {
 		logger.LogError(sessionId, "failed to delete passenger error: "+err.Error())
 		err = fmt.Errorf(constants.DELETE_Failed, "passenger")
 		return

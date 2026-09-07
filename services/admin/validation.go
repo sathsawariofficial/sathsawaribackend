@@ -154,3 +154,29 @@ func ValidateAnnouncementRequest(request *AnnouncementRequest) error {
 
 	return nil
 }
+
+// ValidateAccountStatus checks a moderation status change. Only the two states an
+// admin can put an account into are accepted, pending belongs to the otp flow and
+// is never something an admin sets by hand.
+func ValidateAccountStatus(id string, request *AdminStatusRequest) error {
+	if err := utils.ValidateId(id); err != nil {
+		return err
+	}
+
+	if request.Status != constants.Status_Active && request.Status != constants.Status_InActive {
+		return fmt.Errorf(constants.Invalid_Data, "status")
+	}
+
+	return nil
+}
+
+func ValidateSearchFilters(status string) error {
+	if !utils.IsStringEmpty(status) &&
+		status != constants.Status_Active &&
+		status != constants.Status_InActive &&
+		status != constants.Status_PendingApproval {
+		return fmt.Errorf(constants.Invalid_Data, "status")
+	}
+
+	return nil
+}

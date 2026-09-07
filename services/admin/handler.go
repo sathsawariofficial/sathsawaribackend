@@ -655,3 +655,395 @@ func SetRolePermissionsHandler(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(fmt.Sprintf(constants.Updated_Successfully, "Role permissions")))
 }
+
+// the whole platform counted in one call, the admin's first screen
+func GetOverviewHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetOverviewHandler", sessionId)
+
+	overview, err := GetPlatformOverview(ctx, sessionId)
+	if err != nil {
+		logger.LogError(sessionId, "get overview error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	overviewResp := platformOverviewResp(overview)
+
+	logger.LogInfo("Response returned from GetOverviewHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, overviewResp)
+}
+
+// lists passenger accounts, searchable by name or number
+func GetPassengersHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetPassengersHandler", sessionId)
+
+	search := ctx.DefaultQuery(constants.Search_Loc_Key, "")
+	status := ctx.DefaultQuery(constants.Status_Key, "")
+
+	if err := ValidateSearchFilters(status); err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	page, err := utils.GetPageNumber(ctx)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get page number error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Invalid_Data, "page"),
+		})
+		return
+	}
+
+	passengers, totalRows, err := GetPassengers(ctx, sessionId, search, status, page)
+	if err != nil {
+		logger.LogError(sessionId, "get passengers error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	passengersResp := passengersResp(passengers, totalRows)
+
+	logger.LogInfo("Response returned from GetPassengersHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, passengersResp)
+}
+
+// one passenger with the fleets they ride with and the travel form they filled in
+func GetPassengerProfileHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetPassengerProfileHandler", sessionId)
+
+	passengerId := ctx.Query(constants.Passenger_Key)
+
+	if err := utils.ValidateId(passengerId); err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Invalid_Data, "passenger id"),
+		})
+		return
+	}
+
+	passenger, groups, preferences, err := GetPassengerProfile(ctx, sessionId, passengerId)
+	if err != nil {
+		logger.LogError(sessionId, "get passenger error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	profileResp := passengerProfileResp(passenger, groups, preferences)
+
+	logger.LogInfo("Response returned from GetPassengerProfileHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, profileResp)
+}
+
+// switches a passenger account on or off without destroying anything
+func UpdatePassengerStatusHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in UpdatePassengerStatusHandler", sessionId)
+
+	adminId := ctx.GetString(constants.User_KEY)
+	passengerId := ctx.Query(constants.Passenger_Key)
+
+	var request AdminStatusRequest
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		logger.LogError(sessionId, "binding error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Update_Failed, "passenger"),
+		})
+		return
+	}
+
+	if err := ValidateAccountStatus(passengerId, &request); err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	if err := UpdatePassengerStatus(ctx, sessionId, adminId, passengerId, request.Status); err != nil {
+		logger.LogError(sessionId, "update passenger status error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	logger.LogInfo("Response returned from UpdatePassengerStatusHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(fmt.Sprintf(constants.Updated_Successfully, "Passenger")))
+}
+
+// removes a passenger account and everything still pointing at it
+func DeletePassengerHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in DeletePassengerHandler", sessionId)
+
+	adminId := ctx.GetString(constants.User_KEY)
+	passengerId := ctx.Query(constants.Passenger_Key)
+
+	if err := utils.ValidateId(passengerId); err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Invalid_Data, "passenger id"),
+		})
+		return
+	}
+
+	if err := DeletePassenger(ctx, sessionId, adminId, passengerId); err != nil {
+		logger.LogError(sessionId, "delete passenger error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	logger.LogInfo("Response returned from DeletePassengerHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(fmt.Sprintf(constants.Deleted_Successfully, "Passenger")))
+}
+
+// switches a driver account on or off, the softer alternative to deleting them
+func UpdateDriverStatusHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in UpdateDriverStatusHandler", sessionId)
+
+	adminId := ctx.GetString(constants.User_KEY)
+	driverId := ctx.Query(constants.Driver_Key)
+
+	var request AdminStatusRequest
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		logger.LogError(sessionId, "binding error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Update_Failed, "driver"),
+		})
+		return
+	}
+
+	if err := ValidateAccountStatus(driverId, &request); err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	if err := UpdateDriverStatus(ctx, sessionId, adminId, driverId, request.Status); err != nil {
+		logger.LogError(sessionId, "update driver status error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	logger.LogInfo("Response returned from UpdateDriverStatusHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(fmt.Sprintf(constants.Updated_Successfully, "Driver")))
+}
+
+// every fleet on the platform with the size of each
+func GetGroupsHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetGroupsHandler", sessionId)
+
+	search := ctx.DefaultQuery(constants.Search_Loc_Key, "")
+	status := ctx.DefaultQuery(constants.Status_Key, "")
+
+	page, err := utils.GetPageNumber(ctx)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get page number error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Invalid_Data, "page"),
+		})
+		return
+	}
+
+	groups, totalRows, err := GetGroups(ctx, sessionId, search, status, page)
+	if err != nil {
+		logger.LogError(sessionId, "get groups error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	groupsResp := adminGroupsResp(groups, totalRows)
+
+	logger.LogInfo("Response returned from GetGroupsHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, groupsResp)
+}
+
+// one fleet with its full rosters, including everybody who was turned away
+func GetGroupDetailsHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetGroupDetailsHandler", sessionId)
+
+	groupId := ctx.Query(constants.Group_Key)
+
+	if err := utils.ValidateId(groupId); err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Invalid_Data, "group id"),
+		})
+		return
+	}
+
+	_, overview, members, vehicles, passengers, err := GetGroupDetails(ctx, sessionId, groupId)
+	if err != nil {
+		logger.LogError(sessionId, "get group error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	detailsResp := adminGroupDetailsResp(overview, members, vehicles, passengers)
+
+	logger.LogInfo("Response returned from GetGroupDetailsHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, detailsResp)
+}
+
+// shuts a fleet down, or brings it back, without deleting its history
+func UpdateGroupStatusHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in UpdateGroupStatusHandler", sessionId)
+
+	groupId := ctx.Query(constants.Group_Key)
+
+	var request AdminStatusRequest
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		logger.LogError(sessionId, "binding error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Update_Failed, "group"),
+		})
+		return
+	}
+
+	if err := ValidateAccountStatus(groupId, &request); err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	if err := UpdateGroupStatus(ctx, sessionId, groupId, request.Status); err != nil {
+		logger.LogError(sessionId, "update group status error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	logger.LogInfo("Response returned from UpdateGroupStatusHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(fmt.Sprintf(constants.Updated_Successfully, "Group")))
+}
+
+// every shift on the platform, filterable
+func GetShiftsHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetShiftsHandler", sessionId)
+
+	groupId := ctx.DefaultQuery(constants.Group_Key, "")
+	driverId := ctx.DefaultQuery(constants.Driver_Key, "")
+	direction := ctx.DefaultQuery(constants.Direction_Key, "")
+	startTime := ctx.DefaultQuery(constants.Start_Time_Key, "")
+	endTime := ctx.DefaultQuery(constants.Extimated_End_Time_Key, "")
+	status := ctx.DefaultQuery(constants.Status_Key, "")
+
+	page, err := utils.GetPageNumber(ctx)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get page number error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Invalid_Data, "page"),
+		})
+		return
+	}
+
+	shifts, totalRows, err := GetShifts(ctx, sessionId, groupId, driverId, direction, startTime, endTime, status, page)
+	if err != nil {
+		logger.LogError(sessionId, "get shifts error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	shiftsResp := adminShiftsResp(shifts, totalRows)
+
+	logger.LogInfo("Response returned from GetShiftsHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, shiftsResp)
+}
+
+// one shift with its route in order and everybody aboard
+func GetShiftDetailsHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetShiftDetailsHandler", sessionId)
+
+	shiftId := ctx.Query(constants.Shift_Key)
+
+	if err := utils.ValidateId(shiftId); err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Invalid_Data, "shift id"),
+		})
+		return
+	}
+
+	shift, stops, seats, err := GetShiftDetails(ctx, sessionId, shiftId)
+	if err != nil {
+		logger.LogError(sessionId, "get shift error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	detailsResp := adminShiftDetailsResp(shift, stops, seats)
+
+	logger.LogInfo("Response returned from GetShiftDetailsHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, detailsResp)
+}

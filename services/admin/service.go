@@ -396,3 +396,276 @@ func SetRolePermissions(ctx *gin.Context, sessionId string, request AdminRolePer
 
 	return
 }
+
+// GetPlatformOverview is the admin's first screen: how much of everything exists and
+// how much of it is live.
+func GetPlatformOverview(ctx *gin.Context, sessionId string) (overview postgress.PlatformOverview, err error) {
+	logger.LogInfo("Request received in GetPlatformOverview", sessionId)
+
+	overview, err = getPlatformOverview(ctx, sessionId)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get the overview error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the overview")
+		return
+	}
+
+	logger.LogInfo("Response returned from GetPlatformOverview", sessionId)
+
+	return
+}
+
+func GetPassengers(ctx *gin.Context, sessionId, search, status string, page int) (passengers []postgress.Passenger, totalRows int64, err error) {
+	logger.LogInfo("Request received in GetPassengers", sessionId)
+
+	passengers, totalRows, err = getAllPassengers(ctx, sessionId, search, status, page)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get the passengers error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the passengers")
+		return
+	}
+
+	logger.LogInfo("Response returned from GetPassengers", sessionId)
+
+	return
+}
+
+// GetPassengerProfile explains one account: who they ride with and what they asked
+// for, which is what a complaint or a support call actually needs.
+func GetPassengerProfile(ctx *gin.Context, sessionId, passengerId string) (
+	passenger postgress.Passenger,
+	groups []postgress.GroupPassengerDetails,
+	preferences []postgress.PassengerLocationPreference,
+	err error,
+) {
+	logger.LogInfo("Request received in GetPassengerProfile", sessionId)
+
+	passenger, err = getPassengerById(ctx, passengerId)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get the passenger error: "+err.Error())
+		err = errors.New(constants.Passenger_Not_Found)
+		return
+	}
+
+	groups, preferences, err = getPassengerContext(ctx, passengerId)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get the passenger context error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the passenger")
+		return
+	}
+
+	logger.LogInfo("Response returned from GetPassengerProfile", sessionId)
+
+	return
+}
+
+// UpdatePassengerStatus is the softer moderation tool: an account switched off
+// cannot log in or be seated, but nothing it was part of is destroyed.
+func UpdatePassengerStatus(ctx *gin.Context, sessionId, adminId, passengerId, status string) (err error) {
+	logger.LogInfo("Request received in UpdatePassengerStatus", sessionId)
+
+	if _, err = getPassengerById(ctx, passengerId); err != nil {
+		logger.LogError(sessionId, "failed to get the passenger error: "+err.Error())
+		err = errors.New(constants.Passenger_Not_Found)
+		return
+	}
+
+	if err = updatePassengerStatus(ctx, sessionId, passengerId, status, adminId); err != nil {
+		logger.LogError(sessionId, "failed to update the passenger error: "+err.Error())
+		err = fmt.Errorf(constants.Update_Failed, "passenger")
+		return
+	}
+
+	logger.LogInfo("Response returned from UpdatePassengerStatus", sessionId)
+
+	return
+}
+
+// DeletePassenger removes an account for good. The shared helper frees the seats it
+// held on upcoming shifts and ends its fleet memberships, so nothing anywhere is
+// left pointing at somebody who no longer exists.
+func DeletePassenger(ctx *gin.Context, sessionId, adminId, passengerId string) (err error) {
+	logger.LogInfo("Request received in DeletePassenger", sessionId)
+
+	passenger, err := getPassengerById(ctx, passengerId)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get the passenger error: "+err.Error())
+		err = errors.New(constants.Passenger_Not_Found)
+		return
+	}
+
+	if err = database.DeletePassenger(ctx, passenger, adminId); err != nil {
+		logger.LogError(sessionId, "failed to delete the passenger error: "+err.Error())
+		err = fmt.Errorf(constants.DELETE_Failed, "passenger")
+		return
+	}
+
+	logger.LogInfo("Response returned from DeletePassenger", sessionId)
+
+	return
+}
+
+func UpdateDriverStatus(ctx *gin.Context, sessionId, adminId, driverId, status string) (err error) {
+	logger.LogInfo("Request received in UpdateDriverStatus", sessionId)
+
+	driver, err := database.GetDriverById(ctx, driverId)
+	if err != nil || utils.IsStringEmpty(driver.ID) {
+		logger.LogError(sessionId, "failed to get the driver error")
+		err = errors.New(constants.Driver_Not_Found)
+		return
+	}
+
+	if err = updateDriverStatus(ctx, sessionId, driverId, status, adminId); err != nil {
+		logger.LogError(sessionId, "failed to update the driver error: "+err.Error())
+		err = fmt.Errorf(constants.Update_Failed, "driver")
+		return
+	}
+
+	logger.LogInfo("Response returned from UpdateDriverStatus", sessionId)
+
+	return
+}
+
+func GetGroups(ctx *gin.Context, sessionId, search, status string, page int) (groups []postgress.AdminGroupOverview, totalRows int64, err error) {
+	logger.LogInfo("Request received in GetGroups", sessionId)
+
+	groups, totalRows, err = getAllGroups(ctx, sessionId, search, status, page)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get the groups error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the groups")
+		return
+	}
+
+	logger.LogInfo("Response returned from GetGroups", sessionId)
+
+	return
+}
+
+// GetGroupDetails is the admin's read of a fleet, unfiltered by status so somebody
+// looking into a complaint can see who was turned away as well as who was let in.
+func GetGroupDetails(ctx *gin.Context, sessionId, groupId string) (
+	group postgress.Group,
+	overview postgress.AdminGroupOverview,
+	members []postgress.GroupMemberDetails,
+	vehicles []postgress.GroupVehicleDetails,
+	passengers []postgress.GroupPassengerDetails,
+	err error,
+) {
+	logger.LogInfo("Request received in GetGroupDetails", sessionId)
+
+	group, err = getGroupById(ctx, groupId)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get the group error: "+err.Error())
+		err = errors.New(constants.Group_Not_Found)
+		return
+	}
+
+	owner, e := database.GetDriverById(ctx, group.OwnerDriverID)
+	if e != nil {
+		logger.LogError(sessionId, e)
+	}
+
+	members, vehicles, passengers, err = getGroupRosters(ctx, sessionId, groupId)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get the rosters error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the group")
+		return
+	}
+
+	overview = postgress.AdminGroupOverview{
+		ID:            group.ID,
+		Name:          group.Name,
+		Description:   group.Description,
+		Status:        group.Status,
+		OwnerDriverID: group.OwnerDriverID,
+		OwnerName:     owner.DriverName,
+		OwnerMobile:   owner.DriverMobile,
+		CreatedAt:     group.CreatedAt,
+	}
+
+	for _, member := range members {
+		if member.Status == constants.Membership_Status_Approved {
+			overview.MemberCount++
+		}
+	}
+	for _, vehicle := range vehicles {
+		if vehicle.Status == constants.Membership_Status_Approved {
+			overview.VehicleCount++
+		}
+	}
+	for _, passenger := range passengers {
+		if passenger.Status == constants.Membership_Status_Approved {
+			overview.PassengerCount++
+		}
+	}
+
+	logger.LogInfo("Response returned from GetGroupDetails", sessionId)
+
+	return
+}
+
+// UpdateGroupStatus lets an admin shut a fleet down without deleting anything, which
+// is the right hammer for a group that is misbehaving. Switching it off stops it
+// being found, joined or built on, while its history stays intact.
+func UpdateGroupStatus(ctx *gin.Context, sessionId, groupId, status string) (err error) {
+	logger.LogInfo("Request received in UpdateGroupStatus", sessionId)
+
+	if _, err = getGroupById(ctx, groupId); err != nil {
+		logger.LogError(sessionId, "failed to get the group error: "+err.Error())
+		err = errors.New(constants.Group_Not_Found)
+		return
+	}
+
+	if err = updateGroupStatus(ctx, sessionId, groupId, status); err != nil {
+		logger.LogError(sessionId, "failed to update the group error: "+err.Error())
+		err = fmt.Errorf(constants.Update_Failed, "group")
+		return
+	}
+
+	logger.LogInfo("Response returned from UpdateGroupStatus", sessionId)
+
+	return
+}
+
+func GetShifts(ctx *gin.Context, sessionId, groupId, driverId, direction, startTime, endTime, status string, page int) (shifts []postgress.ShiftDetails, totalRows int64, err error) {
+	logger.LogInfo("Request received in GetShifts", sessionId)
+
+	shifts, totalRows, err = getAllShifts(ctx, sessionId, groupId, driverId, direction, startTime, endTime, status, page)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get the shifts error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the shifts")
+		return
+	}
+
+	logger.LogInfo("Response returned from GetShifts", sessionId)
+
+	return
+}
+
+// GetShiftDetails is the whole trip: who is driving, who is aboard, and the route in
+// the order it is driven.
+func GetShiftDetails(ctx *gin.Context, sessionId, shiftId string) (
+	shift postgress.ShiftDetails,
+	stops []postgress.ShiftStop,
+	seats []postgress.ShiftSeatDetails,
+	err error,
+) {
+	logger.LogInfo("Request received in GetShiftDetails", sessionId)
+
+	shift, err = getShiftDetailsById(ctx, shiftId)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get the shift error: "+err.Error())
+		err = errors.New(constants.Shift_Not_Found)
+		return
+	}
+
+	stops, seats, err = getShiftRoute(ctx, shiftId)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get the route error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the shift")
+		return
+	}
+
+	logger.LogInfo("Response returned from GetShiftDetails", sessionId)
+
+	return
+}

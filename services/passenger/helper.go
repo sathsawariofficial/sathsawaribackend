@@ -256,64 +256,6 @@ func updatePassengerFCM(orgCtx *gin.Context, id, fcm string) error {
 		Update("fcm", fcm).Error
 }
 
-// deletePassengerProfile archives the account into DELPassenger the way a driver
-// account is archived, then clears the passenger and their weekly form. The mobile
-// number is prefixed on the archive row so the number is free to register again.
-func deletePassengerProfile(orgCtx *gin.Context, sessionId string, passenger postgress.Passenger) (err error) {
-	logger.LogInfo("Request received in deletePassengerProfile", sessionId)
-
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	tx := database.DatabaseConn.Postgres.WithContext(ctx).Begin()
-	if tx.Error != nil {
-		return tx.Error
-	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-
-	delPassenger := postgress.DELPassenger{
-		ID:              passenger.ID,
-		PassengerName:   passenger.PassengerName,
-		PassengerMobile: fmt.Sprintf("DEL_%s_%s", passenger.PassengerMobile, time.Now().String()),
-		Password:        passenger.Password,
-		Gender:          passenger.Gender,
-		Status:          constants.Status_InActive,
-		UpdateBy:        passenger.ID,
-		CreatedAt:       passenger.CreatedAt,
-		UpdatedAt:       time.Now(),
-	}
-
-	if err = tx.Create(&delPassenger).Error; err != nil {
-		tx.Rollback()
-		logger.LogError(sessionId, err)
-		return
-	}
-
-	if err = tx.Where("passenger_id = ?", passenger.ID).Delete(&postgress.PassengerLocationPreference{}).Error; err != nil {
-		tx.Rollback()
-		logger.LogError(sessionId, err)
-		return
-	}
-
-	if err = tx.Where("id = ?", passenger.ID).Delete(&postgress.Passenger{}).Error; err != nil {
-		tx.Rollback()
-		logger.LogError(sessionId, err)
-		return
-	}
-
-	err = tx.Commit().Error
-
-	logger.LogInfo("Response returned from deletePassengerProfile", sessionId)
-
-	return
-}
-
 // savePassengerSchedule writes the whole weekly form in one statement. The unique
 // index on (passenger_id, day_of_week, direction) turns a resend of the same leg
 // into an update instead of a duplicate row.

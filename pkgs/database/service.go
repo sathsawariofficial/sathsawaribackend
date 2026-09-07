@@ -112,6 +112,41 @@ func SaveMissingLocation(orgCtx context.Context, request postgress.MissingLocati
 	return
 }
 
+// checkDriverFleetTies stops a driver being deleted out from under a fleet that
+// still depends on them. A fleet with a deleted owner would have nobody able to run
+// it, and a shift whose driver no longer exists would strand its passengers, so
+// both cases are refused and the caller is told what to sort out first.
+func checkDriverFleetTies(ctx context.Context, driverId string) error {
+	var ownedGroups int64
+	if err := DatabaseConn.Postgres.WithContext(ctx).
+		Model(&postgress.Group{}).
+		Where("owner_driver_id = ?", driverId).
+		Where("status = ?", constants.Status_Active).
+		Count(&ownedGroups).Error; err != nil {
+		return err
+	}
+
+	if ownedGroups > 0 {
+		return fmt.Errorf("this driver owns %d active group(s), delete or hand those over first", ownedGroups)
+	}
+
+	var upcomingShifts int64
+	if err := DatabaseConn.Postgres.WithContext(ctx).
+		Model(&postgress.Shift{}).
+		Where("driver_id = ?", driverId).
+		Where("is_active = ?", true).
+		Where("start_datetime > ?", time.Now().Format(constants.DateTimeLayout)).
+		Count(&upcomingShifts).Error; err != nil {
+		return err
+	}
+
+	if upcomingShifts > 0 {
+		return fmt.Errorf("this driver is still driving %d upcoming shift(s), cancel or reassign those first", upcomingShifts)
+	}
+
+	return nil
+}
+
 func DeleteDriver(orgCtx *gin.Context, driver postgress.Driver, updateById string) error {
 	var cancel context.CancelFunc
 	ctx, cancel := context.WithTimeout(
@@ -119,6 +154,10 @@ func DeleteDriver(orgCtx *gin.Context, driver postgress.Driver, updateById strin
 		time.Duration(configuration.ConfigurationData.Timeout)*time.Second,
 	)
 	defer cancel()
+
+	if err := checkDriverFleetTies(ctx, driver.ID); err != nil {
+		return err
+	}
 
 	tx := DatabaseConn.Postgres.WithContext(ctx).Begin()
 	if tx.Error != nil {
@@ -230,8 +269,127 @@ func DeleteDriver(orgCtx *gin.Context, driver postgress.Driver, updateById strin
 		}
 	}
 
+	////////// LEAVE EVERY FLEET //////////
+	// the driver is on their way out, so their membership and the vehicles they
+	// lent stop counting towards any fleet they belonged to
+	if err := tx.Model(&postgress.GroupMember{}).
+		Where("driver_id = ?", driver.ID).
+		Updates(map[string]interface{}{
+			"status":  constants.Membership_Status_Left,
+			"role_id": "",
+		}).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if err := tx.Model(&postgress.GroupVehicle{}).
+		Where("driver_id = ?", driver.ID).
+		Update("status", constants.Membership_Status_Left).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
 	// Delete original record
 	if err := tx.Delete(&postgress.Driver{}, "id = ?", driver.ID).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit().Error
+}
+
+// DeletePassenger archives a passenger account and unpicks everything it was still
+// attached to: the seats it holds on upcoming shifts go back to the manager, its
+// fleet memberships end, and its standing travel form is cleared. The mobile number
+// is prefixed on the archive row so it is free to register again.
+func DeletePassenger(orgCtx *gin.Context, passenger postgress.Passenger, updateById string) error {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(
+		orgCtx,
+		time.Duration(configuration.ConfigurationData.Timeout)*time.Second,
+	)
+	defer cancel()
+
+	tx := DatabaseConn.Postgres.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	delPassenger := postgress.DELPassenger{
+		ID:              passenger.ID,
+		PassengerName:   passenger.PassengerName,
+		PassengerMobile: fmt.Sprintf("DEL_%s_%s", passenger.PassengerMobile, time.Now().String()),
+		Password:        passenger.Password,
+		Gender:          passenger.Gender,
+		Status:          constants.Status_InActive,
+		UpdateBy:        updateById,
+		CreatedAt:       passenger.CreatedAt,
+		UpdatedAt:       time.Now(),
+	}
+
+	if err := tx.Create(&delPassenger).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	////////// FREE THEIR UPCOMING SEATS //////////
+	var shiftIds []string
+	if err := tx.Model(&postgress.Shift{}).
+		Where("is_active = ?", true).
+		Where("start_datetime > ?", time.Now().Format(constants.DateTimeLayout)).
+		Pluck("id", &shiftIds).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if len(shiftIds) > 0 {
+		if err := tx.Model(&postgress.ShiftSeat{}).
+			Where("shift_id IN ?", shiftIds).
+			Where("passenger_id = ?", passenger.ID).
+			Updates(map[string]interface{}{
+				"passenger_id": "",
+				"stop_id":      "",
+				"gender":       "",
+				"status":       constants.Seat_Status_Empty,
+			}).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+
+		if err := tx.Exec(`
+			UPDATE shifts
+			SET seats_taken = (
+				SELECT COUNT(*) FROM shift_seats
+				WHERE shift_seats.shift_id = shifts.id
+				  AND shift_seats.status = ?
+			)
+			WHERE shifts.id IN ?
+		`, constants.Seat_Status_Assigned, shiftIds).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	////////// LEAVE EVERY FLEET //////////
+	if err := tx.Model(&postgress.GroupPassenger{}).
+		Where("passenger_id = ?", passenger.ID).
+		Update("status", constants.Membership_Status_Left).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if err := tx.Where("passenger_id = ?", passenger.ID).Delete(&postgress.PassengerLocationPreference{}).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if err := tx.Delete(&postgress.Passenger{}, "id = ?", passenger.ID).Error; err != nil {
 		tx.Rollback()
 		return err
 	}

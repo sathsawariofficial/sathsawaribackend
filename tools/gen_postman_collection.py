@@ -59,11 +59,82 @@ def save(var, expr, label=None):
 items = []
 
 # ---------------------------------------------------------------- 0 admin ----
-admin = {"name": "0 · Admin & Roles (RBAC)", "item": [
+admin = {"name": "0 · Admin Console", "item": [
     req("Admin Login", "POST", "/api/v1/admin/login", "open_token",
         body={"username": "twssawari", "password": "vR7!xK2@pQ9#Lm4$Zw8^Ty1&Nc5*Hs3%Df6!Ba"},
         tests=save("admin_session", "r.data.sessionId"),
         desc="Saves admin_session. Run this first if you want to touch roles or permissions."),
+
+    req("Platform Overview", "GET", "/api/v1/admin/overview", "admin_session",
+        desc=("The whole product counted in one query: drivers, passengers, vehicles, fleets, "
+              "shifts and carpool rides, each as a total with the live slice of it, plus how many "
+              "join requests are sitting unanswered across every fleet.\n\n"
+              "This is the admin's first screen.")),
+
+    req("List Passengers", "GET", "/api/v1/admin/passengers", "admin_session",
+        query=[q("page", "1"), q("search", "", True), q("status", "", True)],
+        tests=[
+            "const r = pm.response.json();",
+            "if (r.data && r.data.passengers && r.data.passengers.length) {",
+            '    pm.environment.set("admin_passenger_id", r.data.passengers[0].id);',
+            "}",
+        ],
+        desc=("Passengers were invisible to the admin until this feature gave them real accounts. "
+              "search matches the name or the mobile number, status filters active, inactive or "
+              "pending.")),
+
+    req("Passenger Profile", "GET", "/api/v1/admin/passenger", "admin_session",
+        query=[q("passenger_id", "{{passenger1_id}}")],
+        desc="One account explained: the fleets they ride with and the standing travel form they filled in, which is what a support call actually needs."),
+
+    req("Suspend A Passenger", "PATCH", "/api/v1/admin/passenger/status", "admin_session",
+        query=[q("passenger_id", "{{passenger1_id}}")],
+        body={"status": "inactive"},
+        desc=("The softer moderation tool. A suspended account cannot log in or be seated on a "
+              "shift, but nothing it was part of is destroyed. Send active to bring it back.")),
+
+    req("Suspend A Driver", "PATCH", "/api/v1/admin/driver/status", "admin_session",
+        query=[q("driver_id", "{{driver2_id}}")],
+        body={"status": "inactive"},
+        desc="Same idea for a driver, the alternative to deleting them outright."),
+
+    req("Delete A Passenger", "DELETE", "/api/v1/admin/passenger", "admin_session",
+        query=[q("passenger_id", "{{admin_passenger_id}}")],
+        desc=("Permanent. The account is archived, its seats on upcoming shifts are freed with the "
+              "taken counts corrected, its fleet memberships end and its travel form is cleared, "
+              "so nothing anywhere is left pointing at somebody who no longer exists.")),
+
+    req("List Groups", "GET", "/api/v1/admin/groups", "admin_session",
+        query=[q("page", "1"), q("search", "", True), q("status", "", True)],
+        desc="Every fleet with who runs it and how big it is. The member, vehicle, passenger and shift counts come back as subselects, so the page costs one query."),
+
+    req("Group Details", "GET", "/api/v1/admin/group", "admin_session",
+        query=[q("group_id", "{{group_id}}")],
+        desc=("The full rosters, and unlike the manager's own view this is NOT filtered by status "
+              "— an admin looking into a complaint needs to see who was turned away and who left, "
+              "not just who is in.")),
+
+    req("Shut A Group Down", "PATCH", "/api/v1/admin/group/status", "admin_session",
+        query=[q("group_id", "{{group_id}}")],
+        body={"status": "inactive"},
+        desc=("The right hammer for a fleet that is misbehaving. Switched off it cannot be found, "
+              "joined or built on, while its history stays intact. Send active to restore it.")),
+
+    req("List Shifts", "GET", "/api/v1/admin/shifts", "admin_session",
+        query=[q("page", "1"), q("group_id", "", True), q("driver_id", "", True),
+               q("direction", "", True), q("status", "", True),
+               q("start_time", "", True), q("estimated_end_time", "", True)],
+        tests=[
+            "const r = pm.response.json();",
+            "if (r.data && r.data.shifts && r.data.shifts.length) {",
+            '    pm.environment.set("admin_shift_id", r.data.shifts[0].id);',
+            "}",
+        ],
+        desc="Every shift on the platform, filterable the way somebody chasing a complaint would want it."),
+
+    req("Shift Details", "GET", "/api/v1/admin/shift", "admin_session",
+        query=[q("shift_id", "{{shift_id}}")],
+        desc="The whole trip: who is driving, who is aboard, and the route in the order it is driven."),
 
     req("Get Roles", "GET", "/api/v1/admin/roles", "admin_session",
         query=[q("page", "1")],

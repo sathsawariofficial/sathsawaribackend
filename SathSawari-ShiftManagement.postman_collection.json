@@ -7,7 +7,7 @@
   },
   "item": [
     {
-      "name": "0 \u00b7 Admin & Roles (RBAC)",
+      "name": "0 \u00b7 Admin Console",
       "item": [
         {
           "name": "Admin Login",
@@ -66,6 +66,517 @@
               }
             }
           ]
+        },
+        {
+          "name": "Platform Overview",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/admin/overview",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "overview"
+              ]
+            },
+            "description": "The whole product counted in one query: drivers, passengers, vehicles, fleets, shifts and carpool rides, each as a total with the live slice of it, plus how many join requests are sitting unanswered across every fleet.\n\nThis is the admin's first screen."
+          },
+          "response": []
+        },
+        {
+          "name": "List Passengers",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/admin/passengers?page=1",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "passengers"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Passengers were invisible to the admin until this feature gave them real accounts. search matches the name or the mobile number, status filters active, inactive or pending."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && r.data.passengers && r.data.passengers.length) {",
+                  "    pm.environment.set(\"admin_passenger_id\", r.data.passengers[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Passenger Profile",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/admin/passenger?passenger_id={{passenger1_id}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "passenger"
+              ],
+              "query": [
+                {
+                  "key": "passenger_id",
+                  "value": "{{passenger1_id}}"
+                }
+              ]
+            },
+            "description": "One account explained: the fleets they ride with and the standing travel form they filled in, which is what a support call actually needs."
+          },
+          "response": []
+        },
+        {
+          "name": "Suspend A Passenger",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/admin/passenger/status?passenger_id={{passenger1_id}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "passenger",
+                "status"
+              ],
+              "query": [
+                {
+                  "key": "passenger_id",
+                  "value": "{{passenger1_id}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"status\": \"inactive\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "The softer moderation tool. A suspended account cannot log in or be seated on a shift, but nothing it was part of is destroyed. Send active to bring it back."
+          },
+          "response": []
+        },
+        {
+          "name": "Suspend A Driver",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/admin/driver/status?driver_id={{driver2_id}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "driver",
+                "status"
+              ],
+              "query": [
+                {
+                  "key": "driver_id",
+                  "value": "{{driver2_id}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"status\": \"inactive\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Same idea for a driver, the alternative to deleting them outright."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete A Passenger",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/admin/passenger?passenger_id={{admin_passenger_id}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "passenger"
+              ],
+              "query": [
+                {
+                  "key": "passenger_id",
+                  "value": "{{admin_passenger_id}}"
+                }
+              ]
+            },
+            "description": "Permanent. The account is archived, its seats on upcoming shifts are freed with the taken counts corrected, its fleet memberships end and its travel form is cleared, so nothing anywhere is left pointing at somebody who no longer exists."
+          },
+          "response": []
+        },
+        {
+          "name": "List Groups",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/admin/groups?page=1",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "groups"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Every fleet with who runs it and how big it is. The member, vehicle, passenger and shift counts come back as subselects, so the page costs one query."
+          },
+          "response": []
+        },
+        {
+          "name": "Group Details",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/admin/group?group_id={{group_id}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "group"
+              ],
+              "query": [
+                {
+                  "key": "group_id",
+                  "value": "{{group_id}}"
+                }
+              ]
+            },
+            "description": "The full rosters, and unlike the manager's own view this is NOT filtered by status \u2014 an admin looking into a complaint needs to see who was turned away and who left, not just who is in."
+          },
+          "response": []
+        },
+        {
+          "name": "Shut A Group Down",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/admin/group/status?group_id={{group_id}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "group",
+                "status"
+              ],
+              "query": [
+                {
+                  "key": "group_id",
+                  "value": "{{group_id}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"status\": \"inactive\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "The right hammer for a fleet that is misbehaving. Switched off it cannot be found, joined or built on, while its history stays intact. Send active to restore it."
+          },
+          "response": []
+        },
+        {
+          "name": "List Shifts",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/admin/shifts?page=1",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "shifts"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "group_id",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "driver_id",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "direction",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "start_time",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "estimated_end_time",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Every shift on the platform, filterable the way somebody chasing a complaint would want it."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && r.data.shifts && r.data.shifts.length) {",
+                  "    pm.environment.set(\"admin_shift_id\", r.data.shifts[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Shift Details",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/admin/shift?shift_id={{shift_id}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "shift"
+              ],
+              "query": [
+                {
+                  "key": "shift_id",
+                  "value": "{{shift_id}}"
+                }
+              ]
+            },
+            "description": "The whole trip: who is driving, who is aboard, and the route in the order it is driven."
+          },
+          "response": []
         },
         {
           "name": "Get Roles",

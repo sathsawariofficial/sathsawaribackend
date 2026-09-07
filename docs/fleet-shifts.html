@@ -380,7 +380,7 @@
     <div class="facts">
       <div>branch <b>feature/shift-management</b></div>
       <div>tables <b>14 new</b></div>
-      <div>endpoints <b>43 new</b></div>
+      <div>endpoints <b>56 new</b></div>
       <div>packages <b>group · shift</b></div>
     </div>
   </header>
@@ -392,7 +392,8 @@
     <a href="#roles"><span>04</span>Who may do what</a>
     <a href="#rules"><span>05</span>Enforced rules</a>
     <a href="#flow"><span>06</span>Test flow</a>
-    <a href="#reference"><span>07</span>Endpoints</a>
+    <a href="#admin"><span>07</span>Admin console</a>
+    <a href="#reference"><span>08</span>Endpoints</a>
   </nav>
 
   <!-- ================================================== 1 -->
@@ -936,9 +937,89 @@
   </section>
 
   <!-- ================================================== 7 -->
+  <section id="admin">
+    <div class="col">
+      <h2><span class="num">07 / oversight</span>What the admin can see</h2>
+      <p class="lede">The fleet feature created three whole populations the admin console could not see: passenger accounts, groups, and shifts.</p>
+      <p>The admin already had drivers, vehicles, rides and broadcasts. Everything this feature added was invisible to it — a passenger could be suspended nowhere, a fleet could misbehave with no way to shut it down, and a shift could go wrong with no way to look at who was on it.</p>
+      <p>Moderation is deliberately two-tiered. Switching an account or a fleet <em>off</em> stops it being used while leaving its history intact; deleting is separate, permanent, and unpicks every reference to it.</p>
+    </div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 900 300" role="img" aria-label="The admin console's reach: it could already see drivers, vehicles, rides and broadcasts, and now also reaches passenger accounts, fleets and shifts, with a soft suspend and a permanent delete for each.">
+          <defs>
+            <marker id="a6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <rect x="20" y="100" width="150" height="70" fill="var(--surface-2)" stroke="currentColor" stroke-width="2"/>
+          <text x="95" y="130" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="13" font-weight="600" fill="currentColor">admin</text>
+          <text x="95" y="150" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">admin_token</text>
+
+          <text x="240" y="46" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1.6" fill="currentColor" opacity="0.55">ALREADY REACHED</text>
+          <rect x="240" y="58" width="290" height="46" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>
+          <text x="256" y="86" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" opacity="0.8">drivers · vehicles · rides · broadcasts</text>
+
+          <text x="240" y="140" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1.6" fill="var(--pickup)">NEWLY REACHED</text>
+          <rect x="240" y="152" width="290" height="46" fill="var(--pickup-wash)" stroke="var(--pickup)" stroke-width="2"/>
+          <text x="256" y="180" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">passengers · fleets · shifts</text>
+
+          <rect x="240" y="216" width="290" height="46" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.6"/>
+          <text x="256" y="244" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" opacity="0.8">roles · permissions</text>
+
+          <line x1="170" y1="120" x2="238" y2="82" stroke="currentColor" stroke-width="1.5" marker-end="url(#a6)" opacity="0.6"/>
+          <line x1="170" y1="135" x2="238" y2="175" stroke="var(--pickup)" stroke-width="2" marker-end="url(#a6)"/>
+          <line x1="170" y1="150" x2="238" y2="238" stroke="currentColor" stroke-width="1.5" marker-end="url(#a6)" opacity="0.6"/>
+
+          <!-- two tiers of moderation -->
+          <rect x="600" y="100" width="130" height="46" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <text x="665" y="122" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">suspend</text>
+          <text x="665" y="138" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" opacity="0.6">history kept</text>
+
+          <rect x="750" y="100" width="130" height="46" fill="var(--signal-wash)" stroke="var(--signal)" stroke-width="1.5"/>
+          <text x="815" y="122" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="var(--signal)">delete</text>
+          <text x="815" y="138" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="var(--signal)" opacity="0.85">refs unpicked</text>
+
+          <line x1="530" y1="175" x2="640" y2="150" stroke="currentColor" stroke-width="1.5" marker-end="url(#a6)"/>
+          <line x1="530" y1="175" x2="790" y2="150" stroke="var(--signal)" stroke-width="1.5" marker-end="url(#a6)"/>
+
+          <text x="600" y="188" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.7">deleting a driver is refused while they own a fleet</text>
+          <text x="600" y="206" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.7">or still have shifts to drive</text>
+        </svg>
+      </div>
+      <figcaption><b>A deleted account must not leave anything pointing at it.</b> Removing a passenger frees their seats on upcoming shifts and corrects each shift's taken count; removing a driver is refused outright while they own an active fleet or are still expected behind the wheel, because neither can be reassigned automatically.</figcaption>
+    </figure>
+
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/admin/overview</td><td>The whole platform counted in one query</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/admin/passengers</td><td>Passenger accounts, searchable by name or number</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/admin/passenger</td><td>One account: their fleets and their travel form</td></tr>
+          <tr><td><span class="verb">PATCH</span></td><td class="mono">/admin/passenger/status</td><td>Suspend or restore a passenger</td></tr>
+          <tr><td><span class="verb">DELETE</span></td><td class="mono">/admin/passenger</td><td>Delete, freeing their upcoming seats</td></tr>
+          <tr><td><span class="verb">PATCH</span></td><td class="mono">/admin/driver/status</td><td>Suspend or restore a driver</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/admin/groups</td><td>Every fleet with owner and size</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/admin/group</td><td>Full rosters, including who was turned away</td></tr>
+          <tr><td><span class="verb">PATCH</span></td><td class="mono">/admin/group/status</td><td>Shut a fleet down or bring it back</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/admin/shifts</td><td>Every shift, filterable</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/admin/shift</td><td>One trip with its route and everybody aboard</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="col">
+      <p>The existing <code>GET /admin/vehicles</code> also changed: it now returns the seat count and the comfort flags, and its total-pages count was fixed — it had been counting a query that already had the page limit applied, so it could never report more than one page.</p>
+    </div>
+  </section>
+
+  <!-- ================================================== 8 -->
   <section id="reference">
     <div class="col">
-      <h2><span class="num">07 / reference</span>Every new endpoint</h2>
+      <h2><span class="num">08 / reference</span>Every new endpoint</h2>
       <p class="lede">Thirty-seven routes across four packages. Bulk wherever the domain allows it.</p>
     </div>
 

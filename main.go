@@ -110,6 +110,26 @@ func main() {
 				adminProtected.GET("/approch", admin.GetApprochRequestsHandler)
 				adminProtected.POST("/announcement", admin.AnnouncementHandler)
 
+				// the whole platform at a glance
+				adminProtected.GET("/overview", admin.GetOverviewHandler)
+
+				// moderation: switch an account off rather than destroying it
+				adminProtected.PATCH("/driver/status", admin.UpdateDriverStatusHandler)
+
+				// passengers, invisible to the admin until the fleet feature gave
+				// them real accounts
+				adminProtected.GET("/passengers", admin.GetPassengersHandler)
+				adminProtected.GET("/passenger", admin.GetPassengerProfileHandler)
+				adminProtected.PATCH("/passenger/status", admin.UpdatePassengerStatusHandler)
+				adminProtected.DELETE("/passenger", admin.DeletePassengerHandler)
+
+				// oversight of the fleets and the shifts they run
+				adminProtected.GET("/groups", admin.GetGroupsHandler)
+				adminProtected.GET("/group", admin.GetGroupDetailsHandler)
+				adminProtected.PATCH("/group/status", admin.UpdateGroupStatusHandler)
+				adminProtected.GET("/shifts", admin.GetShiftsHandler)
+				adminProtected.GET("/shift", admin.GetShiftDetailsHandler)
+
 				// role and permission management, an admin can add a new role or
 				// remap what a role may do without a code change
 				adminProtected.POST("/role", admin.CreateRoleHandler)

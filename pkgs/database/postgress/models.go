@@ -600,6 +600,41 @@ type GroupVehicleDetails struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
+// PlatformOverview is the whole product counted in one query, the numbers an admin
+// wants on the first screen before drilling into anything.
+type PlatformOverview struct {
+	TotalDrivers     int64 `json:"total_drivers"`
+	ActiveDrivers    int64 `json:"active_drivers"`
+	TotalPassengers  int64 `json:"total_passengers"`
+	ActivePassengers int64 `json:"active_passengers"`
+	TotalVehicles    int64 `json:"total_vehicles"`
+	SeatedVehicles   int64 `json:"seated_vehicles"`
+	TotalGroups      int64 `json:"total_groups"`
+	ActiveGroups     int64 `json:"active_groups"`
+	TotalShifts      int64 `json:"total_shifts"`
+	UpcomingShifts   int64 `json:"upcoming_shifts"`
+	TotalRides       int64 `json:"total_rides"`
+	ActiveRides      int64 `json:"active_rides"`
+	PendingRequests  int64 `json:"pending_requests"`
+}
+
+// AdminGroupOverview is a fleet as an admin sees it in a list: who runs it, how big
+// it is, and how much work it is carrying.
+type AdminGroupOverview struct {
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	Description    string    `json:"description"`
+	Status         string    `json:"status"`
+	OwnerDriverID  string    `json:"owner_driver_id"`
+	OwnerName      string    `json:"owner_name"`
+	OwnerMobile    string    `json:"owner_mobile"`
+	MemberCount    int       `json:"member_count"`
+	VehicleCount   int       `json:"vehicle_count"`
+	PassengerCount int       `json:"passenger_count"`
+	ShiftCount     int       `json:"shift_count"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
 // GroupSearchDetails is how a fleet looks to somebody who is not in it yet: enough
 // to decide whether to ask to join, plus where their own request currently stands.
 type GroupSearchDetails struct {
