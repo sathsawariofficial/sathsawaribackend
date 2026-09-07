@@ -15,8 +15,10 @@ import (
 	general "rideshare/services/general/rest"
 	general_rest "rideshare/services/general/rest"
 	"rideshare/services/general/socket"
+	"rideshare/services/group"
 	"rideshare/services/passenger"
 	"rideshare/services/ride"
+	"rideshare/services/shift"
 	"rideshare/worker"
 	"strings"
 	"time"
@@ -89,6 +91,9 @@ func main() {
 			{
 				passengerPublic.POST("/seat/book", passenger.BookSeatHandler)
 				passengerPublic.POST("/ride/request", passenger.RideRequestHandler)
+				passengerPublic.POST("/register", passenger.RegisterPassengerHandler)
+				passengerPublic.POST("/login", passenger.LoginPassengerHandler)
+				passengerPublic.GET("/password/forgot", passenger.ForgotPasswordHandler)
 			}
 		}
 
@@ -104,6 +109,16 @@ func main() {
 				adminProtected.POST("/broadcast", admin.AdminBroadcastHandler)
 				adminProtected.GET("/approch", admin.GetApprochRequestsHandler)
 				adminProtected.POST("/announcement", admin.AnnouncementHandler)
+
+				// role and permission management, an admin can add a new role or
+				// remap what a role may do without a code change
+				adminProtected.POST("/role", admin.CreateRoleHandler)
+				adminProtected.GET("/roles", admin.GetRolesHandler)
+				adminProtected.PATCH("/role", admin.UpdateRoleHandler)
+				adminProtected.DELETE("/role", admin.DeleteRoleHandler)
+				adminProtected.POST("/permission", admin.CreatePermissionHandler)
+				adminProtected.GET("/permissions", admin.GetPermissionsHandler)
+				adminProtected.PUT("/role/permissions", admin.SetRolePermissionsHandler)
 			}
 
 			driverProtected := protected.Group("/driver")
@@ -146,6 +161,52 @@ func main() {
 				rideProtected.GET("/templates", ride.GetRideTemplatesHandler)
 				rideProtected.DELETE("/template", ride.DeleteRideTemplatesHandler)
 				rideProtected.DELETE("/series", ride.CancelRideSeriesHandler)
+			}
+
+			// the fleet a driver owns or belongs to
+			groupProtected := protected.Group("/group")
+			groupProtected.Use(middleware.Authentication(constants.DRIVER_TOKEN))
+			{
+				groupProtected.POST("", group.CreateGroupHandler)
+				groupProtected.GET("/mine", group.GetMyGroupsHandler)
+				groupProtected.GET("", group.GetGroupDetailsHandler)
+				groupProtected.POST("/request/driver", group.RequestJoinGroupAsDriverHandler)
+				groupProtected.GET("/requests", group.GetGroupRequestsHandler)
+				groupProtected.PATCH("/requests", group.DecideGroupRequestsHandler)
+				groupProtected.PATCH("/submanagers", group.SetGroupSubManagersHandler)
+				groupProtected.DELETE("", group.DeleteGroupHandler)
+			}
+
+			// building and running the shifts of a fleet
+			shiftProtected := protected.Group("/shift")
+			shiftProtected.Use(middleware.Authentication(constants.DRIVER_TOKEN))
+			{
+				shiftProtected.POST("", shift.CreateShiftHandler)
+				shiftProtected.PUT("/seats", shift.UpdateShiftSeatsHandler)
+				shiftProtected.GET("/detail", shift.GetShiftHandler)
+				shiftProtected.GET("", shift.GetGroupShiftsHandler)
+				shiftProtected.GET("/mine", shift.GetMyShiftsHandler)
+				shiftProtected.DELETE("", shift.CancelShiftHandler)
+				shiftProtected.GET("/templates", shift.GetShiftTemplatesHandler)
+				shiftProtected.DELETE("/template", shift.DeleteShiftTemplateHandler)
+			}
+
+			// everything a signed in passenger can reach
+			passengerProtected := protected.Group("/passenger")
+			passengerProtected.Use(middleware.Authentication(constants.PASSENGER_TOKEN))
+			{
+				passengerProtected.GET("/info", passenger.PassengerProfileInfoHandler)
+				passengerProtected.GET("/logout", passenger.LogoutPassengerHandler)
+				passengerProtected.POST("/password/reset", passenger.ChangePasswordHandler)
+				passengerProtected.DELETE("/delete", passenger.DeletePassengerProfileHandler)
+				passengerProtected.PUT("/schedule", passenger.SetPassengerScheduleHandler)
+				passengerProtected.GET("/schedule", passenger.GetPassengerScheduleHandler)
+
+				// a passenger asks to join a fleet and follows the shifts they are on
+				passengerProtected.POST("/group/request", group.RequestJoinGroupAsPassengerHandler)
+				passengerProtected.GET("/shifts", shift.GetMyShiftsHandler)
+				passengerProtected.GET("/shift/detail", shift.GetShiftHandler)
+				passengerProtected.GET("/notifications", general_rest.GetNotificationsHandler)
 			}
 
 			userProtected := protected.Group("/user")
