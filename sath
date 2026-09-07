@@ -277,7 +277,14 @@ cmd_db() {
     dangling)
       say "references left pointing at something deleted"
       PGPASSWORD="$pw" psql -h "$dsn_host" -U "$dsn_user" -d "$dsn_db" -tAc "
-        SELECT 'seats holding a missing passenger', count(*) FROM shift_seats s
+        SELECT 'live seats holding a missing passenger', count(*) FROM shift_seats s
+          JOIN shifts sh ON sh.id = s.shift_id AND sh.is_active = true
+          WHERE s.passenger_id <> '' AND NOT EXISTS (SELECT 1 FROM passengers p WHERE p.id = s.passenger_id)
+        UNION ALL
+        -- a seat on a finished or cancelled shift naming somebody since deleted is
+        -- history, not a dangling pointer: del_passengers is where the name lives
+        SELECT 'historical seats (expected, resolve via del_passengers)', count(*) FROM shift_seats s
+          JOIN shifts sh ON sh.id = s.shift_id AND sh.is_active = false
           WHERE s.passenger_id <> '' AND NOT EXISTS (SELECT 1 FROM passengers p WHERE p.id = s.passenger_id)
         UNION ALL
         SELECT 'shifts on a missing vehicle', count(*) FROM shifts sh

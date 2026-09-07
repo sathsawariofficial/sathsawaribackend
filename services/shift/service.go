@@ -75,6 +75,11 @@ func CreateShift(ctx *gin.Context, sessionId, createdByDriverId string, request 
 		return
 	}
 
+	if err = checkPassengersFree(ctx, sessionId, passengerIdsFromPlan(plan),
+		request.StartDatetime, request.EstimatedEndDatetime, "", passengers); err != nil {
+		return
+	}
+
 	shiftId, templateId, err = createShiftWithStopsAndSeats(ctx, sessionId, createdByDriverId, vehicle, plan, request)
 	if err != nil {
 		logger.LogError(sessionId, "failed to create shift error: "+err.Error())
@@ -183,6 +188,13 @@ func UpdateShiftSeats(ctx *gin.Context, sessionId, driverId string, request Upda
 			logger.LogError(sessionId, err)
 			return
 		}
+	}
+
+	// judged against this shift's own window, ignoring this shift, so somebody
+	// already aboard it is not reported as clashing with themselves
+	if err = checkPassengersFree(ctx, sessionId, passengerIds,
+		shift.StartDatetime, shift.EstimatedEndDatetime, shift.ID, passengers); err != nil {
+		return
 	}
 
 	seatsTaken := 0
@@ -433,6 +445,14 @@ func RescheduleShift(ctx *gin.Context, sessionId, driverId string, request Resch
 	}
 
 	if err = requirePermission(ctx, sessionId, shift.GroupID, driverId, constants.PERMISSION_SHIFT_CREATE); err != nil {
+		return
+	}
+
+	// the same guard cancelling uses: this close to departure people are already on
+	// their way to the stop, the time cannot be moved under them
+	if blocked, _ := checkShiftCancellationGuard(shift, time.Now()); blocked {
+		err = fmt.Errorf(constants.Shift_Too_Close, constants.Shift_Cancel_Min_Hours_Before_Start)
+		logger.LogError(sessionId, err)
 		return
 	}
 

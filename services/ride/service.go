@@ -155,6 +155,10 @@ func handleRecurring(ctx *gin.Context, sessionId, rideId, vehicleId string, requ
 			// [number of days to be added since the start date]
 			shift++
 
+			if skipRecurringForShift(ctx, sessionId, vehicleId, rideRequest.EXTDriverId, rideRequest.StartDatetime, rideRequest.EstimatedEndDatetime) {
+				continue
+			}
+
 			ride := mapRideData(rideRequest, rideId, rideRequest.EXTDriverId, vehicleId)
 
 			if err = database.DatabaseConn.Postgres.Create(&ride).Error; err != nil {
@@ -176,6 +180,10 @@ func handleRecurring(ctx *gin.Context, sessionId, rideId, vehicleId string, requ
 
 			rideRequest.StartDatetime = currentStart.Format(constants.DateTimeLayout)
 			rideRequest.EstimatedEndDatetime = currentEnd.Format(constants.DateTimeLayout)
+
+			if skipRecurringForShift(ctx, sessionId, vehicleId, rideRequest.EXTDriverId, rideRequest.StartDatetime, rideRequest.EstimatedEndDatetime) {
+				continue
+			}
 
 			ride := mapRideData(
 				rideRequest,

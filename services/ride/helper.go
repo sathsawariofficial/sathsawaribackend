@@ -615,3 +615,32 @@ func checkRideDeletionGuards(ride postgress.Ride, now time.Time) (blocked bool, 
 
 	return false, "", ""
 }
+
+// skipRecurringForShift keeps a recurring series off the fleet shifts. The first
+// ride of a series is refused outright when it clashes, but a series lays down many
+// more dates and one of those landing on a shift would put the same vehicle or the
+// same driver in two places at once. A clashing date is skipped rather than failing
+// the whole series, so the rest of the run is still created.
+func skipRecurringForShift(ctx *gin.Context, sessionId, vehicleId, driverId, startDatetime, endDatetime string) bool {
+	hasVehicleShift, err := database.VehicleHasShiftDuringTime(ctx, vehicleId, startDatetime, endDatetime, "")
+	if err != nil {
+		logger.LogError(sessionId, err)
+		return false
+	}
+	if hasVehicleShift {
+		logger.LogWarning(sessionId, "skipping a recurring ride, the vehicle is on a shift at "+startDatetime)
+		return true
+	}
+
+	hasDriverShift, err := database.DriverHasShiftDuringTime(ctx, driverId, startDatetime, endDatetime, "")
+	if err != nil {
+		logger.LogError(sessionId, err)
+		return false
+	}
+	if hasDriverShift {
+		logger.LogWarning(sessionId, "skipping a recurring ride, the driver is on a shift at "+startDatetime)
+		return true
+	}
+
+	return false
+}

@@ -569,6 +569,52 @@ func DriverHasShiftDuringTime(orgCtx *gin.Context, driverId, startTime, endTime,
 	return count > 0, err
 }
 
+// PassengersBusyDuringTime returns which of the given passengers already hold a
+// seat on another shift overlapping the window. A person cannot be in two vehicles
+// at once any more than a driver or a vehicle can, and the whole batch is judged in
+// one query rather than one per passenger.
+func PassengersBusyDuringTime(orgCtx *gin.Context, passengerIds []string, startTime, endTime, excludeShiftId string) (busy map[string]string, err error) {
+	busy = map[string]string{}
+
+	if len(passengerIds) == 0 {
+		return
+	}
+
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	type row struct {
+		PassengerID   string
+		StartDatetime string
+	}
+
+	var rows []row
+
+	query := DatabaseConn.Postgres.WithContext(ctx).
+		Table("shift_seats").
+		Select("shift_seats.passenger_id, shifts.start_datetime").
+		Joins("JOIN shifts ON shifts.id = shift_seats.shift_id").
+		Where("shift_seats.passenger_id IN ?", passengerIds).
+		Where("shift_seats.status = ?", constants.Seat_Status_Assigned).
+		Where("shifts.is_active = ?", true).
+		Where("shifts.start_datetime < ? AND shifts.estimated_end_datetime > ?", endTime, startTime)
+
+	if excludeShiftId != "" {
+		query = query.Where("shifts.id <> ?", excludeShiftId)
+	}
+
+	if err = query.Find(&rows).Error; err != nil {
+		return
+	}
+
+	for _, r := range rows {
+		busy[r.PassengerID] = r.StartDatetime
+	}
+
+	return
+}
+
 // VehicleHasRideDuringTime reports whether a vehicle is already committed to a
 // carpool ride that overlaps the given window.
 func VehicleHasRideDuringTime(orgCtx *gin.Context, vehicleId, startTime, endTime string) (hasRide bool, err error) {

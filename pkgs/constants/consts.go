@@ -54,6 +54,9 @@ const (
 	Vehicle_Seats_Missing  = "Vehicle must have its number of seats set before it can join a group"
 	Not_System_Role        = "System roles cannot be deleted"
 	Owner_Cannot_Leave     = "The owner cannot leave their own group, delete it instead"
+	Passenger_Busy         = "%s is already on another shift starting %s"
+	Shift_In_The_Past      = "A shift cannot be scheduled in the past"
+	Shift_Too_Close        = "This shift starts within %d hour(s) and can no longer be changed"
 )
 
 // keys

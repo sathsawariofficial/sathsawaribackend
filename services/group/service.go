@@ -624,6 +624,20 @@ func LeaveGroup(ctx *gin.Context, sessionId, userId, groupId string, isPassenger
 			logger.LogError(sessionId, err)
 			return
 		}
+
+		// their vehicles leave with them, so a shift somebody else is driving on one
+		// of those vehicles has to be settled first as well
+		vehicleShifts, e := countFutureShiftsOnDriverVehicles(ctx, groupId, userId)
+		if e != nil {
+			logger.LogError(sessionId, "failed to count the shifts on their vehicles error: "+e.Error())
+			err = errors.New(constants.Unknown_Error)
+			return
+		}
+		if vehicleShifts > 0 {
+			err = fmt.Errorf("your vehicles are on %d upcoming shift(s) for this group, they have to be reassigned or cancelled first", vehicleShifts)
+			logger.LogError(sessionId, err)
+			return
+		}
 	}
 
 	if err = leaveGroup(ctx, sessionId, groupId, userId, isPassenger); err != nil {

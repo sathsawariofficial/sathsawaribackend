@@ -142,6 +142,30 @@ func checkClashes(ctx *gin.Context, sessionId, vehicleId, driverId, startDatetim
 	return nil
 }
 
+// checkPassengersFree refuses to seat somebody who is already aboard another shift
+// at that hour. A passenger cannot be in two vehicles at once any more than a
+// driver or a vehicle can, which the clash rules already covered for those two.
+func checkPassengersFree(ctx *gin.Context, sessionId string, passengerIds []string, startDatetime, endDatetime, excludeShiftId string, names map[string]postgress.Passenger) error {
+	busy, err := database.PassengersBusyDuringTime(ctx, passengerIds, startDatetime, endDatetime, excludeShiftId)
+	if err != nil {
+		logger.LogError(sessionId, "failed to check the passenger shifts error: "+err.Error())
+		return errors.New(constants.Unknown_Error)
+	}
+
+	for passengerId, clashStart := range busy {
+		name := passengerId
+		if passenger, ok := names[passengerId]; ok {
+			name = passenger.PassengerName
+		}
+
+		err = fmt.Errorf(constants.Passenger_Busy, name, clashStart)
+		logger.LogError(sessionId, err)
+		return err
+	}
+
+	return nil
+}
+
 // flattenSeatPlan pulls the seats out of the nested stop payload and remembers
 // which stop each one belongs to.
 func flattenSeatPlan(stops []StopRequest) (plan []seatPlan) {

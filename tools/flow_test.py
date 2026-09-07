@@ -272,6 +272,13 @@ clash["stops"] = [{"location": "Somewhere", "lat": 33.6, "lng": 73.1, "scheduled
 call("Overlapping vehicle (refused)", "POST", "/api/v1/shift", ENV["owner"], clash,
      expect=400, note="one vehicle cannot be in two places at once")
 
+past = json.loads(json.dumps(shift_body))
+past["startDatetime"] = "2020-01-01 07:00:00"
+past["estimatedEndDatetime"] = "2020-01-01 08:30:00"
+past["makeTemplate"] = False
+call("Shift in the past (refused)", "POST", "/api/v1/shift", ENV["owner"], past,
+     expect=400, note="nobody can be picked up yesterday")
+
 drop_body = {
     "groupId": ENV["group"], "vehicleId": ENV["vehicle"], "driverId": ENV["owner_id"],
     "direction": "drop",
@@ -288,6 +295,18 @@ drop_body = {
 }
 r = call("Create drop shift", "POST", "/api/v1/shift", ENV["owner"], drop_body)
 ENV["drop_shift"] = data(r, "shiftId")
+
+double = json.loads(json.dumps(shift_body))
+double["vehicleId"] = ENV["vehicle2"]
+double["driverId"] = ENV["drv2_id"]
+double["makeTemplate"] = False
+double["stops"] = [
+    {"location": "Elsewhere", "lat": 33.6, "lng": 73.1, "scheduledTime": "07:15:00",
+     "seats": [{"seatNumber": 1, "gender": "female", "passengerId": ENV["psg1_id"]}]},
+    {"location": "Roots School F-8", "lat": 33.7101, "lng": 73.0441, "scheduledTime": "08:20:00", "seats": []},
+]
+call("Passenger already on another shift (refused)", "POST", "/api/v1/shift", ENV["owner"], double,
+     expect=400, note="a different vehicle and driver, but the passenger cannot be in two vans at once")
 
 call("Shift detail", "GET", f"/api/v1/shift/detail?shift_id={ENV['shift']}", ENV["owner"])
 call("Group shift roster", "GET", f"/api/v1/shift?group_id={ENV['group']}&page=1", ENV["owner"])
@@ -306,6 +325,11 @@ call("Seat a passenger twice (refused)", "PUT", "/api/v1/shift/seats", ENV["owne
     ]}, expect=400, note="they already hold seat 2 on this shift")
 call("Free a seat", "PUT", "/api/v1/shift/seats", ENV["owner"], {
     "shiftId": ENV["shift"], "seats": [{"seatNumber": 1, "gender": "", "passengerId": "", "stopSequence": 0}]})
+call("Reschedule into the past (refused)", "PATCH", "/api/v1/shift", ENV["owner"], {
+    "shiftId": ENV["shift"],
+    "startDatetime": "2020-01-01 07:00:00", "estimatedEndDatetime": "2020-01-01 08:30:00"},
+    expect=400, note="a shift cannot be moved backwards out of sight")
+
 call("Reschedule the shift", "PATCH", "/api/v1/shift", ENV["owner"], {
     "shiftId": ENV["shift"],
     "startDatetime": f"{D1} 07:20:00", "estimatedEndDatetime": f"{D1} 08:50:00",
@@ -332,7 +356,26 @@ call("Sub manager decides membership (refused)", "PATCH", "/api/v1/group/request
      {"groupId": ENV["group"], "decisions": [{"memberType": "driver", "memberId": ENV["drv2_id"], "action": "remove"}]},
      expect=400, note="a sub manager holds the shift permissions and none of the membership ones")
 
+lent_body = {
+    "groupId": ENV["group"], "vehicleId": ENV["vehicle2"], "driverId": ENV["owner_id"],
+    "direction": "pickup",
+    "startDatetime": f"{D2} 14:00:00", "estimatedEndDatetime": f"{D2} 15:30:00",
+    "startLocation": "Gulberg Greens", "endLocation": "Roots School F-8",
+    "routeDetails": "Owner driving a lent vehicle", "makeTemplate": False, "daysOfWeek": [2],
+    "stops": [
+        {"location": "Gulberg Greens", "lat": 33.6180, "lng": 73.1560, "scheduledTime": "14:20:00", "seats": []},
+        {"location": "Roots School F-8", "lat": 33.7101, "lng": 73.0441, "scheduledTime": "15:20:00", "seats": []},
+    ],
+}
+r = call("Owner drives a lent vehicle", "POST", "/api/v1/shift", ENV["owner"], lent_body,
+         note="the vehicle belongs to the second driver, the owner is behind the wheel")
+ENV["lent_shift"] = data(r, "shiftId")
+
 call("Get shift templates", "GET", f"/api/v1/shift/templates?group_id={ENV['group']}", ENV["owner"])
+
+call("Shrink the vehicle under a shift (refused)", "PATCH", "/api/v1/vehicle/update", ENV["owner"],
+     {"vehicleId": ENV["vehicle"], "numberOfSeats": 2, "pin": "121212"},
+     expect=400, note="an upcoming shift was built on 7 seats, the vehicle cannot drop to 2")
 
 print("=" * 100)
 print("RIDESHARE (existing carpool)")
@@ -401,7 +444,14 @@ call("Delete a driver who owns a fleet (refused)", "DELETE",
 print("=" * 100)
 print("TEARDOWN")
 print("=" * 100)
-call("Cancel the sub manager shift", "DELETE", f"/api/v1/shift?shift_id={ENV['sub_shift']}", ENV["owner"])
+call("Leave while still driving (refused)", "DELETE",
+     f"/api/v1/group/leave?group_id={ENV['group']}", ENV["drv2"],
+     expect=400, note="they are still expected behind the wheel of their own shift")
+call("Cancel the shift they drive", "DELETE", f"/api/v1/shift?shift_id={ENV['sub_shift']}", ENV["owner"])
+call("Leave while a lent vehicle is on a shift (refused)", "DELETE",
+     f"/api/v1/group/leave?group_id={ENV['group']}", ENV["drv2"],
+     expect=400, note="they drive nothing now, but their vehicle is carrying somebody else's shift")
+call("Cancel the shift on their vehicle", "DELETE", f"/api/v1/shift?shift_id={ENV['lent_shift']}", ENV["owner"])
 call("Driver leaves the fleet", "DELETE", f"/api/v1/group/leave?group_id={ENV['group']}", ENV["drv2"])
 call("Passenger leaves the fleet", "DELETE", f"/api/v1/passenger/group/leave?group_id={ENV['group']}", ENV["psg2"])
 call("Delete shift template", "DELETE", f"/api/v1/shift/template?shift_template_id={ENV['template']}", ENV["owner"])

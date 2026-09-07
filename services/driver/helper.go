@@ -464,6 +464,30 @@ func updateVehicleInfo(orgCtx *gin.Context, sessionId, driverId string, request 
 		return nil
 	}
 
+	// a shift snapshots the seat count it was built with, so shrinking the vehicle
+	// under a shift that is already seated leaves the trip claiming places the
+	// vehicle no longer has
+	if request.NumberOfSeats > 0 && request.NumberOfSeats < existingVehicle.NumberOfSeats {
+		var biggest int
+		if err := tx.Model(&postgress.Shift{}).
+			Where("vehicle_id = ?", request.VehicleId).
+			Where("is_active = ?", true).
+			Where("start_datetime > ?", time.Now().Format(constants.DateTimeLayout)).
+			Select("COALESCE(MAX(number_of_seats), 0)").
+			Scan(&biggest).Error; err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return errors.New(constants.General_Error)
+		}
+
+		if request.NumberOfSeats < biggest {
+			tx.Rollback()
+			err := fmt.Errorf("an upcoming shift is built on %d seats, this vehicle cannot drop to %d", biggest, request.NumberOfSeats)
+			logger.LogError(sessionId, err)
+			return err
+		}
+	}
+
 	// Normal update
 	updatedVehicle := mapVehicleUpdateData(request, existingVehicle, driverId)
 	updatedVehicle.ID = existingVehicle.ID

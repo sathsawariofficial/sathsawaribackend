@@ -1,6 +1,7 @@
 package shift
 
 import (
+	"errors"
 	"fmt"
 	"rideshare/pkgs/constants"
 	"rideshare/pkgs/logger"
@@ -199,6 +200,12 @@ func validateShiftWindow(startDatetime, estimatedEndDatetime string) error {
 		return fmt.Errorf(constants.Invalid_Data, "estimated end date, it has to be after the start")
 	}
 
+	// a shift in the past is nonsense: nobody can be picked up yesterday, and the
+	// worker would retire it the moment it was written
+	if start.Before(time.Now()) {
+		return errors.New(constants.Shift_In_The_Past)
+	}
+
 	return nil
 }
 
@@ -218,6 +225,8 @@ func ValidateRescheduleShift(request *RescheduleShiftRequest) error {
 	}
 
 	if startGiven {
+		// validateShiftWindow also refuses a window that starts in the past, which is
+		// what stops a shift being reschedulued backwards out of sight
 		if err := validateShiftWindow(request.StartDatetime, request.EstimatedEndDatetime); err != nil {
 			return err
 		}

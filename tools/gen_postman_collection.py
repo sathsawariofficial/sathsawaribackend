@@ -104,7 +104,7 @@ EXAMPLE_MAP = {
     "Second Driver · Login": ["Login second driver"],
     "Second Driver · Set Pin": ["Second driver pin"],
     "Second Driver · Register Vehicle (4 seats)": ["Register second vehicle"],
-    "Update Vehicle (seats / AC / heating)": ["Update vehicle comfort"],
+    "Update Vehicle (seats / AC / heating)": ["Update vehicle comfort", "Shrink the vehicle under a shift (refused)"],
     "Get Vehicles": ["Get vehicles"],
     "Passenger · Register (female)": ["Register passenger (female)"],
     "Passenger · Verify OTP": ["Verify passenger otp"],
@@ -134,11 +134,14 @@ EXAMPLE_MAP = {
     "Passenger Travel Forms (manager view)": ["Passenger travel forms (manager view)"],
     "Find Groups To Join (passenger)": ["Search groups (passenger)"],
     "My Groups (passenger)": ["Passenger my groups"],
-    "Driver Leaves The Group": ["Driver leaves the fleet"],
+    "Driver Leaves The Group": ["Driver leaves the fleet", "Leave while still driving (refused)",
+                                "Leave while a lent vehicle is on a shift (refused)"],
     "Passenger Leaves The Group": ["Passenger leaves the fleet"],
     "Delete Group": ["Delete the group", "Delete the group with shifts (refused)"],
 
-    "Create Morning PICKUP Shift (+ template)": ["Create pickup shift (+template)", "Wrong gender on a seat (refused)"],
+    "Create Morning PICKUP Shift (+ template)": ["Create pickup shift (+template)", "Wrong gender on a seat (refused)",
+                                                 "Shift in the past (refused)",
+                                                 "Passenger already on another shift (refused)"],
     "Create Evening DROP Shift": ["Create drop shift"],
     "Shift Detail": ["Shift detail"],
     "Group Shift Roster": ["Group shift roster"],
@@ -148,9 +151,10 @@ EXAMPLE_MAP = {
     "Swap Male Rider For Female (one call)": ["Swap male rider for female", "Seat a passenger twice (refused)"],
     "Free A Seat": ["Free a seat"],
     "Sub Manager Builds A Shift": ["Sub manager builds a shift", "Sub manager decides membership (refused)"],
+    "Owner Drives A Lent Vehicle": ["Owner drives a lent vehicle"],
     "Clash Check · Same Vehicle, Overlapping Time": ["Overlapping vehicle (refused)"],
-    "Reschedule Shift (move the time)": ["Reschedule the shift"],
-    "Cancel Shift": ["Cancel the sub manager shift"],
+    "Reschedule Shift (move the time)": ["Reschedule the shift", "Reschedule into the past (refused)"],
+    "Cancel Shift": ["Cancel the shift they drive"],
     "Get Shift Templates": ["Get shift templates"],
     "Delete Shift Template": ["Delete shift template"],
     "Create Ride": ["Create carpool ride", "Carpool ride clashing with a shift (refused)"],
@@ -745,6 +749,25 @@ shifts = {"name": "4 · Shifts", "item": [
               "Try the group membership calls on this token and they will come back "
               "'Operation is not permitted', because a sub manager holds the shift permissions and "
               "none of the membership ones.")),
+
+    req("Owner Drives A Lent Vehicle", "POST", "/api/v1/shift", "owner_session",
+        body={
+            "groupId": "{{group_id}}", "vehicleId": "{{driver2_vehicle_id}}", "driverId": "{{owner_driver_id}}",
+            "direction": "pickup",
+            "startDatetime": "2026-09-15 14:00:00", "estimatedEndDatetime": "2026-09-15 15:30:00",
+            "startLocation": "Gulberg Greens", "endLocation": "Roots School F-8",
+            "routeDetails": "Owner driving a lent vehicle", "makeTemplate": False, "daysOfWeek": [2],
+            "stops": [
+                {"location": "Gulberg Greens", "lat": 33.6180, "lng": 73.1560, "scheduledTime": "14:20:00", "seats": []},
+                {"location": "Roots School F-8", "lat": 33.7101, "lng": 73.0441, "scheduledTime": "15:20:00", "seats": []},
+            ],
+        },
+        desc=("A driver joining with joinType both lends a vehicle AND drives. Those are separate "
+              "commitments: here the vehicle belongs to the second driver but the owner is behind "
+              "the wheel.\n\n"
+              "It matters at teardown. That driver cannot leave the fleet while their vehicle is "
+              "carrying a shift, even one they have nothing to do with, because their vehicles go "
+              "out of the fleet with them. Both refusals are saved on the leave request.")),
 
     req("Clash Check · Same Vehicle, Overlapping Time", "POST", "/api/v1/shift", "owner_session",
         body={

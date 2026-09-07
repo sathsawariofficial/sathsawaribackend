@@ -928,6 +928,26 @@ func countFutureDriverShifts(orgCtx *gin.Context, groupId, driverId string) (cou
 	return
 }
 
+// countFutureShiftsOnDriverVehicles counts upcoming shifts running on vehicles this
+// driver lent to the fleet, whoever happens to be driving them. Leaving takes those
+// vehicles out with them, so a shift built on one would be left pointing at a
+// vehicle the fleet no longer has.
+func countFutureShiftsOnDriverVehicles(orgCtx *gin.Context, groupId, driverId string) (count int64, err error) {
+	ctx, cancel := withTimeout(orgCtx)
+	defer cancel()
+
+	err = database.DatabaseConn.Postgres.WithContext(ctx).
+		Model(&postgress.Shift{}).
+		Joins("JOIN group_vehicles ON group_vehicles.vehicle_id = shifts.vehicle_id AND group_vehicles.group_id = shifts.group_id").
+		Where("shifts.group_id = ?", groupId).
+		Where("group_vehicles.driver_id = ?", driverId).
+		Where("shifts.is_active = ?", true).
+		Where("shifts.start_datetime > ?", time.Now().Format(constants.DateTimeLayout)).
+		Count(&count).Error
+
+	return
+}
+
 // releasePassengerSeats frees the seats a departing passenger still holds on the
 // fleet's upcoming shifts and puts each affected shift's taken count back in step.
 // Without this a passenger who left would go on occupying a seat nobody could fill.
