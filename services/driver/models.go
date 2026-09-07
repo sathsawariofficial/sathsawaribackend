@@ -13,16 +13,27 @@ type DriverRegistrationRequest struct {
 	EXTPassword  string       `json:"-"`
 }
 
+// VehicleRegistrationRequest carries the seating details a fleet needs. They stay
+// optional so a carpool only vehicle can still be registered without them, but a
+// vehicle cannot join a group until it says how many seats it has.
 type VehicleRegistrationRequest struct {
 	VehicleNumber string `json:"vehicleNumber"`
 	VehicleInfo   string `json:"vehicleInfo"`
+	NumberOfSeats int    `json:"numberOfSeats"`
+	HasAC         bool   `json:"hasAC"`
+	HasHeating    bool   `json:"hasHeating"`
 	Pin           string `json:"pin"`
 }
 
+// VehicleUpdateRequest takes the two comfort flags as pointers so that leaving them
+// out is different from switching them off.
 type VehicleUpdateRequest struct {
 	VehicleId     string `json:"vehicleId"`
 	VehicleNumber string `json:"vehicleNumber"`
 	VehicleInfo   string `json:"vehicleInfo"`
+	NumberOfSeats int    `json:"numberOfSeats"`
+	HasAC         *bool  `json:"hasAC"`
+	HasHeating    *bool  `json:"hasHeating"`
 	Status        string `json:"status"`
 	Pin           string `json:"pin"`
 }
@@ -101,6 +112,9 @@ type Vehicles struct {
 	DriverId      string `json:"driverId"`
 	VehicleNumber string `json:"vehicleNumber"`
 	VehicleInfo   string `json:"vehicleInfo"`
+	NumberOfSeats int    `json:"numberOfSeats"`
+	HasAC         bool   `json:"hasAC"`
+	HasHeating    bool   `json:"hasHeating"`
 	Status        string `json:"status"`
 }
 

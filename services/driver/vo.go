@@ -113,6 +113,9 @@ func vehicleInfoResp(vehicles []postgress.Vehicle) utils.APIResponse {
 			DriverId:      val.DriverId,
 			VehicleNumber: val.VehicleNumber,
 			VehicleInfo:   val.VehicleInfo,
+			NumberOfSeats: val.NumberOfSeats,
+			HasAC:         val.HasAC,
+			HasHeating:    val.HasHeating,
 			Status:        val.Status,
 		})
 	}

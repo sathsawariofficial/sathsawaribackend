@@ -55,7 +55,27 @@ func ValidateVehicleRegistration(request *VehicleRegistrationRequest) error {
 		return fmt.Errorf("length of the vehicle information should be between %v and %v characters", constants.VehicleInfo_Min_Len, constants.VehicleInfo_Max_Len)
 	}
 
+	// seats stay optional here so a carpool only vehicle can still be registered,
+	// a vehicle is stopped from joining a fleet later if it never declared them
+	if err := validateSeatCount(request.NumberOfSeats); err != nil {
+		return err
+	}
+
 	return ValidatePin(request.Pin)
+}
+
+// validateSeatCount allows a vehicle to say nothing about its seats, but never to
+// claim a number outside what a vehicle can actually hold.
+func validateSeatCount(numberOfSeats int) error {
+	if numberOfSeats == 0 {
+		return nil
+	}
+
+	if numberOfSeats < constants.Number_Of_Seats_Min_Value || numberOfSeats > constants.Number_Of_Seats_Max_Value {
+		return fmt.Errorf("value of the number of seats should be between %v and %v", constants.Number_Of_Seats_Min_Value, constants.Number_Of_Seats_Max_Value)
+	}
+
+	return nil
 }
 
 func ValidateVehicleUpdate(request *VehicleUpdateRequest) error {
@@ -75,6 +95,10 @@ func ValidateVehicleUpdate(request *VehicleUpdateRequest) error {
 		(request.Status != constants.Status_InActive &&
 			request.Status != constants.Status_Active) {
 		return fmt.Errorf(constants.Invalid_Data, "status")
+	}
+
+	if err := validateSeatCount(request.NumberOfSeats); err != nil {
+		return err
 	}
 
 	return ValidatePin(request.Pin)

@@ -44,6 +44,9 @@ func mapVehicleData(request VehicleRegistrationRequest, driverId string) postgre
 		DriverId:      driverId,
 		VehicleNumber: request.VehicleNumber,
 		VehicleInfo:   request.VehicleInfo,
+		NumberOfSeats: request.NumberOfSeats,
+		HasAC:         request.HasAC,
+		HasHeating:    request.HasHeating,
 		Status:        constants.Status_Active,
 	}
 }
@@ -62,6 +65,20 @@ func mapVehicleUpdateData(
 
 	if request.VehicleInfo != "" {
 		updated.VehicleInfo = request.VehicleInfo
+	}
+
+	if request.NumberOfSeats > 0 {
+		updated.NumberOfSeats = request.NumberOfSeats
+	}
+
+	// the comfort flags arrive as pointers, so switching one off is told apart from
+	// simply not mentioning it
+	if request.HasAC != nil {
+		updated.HasAC = *request.HasAC
+	}
+
+	if request.HasHeating != nil {
+		updated.HasHeating = *request.HasHeating
 	}
 
 	if request.Status != "" {
@@ -426,6 +443,24 @@ func updateVehicleInfo(orgCtx *gin.Context, sessionId, driverId string, request 
 		tx.Rollback()
 		logger.LogError(sessionId, err)
 		return fmt.Errorf(constants.Update_Failed, "vehicle")
+	}
+
+	// updating from a struct skips false values, so switching a comfort flag off
+	// has to be written explicitly or the vehicle would keep claiming it
+	comfortUpdates := map[string]interface{}{}
+	if request.HasAC != nil {
+		comfortUpdates["has_ac"] = *request.HasAC
+	}
+	if request.HasHeating != nil {
+		comfortUpdates["has_heating"] = *request.HasHeating
+	}
+
+	if len(comfortUpdates) > 0 {
+		if err := tx.Model(&postgress.Vehicle{}).Where("id = ?", existingVehicle.ID).Updates(comfortUpdates).Error; err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return fmt.Errorf(constants.Update_Failed, "vehicle")
+		}
 	}
 
 	if err := tx.Commit().Error; err != nil {
