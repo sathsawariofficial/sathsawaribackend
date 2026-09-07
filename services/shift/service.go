@@ -162,11 +162,6 @@ func UpdateShiftSeats(ctx *gin.Context, sessionId, driverId string, request Upda
 		return
 	}
 
-	existingBySeatNumber := map[int]postgress.ShiftSeatDetails{}
-	for _, seat := range existingSeats {
-		existingBySeatNumber[seat.SeatNumber] = seat
-	}
-
 	for _, seat := range request.Seats {
 		if utils.IsStringEmpty(seat.PassengerId) {
 			continue
@@ -179,20 +174,13 @@ func UpdateShiftSeats(ctx *gin.Context, sessionId, driverId string, request Upda
 			return
 		}
 
+		// the seat's gender and the person sitting in it always have to agree. The
+		// manager may re-declare that gender in the same call, which is how a male
+		// rider is swapped for a female one in one go, what can never happen is a
+		// passenger ending up in a seat kept for the other gender.
 		if !strings.EqualFold(passenger.Gender, seat.Gender) {
 			err = fmt.Errorf(constants.Seat_Gender_Mismatch, seat.SeatNumber, seat.Gender)
 			logger.LogError(sessionId, err)
-			return
-		}
-
-		// a seat kept for one gender cannot be turned over to the other while
-		// somebody is still sitting in it, the seat has to be freed first
-		current := existingBySeatNumber[seat.SeatNumber]
-		if current.Status == constants.Seat_Status_Assigned &&
-			!utils.IsStringEmpty(current.Gender) &&
-			!strings.EqualFold(current.Gender, seat.Gender) {
-			err = fmt.Errorf(constants.Seat_Gender_Mismatch, seat.SeatNumber, current.Gender)
-			logger.LogError(sessionId, "the seat is still held for the other gender error: "+err.Error())
 			return
 		}
 	}
