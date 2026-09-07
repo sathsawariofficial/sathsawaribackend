@@ -209,7 +209,10 @@ func getGroupsByDriver(orgCtx *gin.Context, driverId string, page int) (groups [
 			)
 		`, driverId, driverId, constants.Membership_Status_Approved)
 
-	if err = query.Count(&totalRows).Error; err != nil {
+	// count on a clean clone, counting on the same chain would leave its own
+	// select behind for the page query that follows
+	countQuery := query.Session(&gorm.Session{})
+	if err = countQuery.Count(&totalRows).Error; err != nil {
 		return
 	}
 
