@@ -1,6 +1,7 @@
 import json
 
 BASE = "{{base-url}}"
+RECORDED_PATH = "/tmp/claude-1000/-home-raotalha-Code-PersonalCode-sathsawaribackend/461379a6-41df-48ee-a93f-36ece93a6803/scratchpad/responses.json"
 
 
 def url(path, query=None):
@@ -19,7 +20,139 @@ def q(key, value, disabled=False):
     return d
 
 
-def req(name, method, path, token, body=None, query=None, tests=None, desc=None):
+# Real responses captured by driving the whole product against a live database
+# (tools/flow.py). Keyed by the label used there, so an example is never invented.
+try:
+    with open(RECORDED_PATH) as _f:
+        RECORDED = {r["label"]: r for r in json.load(_f)["results"]}
+except Exception:
+    RECORDED = {}
+
+
+def example(label):
+    """Build a postman saved-response block out of one recorded call."""
+    rec = RECORDED.get(label)
+    if not rec:
+        return None
+
+    status_text = {200: "OK", 400: "Bad Request", 401: "Unauthorized"}.get(rec["status"], "Response")
+    name = "SUCCESS" if rec["status"] == 200 else "ERROR"
+    if rec.get("note"):
+        name += " · " + rec["note"][:70]
+
+    original = {
+        "method": rec["method"],
+        "header": [],
+        "url": url(rec["path"].split("?")[0],
+                   [q(k, v) for k, v in (
+                       [kv.split("=", 1) for kv in rec["path"].split("?", 1)[1].split("&")]
+                       if "?" in rec["path"] else [])]),
+    }
+    if rec.get("request") is not None:
+        original["body"] = {
+            "mode": "raw",
+            "raw": json.dumps(rec["request"], indent=4),
+            "options": {"raw": {"language": "json"}},
+        }
+
+    return {
+        "name": name,
+        "originalRequest": original,
+        "status": status_text,
+        "code": rec["status"],
+        "_postman_previewlanguage": "json",
+        "header": [{"key": "Content-Type", "value": "application/json; charset=utf-8"}],
+        "cookie": [],
+        "body": json.dumps(rec["response"], indent=4),
+    }
+
+
+
+# Collection request name -> the label(s) it was recorded under in tools/flow.py.
+# A request can carry several examples, typically the success plus the refusal that
+# proves a rule.
+EXAMPLE_MAP = {
+    "Admin Login": ["Admin login"],
+    "Platform Overview": ["Admin overview (populated)"],
+    "List Passengers": ["Admin list passengers"],
+    "Passenger Profile": ["Admin passenger profile"],
+    "Suspend A Passenger": ["Admin suspend passenger", "Suspended passenger cannot log in"],
+    "Suspend A Driver": ["Admin suspend driver"],
+    "Delete A Passenger": ["Admin deletes a passenger"],
+    "List Groups": ["Admin list groups"],
+    "Group Details": ["Admin group details"],
+    "Shut A Group Down": ["Admin shut a fleet down"],
+    "List Shifts": ["Admin list shifts"],
+    "Shift Details": ["Admin shift details"],
+    "Get Roles": ["List roles"],
+    "Get Permissions": ["List permissions"],
+    "Create Role": ["Create role"],
+    "Set Role Permissions (bulk)": ["Set role permissions"],
+    "Update Role": ["Update role", "Rename a system role (refused)"],
+    "Delete Role": ["Delete custom role", "Delete a system role (refused)"],
+
+    "Owner Driver · Register": ["Register owner driver"],
+    "Owner Driver · Verify OTP": ["Verify driver otp"],
+    "Owner Driver · Login": ["Login owner driver"],
+    "Owner Driver · Set Pin": ["Set pin"],
+    "Owner Driver · Register Vehicle (7 seats, AC)": ["Register vehicle (7 seats)"],
+    "Second Driver · Register": ["Register second driver"],
+    "Second Driver · Verify OTP": ["Verify driver 2 otp"],
+    "Second Driver · Login": ["Login second driver"],
+    "Second Driver · Set Pin": ["Second driver pin"],
+    "Second Driver · Register Vehicle (4 seats)": ["Register second vehicle"],
+    "Update Vehicle (seats / AC / heating)": ["Update vehicle comfort"],
+    "Get Vehicles": ["Get vehicles"],
+    "Passenger · Register (female)": ["Register passenger (female)"],
+    "Passenger · Verify OTP": ["Verify passenger otp"],
+    "Passenger · Login": ["Login passenger Ayesha"],
+    "Passenger 2 · Register (male)": ["Register passenger (male)"],
+    "Passenger 2 · Verify OTP": ["Verify passenger otp"],
+    "Passenger 2 · Login": ["Login passenger Bilal"],
+    "Passenger · Profile": ["Passenger profile"],
+    "Passenger · Forgot Password": ["Passenger forgot password"],
+    "Passenger · Logout": ["Passenger logout"],
+    "Passenger · Reset Password (change)": ["Passenger reset password"],
+
+    "Set Weekly Form (bulk)": ["Set weekly travel form", "Bad day of week (refused)"],
+    "Get Weekly Form": ["Get weekly travel form"],
+    "Passenger 2 · Set Weekly Form": ["Passenger 2 travel form"],
+
+    "Create Group": ["Create group", "Create group with no vehicle (refused)"],
+    "My Groups": ["My groups"],
+    "Find Groups To Join (driver)": ["Search groups (driver)"],
+    "Driver · Request To Join (driver + vehicle)": ["Driver join request", "Duplicate join request (refused)"],
+    "Passenger · Request To Join": ["Passenger join request"],
+    "Passenger 2 · Request To Join": ["Passenger 2 join request"],
+    "List Pending Requests": ["List pending requests"],
+    "Decide Requests (bulk)": ["Decide requests in bulk", "Re-approve the same rows (all skipped)"],
+    "Promote Sub Manager (bulk)": ["Promote sub manager", "Promote an outsider (skipped)"],
+    "Group Details (rosters)": ["Group details", "Passenger token on a driver route (refused)"],
+    "Passenger Travel Forms (manager view)": ["Passenger travel forms (manager view)"],
+    "Find Groups To Join (passenger)": ["Search groups (passenger)"],
+    "My Groups (passenger)": ["Passenger my groups"],
+    "Driver Leaves The Group": ["Driver leaves the fleet"],
+    "Passenger Leaves The Group": ["Passenger leaves the fleet"],
+    "Delete Group": ["Delete the group", "Delete the group with shifts (refused)"],
+
+    "Create Morning PICKUP Shift (+ template)": ["Create pickup shift (+template)", "Wrong gender on a seat (refused)"],
+    "Create Evening DROP Shift": ["Create drop shift"],
+    "Shift Detail": ["Shift detail"],
+    "Group Shift Roster": ["Group shift roster"],
+    "My Shifts (driver)": ["My shifts (driver)"],
+    "My Shifts (passenger)": ["My shifts (passenger)"],
+    "Passenger · Shift Detail": ["Passenger reads shift detail"],
+    "Swap Male Rider For Female (one call)": ["Swap male rider for female", "Seat a passenger twice (refused)"],
+    "Free A Seat": ["Free a seat"],
+    "Sub Manager Builds A Shift": ["Sub manager builds a shift", "Sub manager decides membership (refused)"],
+    "Clash Check · Same Vehicle, Overlapping Time": ["Overlapping vehicle (refused)"],
+    "Reschedule Shift (move the time)": ["Reschedule the shift"],
+    "Cancel Shift": ["Cancel the sub manager shift"],
+    "Get Shift Templates": ["Get shift templates"],
+    "Delete Shift Template": ["Delete shift template"],
+}
+
+def req(name, method, path, token, body=None, query=None, tests=None, desc=None, examples=None):
     r = {
         "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{" + token + "}}", "type": "string"}]},
         "method": method,
@@ -35,7 +168,13 @@ def req(name, method, path, token, body=None, query=None, tests=None, desc=None)
     if desc:
         r["description"] = desc
 
-    item = {"name": name, "request": r, "response": []}
+    saved = []
+    for label in (examples or EXAMPLE_MAP.get(name) or [name]):
+        block = example(label)
+        if block:
+            saved.append(block)
+
+    item = {"name": name, "request": r, "response": saved}
     if tests:
         item["event"] = [{
             "listen": "test",
@@ -206,11 +345,8 @@ accounts = {"name": "1 · Accounts & Vehicles", "item": [
     req("Owner Driver · Register Vehicle (7 seats, AC)", "POST", "/api/v1/vehicle/register", "owner_session",
         body={"vehicleNumber": "FLEET-001", "vehicleInfo": "Hiace van",
               "numberOfSeats": 7, "hasAC": True, "hasHeating": False, "pin": "121212"},
-        tests=save("owner_vehicle_id", "r.data.vehicleId") + ['pm.environment.set("vehicle_otp", r.data.tempOTP);'],
-        desc="numberOfSeats, hasAC and hasHeating are what let this vehicle join a fleet. Seats are counted excluding the driver, so this van seats 7 passengers."),
-
-    req("Owner Driver · Verify Vehicle OTP", "POST", "/api/v1/otp/verify", "open_token",
-        body={"mobile": "{{owner_mobile}}", "otp": "{{vehicle_otp}}", "operation": "ACTIVATE_VEHICLE"}),
+        tests=save("owner_vehicle_id", "r.data.vehicleId"),
+        desc=("numberOfSeats, hasAC and hasHeating are what let this vehicle join a fleet. Seats are counted excluding the driver, so this van seats 7 passengers.\n\nNOTE: a vehicle is created already active and registration sends NO otp, so tempOTP comes back empty. There is no ACTIVATE_VEHICLE step to run.")),
 
     req("Second Driver · Register", "POST", "/api/v1/driver/register", "open_token",
         body={"deviceId": "post_man_2", "mobile": "+923405421302", "name": "Second Driver",
@@ -232,10 +368,7 @@ accounts = {"name": "1 · Accounts & Vehicles", "item": [
     req("Second Driver · Register Vehicle (4 seats)", "POST", "/api/v1/vehicle/register", "driver2_session",
         body={"vehicleNumber": "FLEET-002", "vehicleInfo": "Corolla",
               "numberOfSeats": 4, "hasAC": True, "hasHeating": True, "pin": "131313"},
-        tests=save("driver2_vehicle_id", "r.data.vehicleId") + ['pm.environment.set("vehicle2_otp", r.data.tempOTP);']),
-
-    req("Second Driver · Verify Vehicle OTP", "POST", "/api/v1/otp/verify", "open_token",
-        body={"mobile": "{{driver2_mobile}}", "otp": "{{vehicle2_otp}}", "operation": "ACTIVATE_VEHICLE"}),
+        tests=save("driver2_vehicle_id", "r.data.vehicleId")),
 
     req("Update Vehicle (seats / AC / heating)", "PATCH", "/api/v1/vehicle/update", "owner_session",
         body={"vehicleId": "{{owner_vehicle_id}}", "numberOfSeats": 7, "hasAC": True,
