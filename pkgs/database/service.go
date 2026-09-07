@@ -239,6 +239,182 @@ func DeleteDriver(orgCtx *gin.Context, driver postgress.Driver, updateById strin
 	return tx.Commit().Error
 }
 
+func GetActivePassengerById(orgCtx *gin.Context, passengerId string) (passenger postgress.Passenger, err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	err = DatabaseConn.Postgres.WithContext(ctx).Where(`id = ?`, passengerId).Where(`status = ?`, constants.Status_Active).Find(&passenger).Error
+	return
+}
+
+func GetPassengerById(orgCtx *gin.Context, passengerId string) (passenger postgress.Passenger, err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	err = DatabaseConn.Postgres.WithContext(ctx).Where(`id = ?`, passengerId).Find(&passenger).Error
+	return
+}
+
+func GetGroupById(orgCtx *gin.Context, groupId string) (group postgress.Group, err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	err = DatabaseConn.Postgres.WithContext(ctx).Where(`id = ?`, groupId).Where(`status = ?`, constants.Status_Active).First(&group).Error
+	return
+}
+
+// HasGroupPermission answers whether a driver holds a permission inside one group.
+// The permission is read from the role attached to the driver's membership, so an
+// admin can hand a new permission to a role, or invent a brand new role, without
+// any code change here. A membership that is not approved never holds anything.
+func HasGroupPermission(orgCtx *gin.Context, groupId, driverId, permissionCode string) (hasPermission bool, err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	var count int64
+
+	err = DatabaseConn.Postgres.WithContext(ctx).
+		Table("group_members").
+		Joins("JOIN role_permissions ON role_permissions.role_id = group_members.role_id").
+		Joins("JOIN permissions ON permissions.id = role_permissions.permission_id").
+		Where("group_members.group_id = ?", groupId).
+		Where("group_members.driver_id = ?", driverId).
+		Where("group_members.status = ?", constants.Membership_Status_Approved).
+		Where("permissions.code = ?", permissionCode).
+		Count(&count).Error
+
+	return count > 0, err
+}
+
+// IsApprovedGroupMember reports whether a driver is an approved member of a group,
+// with no regard to any role that driver may hold.
+func IsApprovedGroupMember(orgCtx *gin.Context, groupId, driverId string) (isMember bool, err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	var count int64
+
+	err = DatabaseConn.Postgres.WithContext(ctx).
+		Model(&postgress.GroupMember{}).
+		Where("group_id = ?", groupId).
+		Where("driver_id = ?", driverId).
+		Where("status = ?", constants.Membership_Status_Approved).
+		Count(&count).Error
+
+	return count > 0, err
+}
+
+// IsApprovedGroupPassenger reports whether a passenger is an approved member of a
+// group, a passenger can only be seated on the shifts of a group they belong to.
+func IsApprovedGroupPassenger(orgCtx *gin.Context, groupId, passengerId string) (isMember bool, err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	var count int64
+
+	err = DatabaseConn.Postgres.WithContext(ctx).
+		Model(&postgress.GroupPassenger{}).
+		Where("group_id = ?", groupId).
+		Where("passenger_id = ?", passengerId).
+		Where("status = ?", constants.Membership_Status_Approved).
+		Count(&count).Error
+
+	return count > 0, err
+}
+
+// VehicleHasShiftDuringTime reports whether a vehicle is already committed to a
+// shift that overlaps the given window. excludeShiftId lets a shift that is being
+// edited ignore its own row.
+func VehicleHasShiftDuringTime(orgCtx *gin.Context, vehicleId, startTime, endTime, excludeShiftId string) (hasShift bool, err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	var count int64
+
+	query := DatabaseConn.Postgres.WithContext(ctx).
+		Model(&postgress.Shift{}).
+		Where("vehicle_id = ?", vehicleId).
+		Where("is_active = ?", true).
+		Where("start_datetime < ? AND estimated_end_datetime > ?", endTime, startTime)
+
+	if excludeShiftId != "" {
+		query = query.Where("id <> ?", excludeShiftId)
+	}
+
+	err = query.Count(&count).Error
+
+	return count > 0, err
+}
+
+// DriverHasShiftDuringTime reports whether a driver is already driving a shift that
+// overlaps the given window.
+func DriverHasShiftDuringTime(orgCtx *gin.Context, driverId, startTime, endTime, excludeShiftId string) (hasShift bool, err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	var count int64
+
+	query := DatabaseConn.Postgres.WithContext(ctx).
+		Model(&postgress.Shift{}).
+		Where("driver_id = ?", driverId).
+		Where("is_active = ?", true).
+		Where("start_datetime < ? AND estimated_end_datetime > ?", endTime, startTime)
+
+	if excludeShiftId != "" {
+		query = query.Where("id <> ?", excludeShiftId)
+	}
+
+	err = query.Count(&count).Error
+
+	return count > 0, err
+}
+
+// VehicleHasRideDuringTime reports whether a vehicle is already committed to a
+// carpool ride that overlaps the given window.
+func VehicleHasRideDuringTime(orgCtx *gin.Context, vehicleId, startTime, endTime string) (hasRide bool, err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	var count int64
+
+	err = DatabaseConn.Postgres.WithContext(ctx).
+		Model(&postgress.Ride{}).
+		Where("vehicle_id = ?", vehicleId).
+		Where("is_active = ?", true).
+		Where("start_datetime < ? AND estimated_end_datetime > ?", endTime, startTime).
+		Count(&count).Error
+
+	return count > 0, err
+}
+
+// DriverHasRideDuringTime reports whether a driver is already driving a carpool
+// ride that overlaps the given window.
+func DriverHasRideDuringTime(orgCtx *gin.Context, driverId, startTime, endTime string) (hasRide bool, err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	var count int64
+
+	err = DatabaseConn.Postgres.WithContext(ctx).
+		Model(&postgress.Ride{}).
+		Where("driver_id = ?", driverId).
+		Where("is_active = ?", true).
+		Where("start_datetime < ? AND estimated_end_datetime > ?", endTime, startTime).
+		Count(&count).Error
+
+	return count > 0, err
+}
+
 func GetDriverByRideId(orgCtx *gin.Context, rideId string) (
 	driverID string,
 	vehicleNumber string,

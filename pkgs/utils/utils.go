@@ -197,7 +197,13 @@ func GeneralSocketResp(sessionId string, code int, replyMessage string) []byte {
 }
 
 func SendNotification(orgCtx *gin.Context, sessionId, notificationType, driverId, title, message string, data map[string]string) {
-	logger.LogDebug("Request received  in SendNotification", sessionId, fmt.Sprintf("notificationType: %s, driverId: %s, title: %s, message: %s", notificationType, driverId, title, message))
+	SendUserNotification(orgCtx, sessionId, notificationType, driverId, constants.User_Driver, title, message, data)
+}
+
+// SendUserNotification is SendNotification with the type of the receiving user
+// spelled out, a shift notification has to reach passengers as well as drivers.
+func SendUserNotification(orgCtx *gin.Context, sessionId, notificationType, userId string, userType int, title, message string, data map[string]string) {
+	logger.LogDebug("Request received  in SendNotification", sessionId, fmt.Sprintf("notificationType: %s, userId: %s, title: %s, message: %s", notificationType, userId, title, message))
 
 	var fcm string
 
@@ -206,13 +212,18 @@ func SendNotification(orgCtx *gin.Context, sessionId, notificationType, driverId
 		constants.NOTIFICATION_TYPE_PIN_CREATED,
 		constants.NOTIFICATION_TYPE_INFORMATION,
 		constants.NOTIFICATION_TYPE_MARKETING,
+		constants.NOTIFICATION_TYPE_SHIFT_CREATED,
+		constants.NOTIFICATION_TYPE_SHIFT_UPDATED,
+		constants.NOTIFICATION_TYPE_SHIFT_CANCELLED,
+		constants.NOTIFICATION_TYPE_GROUP_REQUEST,
+		constants.NOTIFICATION_TYPE_GROUP_DECISION,
 		constants.NOTIFICATION_TITLE_RIDE_BOOKED:
-		driverFCM, err := database.GetDriverFCM(orgCtx, driverId)
+		userFCM, err := database.GetDriverFCM(orgCtx, userId)
 		if err != nil {
 			logger.LogError(sessionId, err)
 			return
 		}
-		fcm = driverFCM.FCM
+		fcm = userFCM.FCM
 	case constants.NOTIFICATION_TYPE_SMS_TO_SERVICE,
 		constants.NOTIFICATION_TYPE_BACKUP_SMS_TO_SERVICE:
 		if configuration.ConfigurationData.Integerations.SMS.LocalSMSService ||
@@ -242,8 +253,8 @@ func SendNotification(orgCtx *gin.Context, sessionId, notificationType, driverId
 		Token:            fcm,
 		Title:            title,
 		Message:          message,
-		UserType:         constants.User_Driver,
-		UserId:           driverId,
+		UserType:         userType,
+		UserId:           userId,
 		NotificationType: notificationType,
 		Data:             data,
 	})
@@ -360,6 +371,7 @@ func VerifyOTPOperations(operation string) (isValid bool) {
 	switch operation {
 	case constants.ACTIVATE_DRIVER_OPERATION,
 		constants.ACTIVATE_VEHICLE_OPERATION,
+		constants.ACTIVATE_PASSENGER_OPERATION,
 		constants.UPDATE_PASSWORD_OPERATION,
 		constants.FORGOT_PASSWORD_OPERATION,
 		constants.FORGOT_PIN_OPERATION,
@@ -423,6 +435,16 @@ func GetDriver(orgCtx *gin.Context, mobile string) (driver postgress.Driver, err
 	defer cancel()
 
 	err = database.DatabaseConn.Postgres.WithContext(ctx).Where(`driver_mobile = ?`, mobile).Find(&driver).Error
+
+	return
+}
+
+func GetPassenger(orgCtx *gin.Context, mobile string) (passenger postgress.Passenger, err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	err = database.DatabaseConn.Postgres.WithContext(ctx).Where(`passenger_mobile = ?`, mobile).Find(&passenger).Error
 
 	return
 }

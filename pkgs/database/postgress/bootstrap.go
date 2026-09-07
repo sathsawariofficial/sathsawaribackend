@@ -7,6 +7,7 @@ import (
 	"rideshare/pkgs/logger"
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -61,13 +62,34 @@ func NewPortgress() (db *gorm.DB, err error) {
 		&RideRequest{},
 		&AnnouncementRequests{},
 
+		&Passenger{},
+		&PassengerLocationPreference{},
+		&Role{},
+		&Permission{},
+		&RolePermission{},
+		&Group{},
+		&GroupMember{},
+		&GroupVehicle{},
+		&GroupPassenger{},
+		&Shift{},
+		&ShiftStop{},
+		&ShiftSeat{},
+		&ShiftTemplate{},
+		&ShiftTemplateStop{},
+		&ShiftTemplateSeat{},
+
 		&DELVehicle{},
 		&DELRide{},
 		&DELDriver{},
+		&DELPassenger{},
 	)
 
 	if err != nil {
 		panic(err)
+	}
+
+	if err = seedRolesAndPermissions(db); err != nil {
+		panic("failed to seed roles and permissions: " + err.Error())
 	}
 
 	if db == nil {
@@ -233,4 +255,102 @@ func NewPortgress() (db *gorm.DB, err error) {
 	`)
 
 	return
+}
+
+// seedRolesAndPermissions puts the built in group roles and permissions in place.
+// Permissions are kept up to date on every boot, but a role's default permission
+// map is only written the first time that role is created, so that a mapping an
+// admin has changed later is never silently reset back on the next restart.
+func seedRolesAndPermissions(db *gorm.DB) error {
+	systemPermissions := map[string]string{
+		constants.PERMISSION_GROUP_MANAGE_MEMBERS:     "Approve, reject and remove drivers, vehicles and passengers of a group",
+		constants.PERMISSION_GROUP_MANAGE_VEHICLES:    "Approve, reject and remove the vehicles of a group",
+		constants.PERMISSION_GROUP_MANAGE_SUBMANAGERS: "Appoint and remove the sub managers of a group",
+		constants.PERMISSION_GROUP_DELETE:             "Delete a group",
+		constants.PERMISSION_SHIFT_CREATE:             "Create a shift for a group",
+		constants.PERMISSION_SHIFT_ASSIGN_SEATS:       "Assign drivers, vehicles and passengers to the seats of a shift",
+		constants.PERMISSION_SHIFT_CANCEL:             "Cancel a shift of a group",
+		constants.PERMISSION_SHIFT_MANAGE_TEMPLATES:   "Create and delete the shift templates of a group",
+	}
+
+	defaultRolePermissions := map[string][]string{
+		constants.ROLE_GROUP_OWNER: {
+			constants.PERMISSION_GROUP_MANAGE_MEMBERS,
+			constants.PERMISSION_GROUP_MANAGE_VEHICLES,
+			constants.PERMISSION_GROUP_MANAGE_SUBMANAGERS,
+			constants.PERMISSION_GROUP_DELETE,
+			constants.PERMISSION_SHIFT_CREATE,
+			constants.PERMISSION_SHIFT_ASSIGN_SEATS,
+			constants.PERMISSION_SHIFT_CANCEL,
+			constants.PERMISSION_SHIFT_MANAGE_TEMPLATES,
+		},
+		// a sub manager only takes the shift building load off the manager, it can
+		// not change who is in the group
+		constants.ROLE_GROUP_SUBMANAGER: {
+			constants.PERMISSION_SHIFT_CREATE,
+			constants.PERMISSION_SHIFT_ASSIGN_SEATS,
+			constants.PERMISSION_SHIFT_CANCEL,
+			constants.PERMISSION_SHIFT_MANAGE_TEMPLATES,
+		},
+	}
+
+	roleDescriptions := map[string]string{
+		constants.ROLE_GROUP_OWNER:      "Owner and manager of a group, holds every group permission",
+		constants.ROLE_GROUP_SUBMANAGER: "Sub manager of a group, builds and manages shifts only",
+	}
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		permissionIds := map[string]string{}
+
+		for code, description := range systemPermissions {
+			permission := Permission{
+				ID:          uuid.New().String(),
+				Code:        code,
+				Description: description,
+				IsSystem:    true,
+			}
+
+			if err := tx.Where("code = ?", code).FirstOrCreate(&permission).Error; err != nil {
+				return err
+			}
+
+			permissionIds[code] = permission.ID
+		}
+
+		for roleName, permissionCodes := range defaultRolePermissions {
+			var count int64
+			if err := tx.Model(&Role{}).Where("name = ?", roleName).Count(&count).Error; err != nil {
+				return err
+			}
+			if count > 0 {
+				continue
+			}
+
+			role := Role{
+				ID:          uuid.New().String(),
+				Name:        roleName,
+				Description: roleDescriptions[roleName],
+				IsSystem:    true,
+			}
+
+			if err := tx.Create(&role).Error; err != nil {
+				return err
+			}
+
+			rolePermissions := make([]RolePermission, 0, len(permissionCodes))
+			for _, code := range permissionCodes {
+				rolePermissions = append(rolePermissions, RolePermission{
+					ID:           uuid.New().String(),
+					RoleID:       role.ID,
+					PermissionID: permissionIds[code],
+				})
+			}
+
+			if err := tx.Create(&rolePermissions).Error; err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
 }

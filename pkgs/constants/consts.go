@@ -37,6 +37,22 @@ const (
 	Perform_this_operation  = "Perform this operation"
 	General_Unknown         = "Unknown %s"
 	Not_Found               = "%s not found"
+
+	// group and shift errors
+	Passenger_Not_Found    = "Unknown passenger"
+	Group_Not_Found        = "Group not found"
+	Shift_Not_Found        = "Shift not found"
+	Role_Not_Found         = "Role not found"
+	Permission_Not_Found   = "Permission not found"
+	Not_Group_Member       = "You are not a member of this group"
+	Already_Group_Member   = "You are already a member of this group"
+	Request_Already_Exists = "A request has already been sent"
+	Seat_Gender_Mismatch   = "Seat %d is reserved for a %s passenger"
+	Seat_Already_Taken     = "Seat %d is already assigned"
+	Driver_Busy            = "Driver already has a ride or a shift scheduled for this duration"
+	Vehicle_Busy           = "Vehicle already has a ride or a shift scheduled for this duration"
+	Vehicle_Seats_Missing  = "Vehicle must have its number of seats set before it can join a group"
+	Not_System_Role        = "System roles cannot be deleted"
 )
 
 // keys
@@ -61,6 +77,15 @@ const (
 	Ride_Template_Key      = "ride_template_id"
 	Language_Key           = "lang"
 	Type_Key               = "type"
+	Group_Key              = "group_id"
+	Shift_Key              = "shift_id"
+	Shift_Template_Key     = "shift_template_id"
+	Role_Key               = "role_id"
+	Permission_Key         = "permission_id"
+	Direction_Key          = "direction"
+	Date_Key               = "date"
+	Driver_Key             = "driver_id"
+	Passenger_Key          = "passenger_id"
 )
 
 // ride status
@@ -78,10 +103,15 @@ const (
 
 // notification titles
 const (
-	NOTIFICATION_TITLE_RIDE_CREATION  = "Ride Created"
-	NOTIFICATION_TITLE_PIN_CREATION   = "Pin Created"
-	NOTIFICATION_TITLE_RIDE_BOOKED    = "Ride Booked"
-	NOTIFICATION_TITLE_SMS_TO_SERVICE = "SathSawari sent an OTP"
+	NOTIFICATION_TITLE_RIDE_CREATION   = "Ride Created"
+	NOTIFICATION_TITLE_PIN_CREATION    = "Pin Created"
+	NOTIFICATION_TITLE_RIDE_BOOKED     = "Ride Booked"
+	NOTIFICATION_TITLE_SMS_TO_SERVICE  = "SathSawari sent an OTP"
+	NOTIFICATION_TITLE_SHIFT_CREATED   = "Shift Scheduled"
+	NOTIFICATION_TITLE_SHIFT_UPDATED   = "Shift Updated"
+	NOTIFICATION_TITLE_SHIFT_CANCELLED = "Shift Cancelled"
+	NOTIFICATION_TITLE_GROUP_REQUEST   = "New Group Request"
+	NOTIFICATION_TITLE_GROUP_DECISION  = "Group Request Update"
 )
 
 // notification message
@@ -91,6 +121,20 @@ const (
 	NOTIFICATION_MESSSGE_RIDE_BOOKED_DRIVER = "%v seat(s) booked for vehicle %s."
 	NOTIFICATION_MESSAGE_PIN_UPDATED        = "Your pin has been updated, Please do not share it with anyone"
 	NOTIFICATION_MESSAGE_SMS_TO_SERVICE     = "<#> Sathsawari verification code: %s. Do not share this code with anyone.\n%s"
+
+	// shift notifications, they always carry the driver's number and the number of
+	// the manager or sub manager who built the shift so riders know who to contact
+	NOTIFICATION_MESSAGE_SHIFT_PASSENGER = "Your %s shift on %s. Vehicle %s, you are picked from %s at %s. Driver %s (%s). For any issue contact %s (%s)."
+	NOTIFICATION_MESSAGE_SHIFT_DRIVER    = "Your %s shift on %s. Vehicle %s with %d passenger(s), %d stop(s), starting %s. For any issue contact %s (%s)."
+	NOTIFICATION_MESSAGE_SHIFT_CANCELLED = "Your %s shift on %s with vehicle %s has been cancelled. For any issue contact %s (%s)."
+
+	// group membership notifications
+	NOTIFICATION_MESSAGE_GROUP_JOIN_REQUEST = "%s has requested to join your group %s"
+	NOTIFICATION_MESSAGE_GROUP_APPROVED     = "Your request to join the group %s has been approved"
+	NOTIFICATION_MESSAGE_GROUP_REJECTED     = "Your request to join the group %s has been rejected"
+	NOTIFICATION_MESSAGE_GROUP_REMOVED      = "You have been removed from the group %s"
+	NOTIFICATION_MESSAGE_SUBMANAGER_ADDED   = "You are now a sub manager of the group %s"
+	NOTIFICATION_MESSAGE_SUBMANAGER_REMOVED = "You are no longer a sub manager of the group %s"
 )
 
 // genders
@@ -151,6 +195,22 @@ const (
 	Max_Monthly_Frequency     = 3
 
 	Ride_Cancel_Min_Hours_Before_Start = 2
+
+	// group and shift limits
+	Group_Name_Min_Len                  = 3
+	Group_Name_Max_Len                  = 100
+	Description_Max_Len                 = 500
+	Role_Name_Min_Len                   = 3
+	Role_Name_Max_Len                   = 50
+	Permission_Code_Min_Len             = 3
+	Permission_Code_Max_Len             = 100
+	Location_Min_Len                    = 1
+	Location_Max_Len                    = 200
+	Shift_Stops_Max_Len                 = 60
+	Bulk_Request_Max_Len                = 100
+	Day_Of_Week_Min_Value               = 1
+	Day_Of_Week_Max_Value               = 7
+	Shift_Cancel_Min_Hours_Before_Start = 2
 )
 
 const (
@@ -158,10 +218,68 @@ const (
 )
 
 const (
-	DRIVER_TOKEN  = "driver_token"
-	ADMIN_TOKEN   = "admin_token"
-	OPEN_TOKEN    = "open_token"
-	NO_TOKEN_TYPE = "no_token_type" // such token whose type dont matter
+	DRIVER_TOKEN    = "driver_token"
+	ADMIN_TOKEN     = "admin_token"
+	PASSENGER_TOKEN = "passenger_token"
+	OPEN_TOKEN      = "open_token"
+	NO_TOKEN_TYPE   = "no_token_type" // such token whose type dont matter
+)
+
+// shift direction, a pickup and a drop off are always two separate shifts
+const (
+	Shift_Direction_Pickup = "pickup"
+	Shift_Direction_Drop   = "drop"
+)
+
+// group membership status, shared by driver, vehicle and passenger membership
+const (
+	Membership_Status_Pending  = "pending"
+	Membership_Status_Approved = "approved"
+	Membership_Status_Rejected = "rejected"
+	Membership_Status_Left     = "left"
+	Membership_Status_Removed  = "removed"
+)
+
+// how a driver joins a group
+const (
+	Join_Type_Driver_Only  = "driver_only"
+	Join_Type_Vehicle_Only = "vehicle_only"
+	Join_Type_Both         = "both"
+)
+
+// member kinds and actions used by the bulk membership decision api
+const (
+	Member_Type_Driver    = "driver"
+	Member_Type_Vehicle   = "vehicle"
+	Member_Type_Passenger = "passenger"
+
+	Membership_Action_Approve = "approve"
+	Membership_Action_Reject  = "reject"
+	Membership_Action_Remove  = "remove"
+)
+
+// shift seat status
+const (
+	Seat_Status_Empty    = "empty"
+	Seat_Status_Assigned = "assigned"
+)
+
+// system roles seeded at boot, admin may add more
+const (
+	ROLE_GROUP_OWNER      = "group_owner"
+	ROLE_GROUP_SUBMANAGER = "group_submanager"
+)
+
+// system permissions seeded at boot, admin may add more and remap them to roles
+const (
+	PERMISSION_GROUP_MANAGE_MEMBERS     = "group.manage_members"
+	PERMISSION_GROUP_MANAGE_VEHICLES    = "group.manage_vehicles"
+	PERMISSION_GROUP_MANAGE_SUBMANAGERS = "group.manage_submanagers"
+	PERMISSION_GROUP_DELETE             = "group.delete"
+	PERMISSION_SHIFT_CREATE             = "shift.create"
+	PERMISSION_SHIFT_ASSIGN_SEATS       = "shift.assign_seats"
+	PERMISSION_SHIFT_CANCEL             = "shift.cancel"
+	PERMISSION_SHIFT_MANAGE_TEMPLATES   = "shift.manage_templates"
 )
 
 // OTP Operations
@@ -174,6 +292,8 @@ const (
 	UPDATE_PIN_OPERATION       = "UPDATE_PIN"
 	FORGOT_PIN_OPERATION       = "FORGOT_PIN"
 	BOOK_RIDE_OPERATION        = "BOOK_RIDE"
+
+	ACTIVATE_PASSENGER_OPERATION = "ACTIVATE_PASSENGER"
 )
 
 // SMS Keys
@@ -184,7 +304,9 @@ const (
 
 // Notifications Key
 const (
-	NOTIFICATION_KEY_RIDE_ID = "rideId"
+	NOTIFICATION_KEY_RIDE_ID  = "rideId"
+	NOTIFICATION_KEY_SHIFT_ID = "shiftId"
+	NOTIFICATION_KEY_GROUP_ID = "groupId"
 )
 
 // deep linking url types

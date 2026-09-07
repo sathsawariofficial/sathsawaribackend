@@ -73,6 +73,9 @@ type Vehicle struct {
 	VehicleNumber string    `json:"vehicle_number" gorm:"unique;not null"`
 	VehicleInfo   string    `json:"vehicle_info" gorm:"not null"`
 	Status        string    `json:"status"`
+	NumberOfSeats int       `json:"number_of_seats" gorm:"not null;default:0"`
+	HasAC         bool      `json:"has_ac" gorm:"not null;default:false"`
+	HasHeating    bool      `json:"has_heating" gorm:"not null;default:false"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }
@@ -292,4 +295,319 @@ type RideRequest struct {
 	IsActive             bool      `json:"is_active" gorm:"not null"`
 	CreatedAt            time.Time `json:"created_at"`
 	UpdatedAt            time.Time `json:"updated_at"`
+}
+
+type Passenger struct {
+	ID              string    `json:"id" gorm:"primary_key"`
+	PassengerMobile string    `json:"passenger_mobile" gorm:"unique;not null"`
+	PassengerName   string    `json:"passenger_name" gorm:"not null"`
+	Password        string    `json:"password" gorm:"not null"`
+	Gender          string    `json:"gender" gorm:"not null"`
+	Status          string    `json:"status"`
+	UpdateBy        string    `json:"update_by"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+type DELPassenger struct {
+	ID              string    `json:"id" gorm:"primary_key"`
+	PassengerMobile string    `json:"passenger_mobile" gorm:"unique;not null"`
+	PassengerName   string    `json:"passenger_name" gorm:"not null"`
+	Password        string    `json:"password" gorm:"not null"`
+	Gender          string    `json:"gender" gorm:"not null"`
+	Status          string    `json:"status"`
+	UpdateBy        string    `json:"update_by"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+// PassengerLocationPreference is the standing travel form a passenger fills in:
+// one row per (passenger, day of week, direction), so a passenger can travel in
+// the morning but not in the evening, or be picked from one place and dropped at
+// another. It is reference data the manager reads while building a shift, it does
+// not create any shift by itself.
+type PassengerLocationPreference struct {
+	ID            string    `json:"id" gorm:"primary_key"`
+	PassengerID   string    `json:"passenger_id" gorm:"index:idx_passenger_day_direction,unique;not null"`
+	DayOfWeek     int       `json:"day_of_week" gorm:"index:idx_passenger_day_direction,unique;not null"`
+	Direction     string    `json:"direction" gorm:"index:idx_passenger_day_direction,unique;not null"`
+	IsEnabled     bool      `json:"is_enabled" gorm:"not null;default:true"`
+	Location      string    `json:"location"`
+	Lat           float64   `json:"lat"`
+	Lng           float64   `json:"lng"`
+	ScheduledTime string    `json:"scheduled_time"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+type Role struct {
+	ID          string    `json:"id" gorm:"primary_key"`
+	Name        string    `json:"name" gorm:"unique;not null"`
+	Description string    `json:"description"`
+	IsSystem    bool      `json:"is_system" gorm:"not null;default:false"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type Permission struct {
+	ID          string    `json:"id" gorm:"primary_key"`
+	Code        string    `json:"code" gorm:"unique;not null"`
+	Description string    `json:"description"`
+	IsSystem    bool      `json:"is_system" gorm:"not null;default:false"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type RolePermission struct {
+	ID           string    `json:"id" gorm:"primary_key"`
+	RoleID       string    `json:"role_id" gorm:"index:idx_role_permission,unique;not null"`
+	PermissionID string    `json:"permission_id" gorm:"index:idx_role_permission,unique;not null"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type Group struct {
+	ID            string    `json:"id" gorm:"primary_key"`
+	Name          string    `json:"name" gorm:"not null"`
+	Description   string    `json:"description"`
+	OwnerDriverID string    `json:"owner_driver_id" gorm:"index;not null"`
+	Status        string    `json:"status" gorm:"index;not null"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// GroupMember is a driver's membership of a group. RoleID is only filled for the
+// owner and for appointed sub managers, a plain joined driver carries no role.
+type GroupMember struct {
+	ID        string     `json:"id" gorm:"primary_key"`
+	GroupID   string     `json:"group_id" gorm:"index:idx_group_member,unique;not null"`
+	DriverID  string     `json:"driver_id" gorm:"index:idx_group_member,unique;not null"`
+	RoleID    string     `json:"role_id" gorm:"index"`
+	JoinType  string     `json:"join_type" gorm:"not null"`
+	Status    string     `json:"status" gorm:"index;not null"`
+	DecidedBy string     `json:"decided_by"`
+	DecidedAt *time.Time `json:"decided_at"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+}
+
+type GroupVehicle struct {
+	ID        string     `json:"id" gorm:"primary_key"`
+	GroupID   string     `json:"group_id" gorm:"index:idx_group_vehicle,unique;not null"`
+	VehicleID string     `json:"vehicle_id" gorm:"index:idx_group_vehicle,unique;not null"`
+	DriverID  string     `json:"driver_id" gorm:"index;not null"`
+	Status    string     `json:"status" gorm:"index;not null"`
+	DecidedBy string     `json:"decided_by"`
+	DecidedAt *time.Time `json:"decided_at"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+}
+
+type GroupPassenger struct {
+	ID          string     `json:"id" gorm:"primary_key"`
+	GroupID     string     `json:"group_id" gorm:"index:idx_group_passenger,unique;not null"`
+	PassengerID string     `json:"passenger_id" gorm:"index:idx_group_passenger,unique;not null"`
+	Status      string     `json:"status" gorm:"index;not null"`
+	DecidedBy   string     `json:"decided_by"`
+	DecidedAt   *time.Time `json:"decided_at"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+// Shift is one directional trip of one vehicle on one day. A pickup and a drop off
+// are always two separate shifts even when the same passengers travel in both.
+type Shift struct {
+	ID                   string    `json:"id" gorm:"primary_key"`
+	GroupID              string    `json:"group_id" gorm:"index;not null"`
+	VehicleID            string    `json:"vehicle_id" gorm:"index;not null"`
+	DriverID             string    `json:"driver_id" gorm:"index;not null"`
+	Direction            string    `json:"direction" gorm:"index;not null"`
+	StartDatetime        string    `json:"start_datetime" gorm:"index;not null"`
+	EstimatedEndDatetime string    `json:"estimated_end_datetime" gorm:"not null"`
+	StartLocation        string    `json:"start_location" gorm:"not null"`
+	EndLocation          string    `json:"end_location" gorm:"not null"`
+	NumberOfSeats        int       `json:"number_of_seats" gorm:"not null"`
+	SeatsTaken           int       `json:"seats_taken" gorm:"not null;default:0"`
+	RouteDetails         string    `json:"route_details"`
+	TemplateID           string    `json:"template_id"`
+	CreatedByDriverID    string    `json:"created_by_driver_id" gorm:"not null"`
+	IsActive             bool      `json:"is_active" gorm:"index;not null"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
+
+	// forign key relation
+	Stops []ShiftStop `json:"stops" gorm:"foreignKey:ShiftID;references:ID"`
+	Seats []ShiftSeat `json:"seats" gorm:"foreignKey:ShiftID;references:ID"`
+}
+
+// ShiftStop is one waypoint of a shift's route, in the order the manager or sub
+// manager arranged them.
+type ShiftStop struct {
+	ID             string    `json:"id" gorm:"primary_key"`
+	ShiftID        string    `json:"shift_id" gorm:"index;not null"`
+	SequenceNumber int       `json:"sequence_number" gorm:"not null"`
+	Location       string    `json:"location" gorm:"not null"`
+	Lat            float64   `json:"lat"`
+	Lng            float64   `json:"lng"`
+	ScheduledTime  string    `json:"scheduled_time"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+// ShiftSeat is one physical seat of the vehicle for one shift. Gender is locked on
+// the seat, a seat reserved for one gender can never be given to the other.
+type ShiftSeat struct {
+	ID          string    `json:"id" gorm:"primary_key"`
+	ShiftID     string    `json:"shift_id" gorm:"index:idx_shift_seat,unique;not null"`
+	SeatNumber  int       `json:"seat_number" gorm:"index:idx_shift_seat,unique;not null"`
+	Gender      string    `json:"gender"`
+	PassengerID string    `json:"passenger_id" gorm:"index"`
+	StopID      string    `json:"stop_id" gorm:"index"`
+	Status      string    `json:"status" gorm:"not null"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type ShiftTemplate struct {
+	ID                string        `json:"id" gorm:"primary_key"`
+	ShiftID           string        `json:"shift_id"`
+	GroupID           string        `json:"group_id" gorm:"index;not null"`
+	Name              string        `json:"name"`
+	VehicleID         string        `json:"vehicle_id" gorm:"not null"`
+	DriverID          string        `json:"driver_id" gorm:"not null"`
+	Direction         string        `json:"direction" gorm:"not null"`
+	StartDatetime     string        `json:"start_datetime" gorm:"not null"`
+	EstimatedEndTime  string        `json:"estimated_end_datetime" gorm:"not null"`
+	StartLocation     string        `json:"start_location"`
+	EndLocation       string        `json:"end_location"`
+	NumberOfSeats     int           `json:"number_of_seats"`
+	RouteDetails      string        `json:"route_details"`
+	DaysOfWeek        pq.Int64Array `json:"days_of_week" gorm:"type:integer[]"`
+	CreatedByDriverID string        `json:"created_by_driver_id"`
+	CreatedAt         time.Time     `json:"created_at"`
+	UpdatedAt         time.Time     `json:"updated_at"`
+
+	// forign key relation
+	Vehicle Vehicle             `json:"vehicle" gorm:"foreignKey:VehicleID;references:ID"`
+	Stops   []ShiftTemplateStop `json:"stops" gorm:"foreignKey:ShiftTemplateID;references:ID"`
+	Seats   []ShiftTemplateSeat `json:"seats" gorm:"foreignKey:ShiftTemplateID;references:ID"`
+}
+
+type ShiftTemplateStop struct {
+	ID              string    `json:"id" gorm:"primary_key"`
+	ShiftTemplateID string    `json:"shift_template_id" gorm:"index;not null"`
+	SequenceNumber  int       `json:"sequence_number" gorm:"not null"`
+	Location        string    `json:"location" gorm:"not null"`
+	Lat             float64   `json:"lat"`
+	Lng             float64   `json:"lng"`
+	ScheduledTime   string    `json:"scheduled_time"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+// ShiftTemplateSeat points at its stop by sequence number rather than by id, so a
+// template stays valid when it is used to build a brand new shift.
+type ShiftTemplateSeat struct {
+	ID              string    `json:"id" gorm:"primary_key"`
+	ShiftTemplateID string    `json:"shift_template_id" gorm:"index;not null"`
+	SeatNumber      int       `json:"seat_number" gorm:"not null"`
+	Gender          string    `json:"gender"`
+	PassengerID     string    `json:"passenger_id"`
+	StopSequence    int       `json:"stop_sequence"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+// ShiftDetails is the joined read projection of a shift, it carries the driver and
+// the creating manager's contact details so they can be shown and notified.
+type ShiftDetails struct {
+	ID                   string    `json:"id"`
+	GroupID              string    `json:"group_id"`
+	GroupName            string    `json:"group_name"`
+	VehicleID            string    `json:"vehicle_id"`
+	VehicleNumber        string    `json:"vehicle_number"`
+	VehicleInfo          string    `json:"vehicle_info"`
+	HasAC                bool      `json:"has_ac"`
+	HasHeating           bool      `json:"has_heating"`
+	DriverID             string    `json:"driver_id"`
+	DriverName           string    `json:"driver_name"`
+	DriverMobile         string    `json:"driver_mobile"`
+	Rating               string    `json:"rating"`
+	Direction            string    `json:"direction"`
+	StartDatetime        string    `json:"start_datetime"`
+	EstimatedEndDatetime string    `json:"estimated_end_datetime"`
+	StartLocation        string    `json:"start_location"`
+	EndLocation          string    `json:"end_location"`
+	NumberOfSeats        int       `json:"number_of_seats"`
+	SeatsTaken           int       `json:"seats_taken"`
+	RouteDetails         string    `json:"route_details"`
+	CreatedByDriverID    string    `json:"created_by_driver_id"`
+	CreatedByName        string    `json:"created_by_name"`
+	CreatedByMobile      string    `json:"created_by_mobile"`
+	IsActive             bool      `json:"is_active"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
+}
+
+// ShiftSeatDetails is the joined read projection of a seat with its passenger and
+// the stop that seat is picked from or dropped at.
+type ShiftSeatDetails struct {
+	ID              string  `json:"id"`
+	ShiftID         string  `json:"shift_id"`
+	SeatNumber      int     `json:"seat_number"`
+	Gender          string  `json:"gender"`
+	Status          string  `json:"status"`
+	PassengerID     string  `json:"passenger_id"`
+	PassengerName   string  `json:"passenger_name"`
+	PassengerMobile string  `json:"passenger_mobile"`
+	StopID          string  `json:"stop_id"`
+	SequenceNumber  int     `json:"sequence_number"`
+	Location        string  `json:"location"`
+	Lat             float64 `json:"lat"`
+	Lng             float64 `json:"lng"`
+	ScheduledTime   string  `json:"scheduled_time"`
+}
+
+// GroupMemberDetails is the joined read projection of a driver's membership.
+type GroupMemberDetails struct {
+	ID           string    `json:"id"`
+	GroupID      string    `json:"group_id"`
+	DriverID     string    `json:"driver_id"`
+	DriverName   string    `json:"driver_name"`
+	DriverMobile string    `json:"driver_mobile"`
+	Rating       string    `json:"rating"`
+	RoleID       string    `json:"role_id"`
+	RoleName     string    `json:"role_name"`
+	JoinType     string    `json:"join_type"`
+	Status       string    `json:"status"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+// GroupVehicleDetails is the joined read projection of a vehicle in a group.
+type GroupVehicleDetails struct {
+	ID            string    `json:"id"`
+	GroupID       string    `json:"group_id"`
+	VehicleID     string    `json:"vehicle_id"`
+	VehicleNumber string    `json:"vehicle_number"`
+	VehicleInfo   string    `json:"vehicle_info"`
+	NumberOfSeats int       `json:"number_of_seats"`
+	HasAC         bool      `json:"has_ac"`
+	HasHeating    bool      `json:"has_heating"`
+	DriverID      string    `json:"driver_id"`
+	DriverName    string    `json:"driver_name"`
+	DriverMobile  string    `json:"driver_mobile"`
+	Status        string    `json:"status"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+// GroupPassengerDetails is the joined read projection of a passenger in a group.
+type GroupPassengerDetails struct {
+	ID              string    `json:"id"`
+	GroupID         string    `json:"group_id"`
+	PassengerID     string    `json:"passenger_id"`
+	PassengerName   string    `json:"passenger_name"`
+	PassengerMobile string    `json:"passenger_mobile"`
+	Gender          string    `json:"gender"`
+	Status          string    `json:"status"`
+	CreatedAt       time.Time `json:"created_at"`
 }

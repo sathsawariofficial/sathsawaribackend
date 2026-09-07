@@ -29,6 +29,20 @@ func checkUserStatusById(userId, tokenType string) error {
 		}
 
 		return nil
+	} else if tokenType == constants.PASSENGER_TOKEN {
+		var passenger postgress.Passenger
+
+		err := database.DatabaseConn.Postgres.
+			Select("status").
+			Where("id = ?", userId).
+			First(&passenger).Error
+		if err != nil {
+			logger.LogError(Middleware_Session, err)
+			err = errors.New(constants.Operation_Not_Permitted)
+			return err
+		}
+
+		return nil
 	} else {
 		var driver postgress.Driver
 
