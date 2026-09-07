@@ -136,3 +136,19 @@ func validateIdList(ids []string, key string) error {
 
 	return nil
 }
+
+// ValidateScheduleFilters checks the optional narrowing a manager can put on the
+// travel forms, an empty filter simply means every day or every direction.
+func ValidateScheduleFilters(direction string, dayOfWeek int) error {
+	if !utils.IsStringEmpty(direction) &&
+		direction != constants.Shift_Direction_Pickup &&
+		direction != constants.Shift_Direction_Drop {
+		return fmt.Errorf(constants.Invalid_Data, "direction")
+	}
+
+	if dayOfWeek != 0 && (dayOfWeek < constants.Day_Of_Week_Min_Value || dayOfWeek > constants.Day_Of_Week_Max_Value) {
+		return fmt.Errorf(constants.Invalid_Data, "day of week")
+	}
+
+	return nil
+}

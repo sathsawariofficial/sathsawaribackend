@@ -178,3 +178,32 @@ func setSubManagersResp(applied, skipped []SubManagerResult) utils.APIResponse {
 		},
 	}
 }
+
+func passengerSchedulesResp(schedules []postgress.GroupPassengerScheduleDetails, totalRows int64) utils.APIResponse {
+	entries := []PassengerScheduleEntry{}
+
+	for _, schedule := range schedules {
+		entries = append(entries, PassengerScheduleEntry{
+			PassengerId:     schedule.PassengerID,
+			PassengerName:   schedule.PassengerName,
+			PassengerMobile: schedule.PassengerMobile,
+			Gender:          schedule.Gender,
+			DayOfWeek:       schedule.DayOfWeek,
+			Direction:       schedule.Direction,
+			IsEnabled:       schedule.IsEnabled,
+			Location:        schedule.Location,
+			Lat:             schedule.Lat,
+			Lng:             schedule.Lng,
+			ScheduledTime:   schedule.ScheduledTime,
+		})
+	}
+
+	return utils.APIResponse{
+		Code:    http.StatusOK,
+		Message: constants.Success,
+		Data: PassengerSchedulesResponse{
+			TotalPages: utils.CalculatePagesize(totalRows),
+			Schedules:  entries,
+		},
+	}
+}

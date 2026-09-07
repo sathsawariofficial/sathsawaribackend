@@ -139,3 +139,24 @@ type PendingRequestsResponse struct {
 	Vehicles   []VehicleDetails   `json:"vehicles"`
 	Passengers []PassengerDetails `json:"passengers"`
 }
+
+// PassengerScheduleEntry is one leg of one passenger's standing travel form as the
+// manager sees it while building a shift.
+type PassengerScheduleEntry struct {
+	PassengerId     string  `json:"passengerId"`
+	PassengerName   string  `json:"passengerName"`
+	PassengerMobile string  `json:"passengerMobile"`
+	Gender          string  `json:"gender"`
+	DayOfWeek       int     `json:"dayOfWeek"`
+	Direction       string  `json:"direction"`
+	IsEnabled       bool    `json:"isEnabled"`
+	Location        string  `json:"location"`
+	Lat             float64 `json:"lat"`
+	Lng             float64 `json:"lng"`
+	ScheduledTime   string  `json:"scheduledTime"`
+}
+
+type PassengerSchedulesResponse struct {
+	TotalPages int                      `json:"totalPages"`
+	Schedules  []PassengerScheduleEntry `json:"schedules"`
+}

@@ -362,3 +362,59 @@ func DeleteGroupHandler(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(fmt.Sprintf(constants.Deleted_Successfully, "Group")))
 }
+
+// the standing travel forms of the fleet's passengers, this is the sheet a manager
+// builds a shift from
+func GetGroupPassengerSchedulesHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetGroupPassengerSchedulesHandler", sessionId)
+
+	driverId := ctx.GetString(constants.User_KEY)
+	groupId := ctx.Query(constants.Group_Key)
+	direction := ctx.DefaultQuery(constants.Direction_Key, "")
+	dayOfWeek := utils.ToInt(ctx.DefaultQuery(constants.Day_Of_Week_Key, ""))
+
+	if err := ValidateGroupId(groupId); err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	if err := ValidateScheduleFilters(direction, dayOfWeek); err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	page, err := utils.GetPageNumber(ctx)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get page number error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Invalid_Data, "page"),
+		})
+		return
+	}
+
+	schedules, totalRows, err := GetPassengerSchedules(ctx, sessionId, driverId, groupId, direction, dayOfWeek, page)
+	if err != nil {
+		logger.LogError(sessionId, "get passenger schedules error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	schedulesResp := passengerSchedulesResp(schedules, totalRows)
+
+	logger.LogInfo("Response returned from GetGroupPassengerSchedulesHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, schedulesResp)
+}

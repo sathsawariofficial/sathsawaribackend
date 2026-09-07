@@ -764,3 +764,60 @@ func notifySubManagerChanges(ctx *gin.Context, sessionId string, group postgress
 			constants.NOTIFICATION_TITLE_GROUP_DECISION, fmt.Sprintf(constants.NOTIFICATION_MESSAGE_SUBMANAGER_REMOVED, group.Name), data)
 	}
 }
+
+// getGroupPassengerSchedules reads the standing travel forms of the fleet's
+// passengers, which is the sheet a manager actually builds a shift from. It is one
+// joined query over the whole page of passengers, never one lookup per passenger.
+func getGroupPassengerSchedules(orgCtx *gin.Context, groupId, direction string, dayOfWeek, page int) (
+	schedules []postgress.GroupPassengerScheduleDetails,
+	totalRows int64,
+	err error,
+) {
+	pageSize := configuration.ConfigurationData.PageSize
+	offset := (page - 1) * pageSize
+
+	ctx, cancel := withTimeout(orgCtx)
+	defer cancel()
+
+	query := database.DatabaseConn.Postgres.WithContext(ctx).
+		Table("passenger_location_preferences").
+		Select(`
+			passengers.id AS passenger_id,
+			passengers.passenger_name,
+			passengers.passenger_mobile,
+			passengers.gender,
+			passenger_location_preferences.day_of_week,
+			passenger_location_preferences.direction,
+			passenger_location_preferences.is_enabled,
+			passenger_location_preferences.location,
+			passenger_location_preferences.lat,
+			passenger_location_preferences.lng,
+			passenger_location_preferences.scheduled_time
+		`).
+		Joins("JOIN passengers ON passengers.id = passenger_location_preferences.passenger_id").
+		Joins("JOIN group_passengers ON group_passengers.passenger_id = passengers.id").
+		Where("group_passengers.group_id = ?", groupId).
+		Where("group_passengers.status = ?", constants.Membership_Status_Approved).
+		Where("passengers.status = ?", constants.Status_Active)
+
+	if dayOfWeek > 0 {
+		query = query.Where("passenger_location_preferences.day_of_week = ?", dayOfWeek)
+	}
+
+	if !utils.IsStringEmpty(direction) {
+		query = query.Where("passenger_location_preferences.direction = ?", direction)
+	}
+
+	countQuery := query.Session(&gorm.Session{})
+	if err = countQuery.Count(&totalRows).Error; err != nil {
+		return
+	}
+
+	err = query.
+		Order("passenger_location_preferences.day_of_week ASC, passenger_location_preferences.scheduled_time ASC, passengers.passenger_name ASC").
+		Limit(pageSize).
+		Offset(offset).
+		Find(&schedules).Error
+
+	return
+}

@@ -83,6 +83,7 @@ const (
 	Role_Key               = "role_id"
 	Permission_Key         = "permission_id"
 	Direction_Key          = "direction"
+	Day_Of_Week_Key        = "day_of_week"
 	Date_Key               = "date"
 	Driver_Key             = "driver_id"
 	Passenger_Key          = "passenger_id"

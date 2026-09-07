@@ -492,3 +492,37 @@ func DeleteGroup(ctx *gin.Context, sessionId, driverId, groupId string) (err err
 
 	return
 }
+
+// GetPassengerSchedules hands the manager the standing travel forms of the fleet's
+// passengers. This is the sheet point 7 of the brief describes and the one a shift
+// is actually built from: who wants to travel on this day, in this direction, from
+// where and at what time. It is gated on the seat assigning permission rather than
+// plain membership, since it carries people's home addresses.
+func GetPassengerSchedules(ctx *gin.Context, sessionId, driverId, groupId, direction string, dayOfWeek, page int) (
+	schedules []postgress.GroupPassengerScheduleDetails,
+	totalRows int64,
+	err error,
+) {
+	logger.LogInfo("Request received in GetPassengerSchedules", sessionId)
+
+	if _, err = database.GetGroupById(ctx, groupId); err != nil {
+		logger.LogError(sessionId, "failed to get group error: "+err.Error())
+		err = errors.New(constants.Group_Not_Found)
+		return
+	}
+
+	if err = requirePermission(ctx, sessionId, groupId, driverId, constants.PERMISSION_SHIFT_ASSIGN_SEATS); err != nil {
+		return
+	}
+
+	schedules, totalRows, err = getGroupPassengerSchedules(ctx, groupId, direction, dayOfWeek, page)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get the schedules error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the passenger schedules")
+		return
+	}
+
+	logger.LogInfo("Response returned from GetPassengerSchedules", sessionId)
+
+	return
+}

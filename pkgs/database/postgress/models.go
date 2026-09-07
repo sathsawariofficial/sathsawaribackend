@@ -600,6 +600,23 @@ type GroupVehicleDetails struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
+// GroupPassengerScheduleDetails is one leg of one passenger's standing travel form,
+// read by the manager while deciding who to seat on which shift. A passenger shows
+// up once per day and direction they asked to travel on.
+type GroupPassengerScheduleDetails struct {
+	PassengerID     string  `json:"passenger_id"`
+	PassengerName   string  `json:"passenger_name"`
+	PassengerMobile string  `json:"passenger_mobile"`
+	Gender          string  `json:"gender"`
+	DayOfWeek       int     `json:"day_of_week"`
+	Direction       string  `json:"direction"`
+	IsEnabled       bool    `json:"is_enabled"`
+	Location        string  `json:"location"`
+	Lat             float64 `json:"lat"`
+	Lng             float64 `json:"lng"`
+	ScheduledTime   string  `json:"scheduled_time"`
+}
+
 // GroupPassengerDetails is the joined read projection of a passenger in a group.
 type GroupPassengerDetails struct {
 	ID              string    `json:"id"`

@@ -175,6 +175,9 @@ func main() {
 				groupProtected.PATCH("/requests", group.DecideGroupRequestsHandler)
 				groupProtected.PATCH("/submanagers", group.SetGroupSubManagersHandler)
 				groupProtected.DELETE("", group.DeleteGroupHandler)
+
+				// the travel forms the manager reads while building a shift
+				groupProtected.GET("/passengers/schedules", group.GetGroupPassengerSchedulesHandler)
 			}
 
 			// building and running the shifts of a fleet
