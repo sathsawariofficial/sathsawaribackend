@@ -381,7 +381,7 @@
       <div>branch <b>feature/shift-management</b></div>
       <div>tables <b>14 new</b></div>
       <div>endpoints <b>56 new</b></div>
-      <div>verified <b>109/109 live</b></div>
+      <div>verified <b>118/118 live</b></div>
       <div>packages <b>group · shift</b></div>
     </div>
   </header>
@@ -791,9 +791,10 @@
           <!-- the four checks -->
           <text x="20" y="222" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1.2" fill="currentColor" opacity="0.55">FOUR CHECKS RUN BEFORE ANY SHIFT IS WRITTEN</text>
           <text x="20" y="242" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">vehicle vs shifts · vehicle vs rides · driver vs shifts · driver vs rides</text>
+          <text x="20" y="262" font-family="JetBrains Mono, monospace" font-size="11.5" fill="var(--pickup)">and every passenger being seated, who cannot be in two vans at once either</text>
         </svg>
       </div>
-      <figcaption><b>The check runs in both directions.</b> Creating a carpool ride now also asks whether that driver or vehicle is on a shift — the single change made to the existing ride code, twenty-four lines in <code>CreateRide</code>.</figcaption>
+      <figcaption><b>The check runs in both directions, and covers the people as well as the machines.</b> Creating a carpool ride asks whether that driver or vehicle is on a shift, and a recurring series asks it again for every date it lays down — the first ride being clean never meant the twentieth was. A date that clashes is skipped rather than failing the whole series.</figcaption>
     </figure>
 
     <div class="col">
@@ -809,7 +810,12 @@
         <li>Deleting a fleet that still has shifts ahead of it.</li>
         <li>Deleting a role that is still held by a member, or renaming a system role.</li>
         <li>A driver leaving a fleet while shifts still expect them behind the wheel.</li>
+        <li>A driver leaving while a vehicle they lent is carrying a shift — even one somebody else drives, because their vehicles leave with them.</li>
         <li>The owner leaving their own fleet — they delete it instead.</li>
+        <li>A passenger being seated on two shifts that overlap in time.</li>
+        <li>A shift scheduled in the past, or rescheduled backwards into it.</li>
+        <li>Rescheduling a shift that departs within two hours — people are already on their way to the stop.</li>
+        <li>Lowering a vehicle's seat count beneath a shift already built on it.</li>
       </ul>
     </div>
   </section>
