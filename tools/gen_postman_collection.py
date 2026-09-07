@@ -150,6 +150,19 @@ EXAMPLE_MAP = {
     "Cancel Shift": ["Cancel the sub manager shift"],
     "Get Shift Templates": ["Get shift templates"],
     "Delete Shift Template": ["Delete shift template"],
+    "Create Ride": ["Create carpool ride", "Carpool ride clashing with a shift (refused)"],
+    "Driver Rides": ["Driver rides"],
+    "Get One Ride": ["Get one ride"],
+    "Filtered Rides": ["Filtered rides"],
+    "Ride Templates": ["Ride templates"],
+    "Update Ride": ["Update ride seats"],
+    "Passenger Ride Request": ["Passenger ride request"],
+    "Get Ride Requests": ["Get ride requests"],
+    "Get Announcements": ["Get announcements"],
+    "Driver Notifications": ["Driver notifications"],
+    "Admin · List Rides": ["Admin list rides"],
+    "Admin · List Drivers": ["Admin list drivers"],
+    "Admin · List Vehicles": ["Admin list vehicles"],
 }
 
 def req(name, method, path, token, body=None, query=None, tests=None, desc=None, examples=None):
@@ -805,6 +818,66 @@ templates = {"name": "5 · Templates", "item": [
         desc="Deletes the template with its stops and seats. Needs shift.manage_templates."),
 ]}
 
+
+# ----------------------------------------------------- 6 rideshare ----------
+# The existing carpool feature. Only one line of it changed for the fleet work,
+# the clash check, but its saved responses had drifted from what the server
+# actually returns, so they are recaptured here.
+rideshare = {"name": "6 · Rideshare (existing carpool)", "item": [
+    req("Create Ride", "POST", "/api/v1/ride/create", "owner_session",
+        body={
+            "startDatetime": "2026-09-15 15:30:00", "estimatedEndDatetime": "2026-09-15 17:00:00",
+            "numberOfSeats": 3, "startLocation": "Location A", "endLocation": "Location B",
+            "routePoints": ["LocationA1", "LocationA2"], "fare": 20.5,
+            "routeDetails": "Via Highway 1", "vehicleId": "{{owner_vehicle_id}}",
+            "makeTemplate": True, "isRecurring": False, "frequency": 1, "period": 1,
+            "daysOfWeek": [1],
+        },
+        tests=save("ride_id", "r.data.id"),
+        desc=("Unchanged except for one added guard: the vehicle and the driver are now also "
+              "checked against the fleet shifts, so a carpool ride cannot be created on top of a "
+              "shift. The second saved response shows that refusal.")),
+
+    req("Driver Rides", "GET", "/api/v1/driver/rides", "owner_session",
+        query=[q("page", "1"), q("status", "all")]),
+
+    req("Get One Ride", "GET", "/api/v1/ride", "open_token",
+        query=[q("ride_id", "{{ride_id}}")]),
+
+    req("Filtered Rides", "GET", "/api/v1/ride/filtered", "open_token",
+        query=[q("page", "1"), q("search", "LocationA1")]),
+
+    req("Ride Templates", "GET", "/api/v1/ride/templates", "owner_session"),
+
+    req("Update Ride", "PATCH", "/api/v1/driver/ride/update", "owner_session",
+        query=[q("ride_id", "{{ride_id}}")],
+        body={"numberOfSeats": 2}),
+
+    req("Passenger Ride Request", "POST", "/api/v1/passenger/ride/request", "open_token",
+        body={
+            "startDatetime": "2026-09-15 15:30:00", "estimatedEndDatetime": "2026-09-15 17:00:00",
+            "numberOfSeats": 2, "startLocation": "Location A", "endLocation": "Location B",
+            "routeDetails": "via gt road", "contactNumber": "+923301221121",
+        }),
+
+    req("Get Ride Requests", "GET", "/api/v1/driver/ride/requests", "owner_session",
+        query=[q("page", "1")]),
+
+    req("Get Announcements", "GET", "/api/v1/announcements", "open_token"),
+
+    req("Driver Notifications", "GET", "/api/v1/user/notifications", "owner_session"),
+
+    req("Admin · List Rides", "GET", "/api/v1/admin/rides", "admin_session",
+        query=[q("page", "1")]),
+
+    req("Admin · List Drivers", "GET", "/api/v1/admin/drivers", "admin_session",
+        query=[q("page", "1")]),
+
+    req("Admin · List Vehicles", "GET", "/api/v1/admin/vehicles", "admin_session",
+        query=[q("page", "1")],
+        desc="Now carries numberOfSeats, hasAC and hasHeating, and its totalPages is correct (it used to count a query that already had the page limit applied)."),
+]}
+
 collection = {
     "info": {
         "_postman_id": "b7c41f02-5e6a-4d38-9c11-3a7f0e2b4d91",
@@ -831,7 +904,7 @@ collection = {
         ),
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     },
-    "item": [admin, accounts, form, group, shifts, templates],
+    "item": [admin, accounts, form, group, shifts, templates, rideshare],
     "variable": [
         {"key": "base-url", "value": "http://localhost:8080", "type": "string"},
     ],

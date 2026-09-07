@@ -6785,6 +6785,1031 @@
           ]
         }
       ]
+    },
+    {
+      "name": "6 \u00b7 Rideshare (existing carpool)",
+      "item": [
+        {
+          "name": "Create Ride",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/ride/create",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ride",
+                "create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"startDatetime\": \"2026-09-15 15:30:00\",\n    \"estimatedEndDatetime\": \"2026-09-15 17:00:00\",\n    \"numberOfSeats\": 3,\n    \"startLocation\": \"Location A\",\n    \"endLocation\": \"Location B\",\n    \"routePoints\": [\n        \"LocationA1\",\n        \"LocationA2\"\n    ],\n    \"fare\": 20.5,\n    \"routeDetails\": \"Via Highway 1\",\n    \"vehicleId\": \"{{owner_vehicle_id}}\",\n    \"makeTemplate\": true,\n    \"isRecurring\": false,\n    \"frequency\": 1,\n    \"period\": 1,\n    \"daysOfWeek\": [\n        1\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Unchanged except for one added guard: the vehicle and the driver are now also checked against the fleet shifts, so a carpool ride cannot be created on top of a shift. The second saved response shows that refusal."
+          },
+          "response": [
+            {
+              "name": "SUCCESS",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base-url}}/api/v1/ride/create",
+                  "host": [
+                    "{{base-url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "ride",
+                    "create"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"startDatetime\": \"2026-09-15 15:30:00\",\n    \"estimatedEndDatetime\": \"2026-09-15 17:00:00\",\n    \"numberOfSeats\": 3,\n    \"startLocation\": \"Location A\",\n    \"endLocation\": \"Location B\",\n    \"routePoints\": [\n        \"LocationA1\",\n        \"LocationA2\"\n    ],\n    \"fare\": 20.5,\n    \"routeDetails\": \"Via Highway 1\",\n    \"vehicleId\": \"d213f526-6e8e-48a0-9eb4-f7f49ae0fc88\",\n    \"makeTemplate\": true,\n    \"isRecurring\": false,\n    \"frequency\": 1,\n    \"period\": 1,\n    \"daysOfWeek\": [\n        1\n    ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"code\": 200,\n    \"message\": \"Ride created successfully\",\n    \"data\": {\n        \"id\": \"1bfe0d9e-53ce-4f1b-bc32-16db5b23dee1\",\n        \"isPro\": false,\n        \"openUrl\": \"https://sathsawari.com/r/GxwfKMePspb\"\n    }\n}"
+            },
+            {
+              "name": "ERROR \u00b7 the vehicle is on a fleet shift at that hour",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base-url}}/api/v1/ride/create",
+                  "host": [
+                    "{{base-url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "ride",
+                    "create"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"startDatetime\": \"2026-09-14 07:30:00\",\n    \"estimatedEndDatetime\": \"2026-09-14 08:00:00\",\n    \"numberOfSeats\": 2,\n    \"startLocation\": \"Location A\",\n    \"endLocation\": \"Location B\",\n    \"routePoints\": [\n        \"LocationA1\"\n    ],\n    \"fare\": 20.5,\n    \"routeDetails\": \"Overlaps the morning shift\",\n    \"vehicleId\": \"d213f526-6e8e-48a0-9eb4-f7f49ae0fc88\",\n    \"makeTemplate\": false,\n    \"isRecurring\": false,\n    \"frequency\": 1,\n    \"period\": 1,\n    \"daysOfWeek\": [\n        1\n    ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"code\": 400,\n    \"message\": \"Vehicle already has a ride or a shift scheduled for this duration\",\n    \"data\": null\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.data && (r.data.id) !== undefined && (r.data.id) !== null) {",
+                  "    pm.environment.set(\"ride_id\", r.data.id);",
+                  "    console.log(\"ride_id saved:\", r.data.id);",
+                  "} else {",
+                  "    console.error(\"ride_id not found in response\");",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Driver Rides",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/driver/rides?page=1&status=all",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "driver",
+                "rides"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "status",
+                  "value": "all"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "SUCCESS",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base-url}}/api/v1/driver/rides?page=1&status=all",
+                  "host": [
+                    "{{base-url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "driver",
+                    "rides"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "status",
+                      "value": "all"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"code\": 200,\n    \"message\": \"Success\",\n    \"data\": {\n        \"driverId\": \"779b0f4b-388f-4dd7-b17d-50993b7ceb24\",\n        \"message\": \"\",\n        \"totalPages\": 1,\n        \"rides\": [\n            {\n                \"id\": \"1bfe0d9e-53ce-4f1b-bc32-16db5b23dee1\",\n                \"driverId\": \"779b0f4b-388f-4dd7-b17d-50993b7ceb24\",\n                \"driverName\": \"Owner Driver\",\n                \"driverMobile\": \"+923401620461\",\n                \"vehicleId\": \"d213f526-6e8e-48a0-9eb4-f7f49ae0fc88\",\n                \"vehicleNumber\": \"FLEET-162046A\",\n                \"vehicleInfo\": \"Hiace van\",\n                \"startDatetime\": \"2026-09-15 15:30:00\",\n                \"estimatedEndDatetime\": \"2026-09-15 17:00:00\",\n                \"numberOfSeats\": 3,\n                \"startLocation\": \"location a\",\n                \"endLocation\": \"location b\",\n                \"routePoints\": [\n                    \"location a\",\n                    \"locationa1\",\n                    \"locationa2\",\n                    \"location b\"\n                ],\n                \"code\": \"364049\",\n                \"fare\": 20.5,\n                \"routeDetails\": \"Via Highway 1\",\n                \"isActive\": true,\n                \"openUrl\": \"https://sathsawari.com/r/GxwfKMePspb\"\n            }\n        ]\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get One Ride",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{open_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/ride?ride_id={{ride_id}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ride"
+              ],
+              "query": [
+                {
+                  "key": "ride_id",
+                  "value": "{{ride_id}}"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "SUCCESS",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base-url}}/api/v1/ride?ride_id=1bfe0d9e-53ce-4f1b-bc32-16db5b23dee1",
+                  "host": [
+                    "{{base-url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "ride"
+                  ],
+                  "query": [
+                    {
+                      "key": "ride_id",
+                      "value": "1bfe0d9e-53ce-4f1b-bc32-16db5b23dee1"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"code\": 200,\n    \"message\": \"Success\",\n    \"data\": {\n        \"ride\": {\n            \"id\": \"1bfe0d9e-53ce-4f1b-bc32-16db5b23dee1\",\n            \"driverId\": \"779b0f4b-388f-4dd7-b17d-50993b7ceb24\",\n            \"driverName\": \"Owner Driver\",\n            \"driverMobile\": \"+923401620461\",\n            \"vehicleId\": \"d213f526-6e8e-48a0-9eb4-f7f49ae0fc88\",\n            \"vehicleNumber\": \"FLEET-162046A\",\n            \"vehicleInfo\": \"Hiace van\",\n            \"startDatetime\": \"2026-09-15 15:30:00\",\n            \"estimatedEndDatetime\": \"2026-09-15 17:00:00\",\n            \"numberOfSeats\": 3,\n            \"startLocation\": \"location a\",\n            \"endLocation\": \"location b\",\n            \"routePoints\": [\n                \"location a\",\n                \"locationa1\",\n                \"locationa2\",\n                \"location b\"\n            ],\n            \"fare\": 20.5,\n            \"routeDetails\": \"Via Highway 1\",\n            \"openUrl\": \"https://sathsawari.com/r/GxwfKMePspb\"\n        },\n        \"childRides\": null\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Filtered Rides",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{open_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/ride/filtered?page=1&search=LocationA1",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ride",
+                "filtered"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "search",
+                  "value": "LocationA1"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "SUCCESS",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base-url}}/api/v1/ride/filtered?page=1&search=LocationA1",
+                  "host": [
+                    "{{base-url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "ride",
+                    "filtered"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "search",
+                      "value": "LocationA1"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"code\": 200,\n    \"message\": \"Success\",\n    \"data\": {\n        \"totalPages\": 1,\n        \"rides\": [\n            {\n                \"id\": \"2d2f58e9-be66-4619-92ce-f57df0ce65f7\",\n                \"driverId\": \"77d87035-ee86-4bd5-8d8a-0c20c5ebe3a1\",\n                \"driverName\": \"talha\",\n                \"driverMobile\": \"+923405421341\",\n                \"vehicleId\": \"6196d330-1efd-4bc1-a357-9504dec44aa9\",\n                \"vehicleNumber\": \"12345\",\n                \"vehicleInfo\": \"mehran\",\n                \"startDatetime\": \"2026-09-08 12:30:00\",\n                \"estimatedEndDatetime\": \"2026-09-08 13:00:00\",\n                \"numberOfSeats\": 3,\n                \"startLocation\": \"location a\",\n                \"endLocation\": \"location b\",\n                \"routePoints\": [\n                    \"location a\",\n                    \"locationa1\",\n                    \"locationa2\",\n                    \"locationa3\",\n                    \"locationa4\",\n                    \"locationa5\",\n                    \"location b\"\n                ],\n                \"fare\": 20.5,\n                \"routeDetails\": \"Via Highway 1\",\n                \"parent_id\": \"de761565-7aff-49ea-9236-3eee2ebf543f\",\n                \"isActive\": true,\n                \"openUrl\": \"https://sathsawari.com/r/FyEbpHIjYeU\"\n            },\n            {\n                \"id\": \"1b08e267-18c3-43f4-a5f6-63e09f8e7af7\",\n                \"driverId\": \"77d87035-ee86-4bd5-8d8a-0c20c5ebe3a1\",\n                \"driverName\": \"talha\",\n                \"driverMobile\": \"+923405421341\",\n                \"vehicleId\": \"6196d330-1efd-4bc1-a357-9504dec44aa9\",\n                \"vehicleNumber\": \"12345\",\n                \"vehicleInfo\": \"mehran\",\n                \"startDatetime\": \"2026-09-09 12:30:00\",\n                \"estimatedEndDatetime\": \"2026-09-09 13:00:00\",\n                \"numberOfSeats\": 3,\n                \"startLocation\": \"location a\",\n                \"endLocation\": \"location b\",\n                \"routePoints\": [\n                    \"location a\",\n                    \"locationa1\",\n                    \"locationa2\",\n                    \"locationa3\",\n                    \"locationa4\",\n                    \"locationa5\",\n                    \"location b\"\n                ],\n                \"fare\": 20.5,\n                \"routeDetails\": \"Via Highway 1\",\n                \"parent_id\": \"de761565-7aff-49ea-9236-3eee2ebf543f\",\n                \"isActive\": true,\n                \"openUrl\": \"https://sathsawari.com/r/5cS7uW0KxIi\"\n            },\n            {\n                \"id\": \"baf828c6-3b93-4047-91de-67b16f018623\",\n                \"driverId\": \"77d87035-ee86-4bd5-8d8a-0c20c5ebe3a1\",\n                \"driverName\": \"talha\",\n                \"driverMobile\": \"+923405421341\",\n                \"vehicleId\": \"6196d330-1efd-4bc1-a357-9504dec44aa9\",\n                \"vehicleNumber\": \"12345\",\n                \"vehicleInfo\": \"mehran\",\n                \"startDatetime\": \"2026-09-10 12:30:00\",\n                \"estimatedEndDatetime\": \"2026-09-10 13:00:00\",\n                \"numberOfSeats\": 3,\n                \"startLocation\": \"location a\",\n                \"endLocation\": \"location b\",\n                \"routePoints\": [\n                    \"location a\",\n                    \"locationa1\",\n                    \"locationa2\",\n                    \"locationa3\",\n                    \"locationa4\",\n                    \"locationa5\",\n                    \"location b\"\n                ],\n                \"fare\": 20.5,\n                \"routeDetails\": \"Via Highway 1\",\n                \"parent_id\": \"de761565-7aff-49ea-9236-3eee2ebf543f\",\n                \"isActive\": true,\n                \"openUrl\": \"https://sathsawari.com/r/LmOqIpEoyRv\"\n            },\n            {\n                \"id\": \"30ef3775-b2d1-43bb-b13c-c57374bbb924\",\n                \"driverId\": \"77d87035-ee86-4bd5-8d8a-0c20c5ebe3a1\",\n                \"driverName\": \"talha\",\n                \"driverMobile\": \"+923405421341\",\n                \"vehicleId\": \"6196d330-1efd-4bc1-a357-9504dec44aa9\",\n                \"vehicleNumber\": \"12345\",\n                \"vehicleInfo\": \"mehran\",\n                \"startDatetime\": \"2026-09-11 12:30:00\",\n                \"estimatedEndDatetime\": \"2026-09-11 13:00:00\",\n                \"numberOfSeats\": 3,\n                \"startLocation\": \"location a\",\n                \"endLocation\": \"location b\",\n                \"routePoints\": [\n                    \"location a\",\n                    \"locationa1\",\n                    \"locationa2\",\n                    \"locationa3\",\n                    \"locationa4\",\n                    \"locationa5\",\n                    \"location b\"\n                ],\n                \"fare\": 20.5,\n                \"routeDetails\": \"Via Highway 1\",\n                \"parent_id\": \"de761565-7aff-49ea-9236-3eee2ebf543f\",\n                \"isActive\": true,\n                \"openUrl\": \"https://sathsawari.com/r/Cwjee1yC8wG\"\n            },\n            {\n                \"id\": \"ab7018f2-c83a-493b-b552-3c9766b0ac07\",\n                \"driverId\": \"77d87035-ee86-4bd5-8d8a-0c20c5ebe3a1\",\n                \"driverName\": \"talha\",\n                \"driverMobile\": \"+923405421341\",\n                \"vehicleId\": \"6196d330-1efd-4bc1-a357-9504dec44aa9\",\n                \"vehicleNumber\": \"12345\",\n                \"vehicleInfo\": \"mehran\",\n                \"startDatetime\": \"2026-09-12 12:30:00\",\n                \"estimatedEndDatetime\": \"2026-09-12 13:00:00\",\n                \"numberOfSeats\": 3,\n                \"startLocation\": \"location a\",\n                \"endLocation\": \"location b\",\n                \"routePoints\": [\n                    \"location a\",\n                    \"locationa1\",\n                    \"locationa2\",\n                    \"locationa3\",\n                    \"locationa4\",\n                    \"locationa5\",\n                    \"location b\"\n                ],\n                \"fare\": 20.5,\n                \"routeDetails\": \"Via Highway 1\",\n                \"parent_id\": \"de761565-7aff-49ea-9236-3eee2ebf543f\",\n                \"isActive\": true,\n                \"openUrl\": \"https://sathsawari.com/r/LYM7vTn96nT\"\n            },\n            {\n                \"id\": \"802ba778-7780-4776-ac15-410ed64e2bb0\",\n                \"driverId\": \"77d87035-ee86-4bd5-8d8a-0c20c5ebe3a1\",\n                \"driverName\": \"talha\",\n                \"driverMobile\": \"+923405421341\",\n                \"vehicleId\": \"6196d330-1efd-4bc1-a357-9504dec44aa9\",\n                \"vehicleNumber\": \"12345\",\n                \"vehicleInfo\": \"mehran\",\n                \"startDatetime\": \"2026-09-13 12:30:00\",\n                \"estimatedEndDatetime\": \"2026-09-13 13:00:00\",\n                \"numberOfSeats\": 3,\n                \"startLocation\": \"location a\",\n                \"endLocation\": \"location b\",\n                \"routePoints\": [\n                    \"location a\",\n                    \"locationa1\",\n                    \"locationa2\",\n                    \"locationa3\",\n                    \"locationa4\",\n                    \"locationa5\",\n                    \"location b\"\n                ],\n                \"fare\": 20.5,\n                \"routeDetails\": \"Via Highway 1\",\n                \"parent_id\": \"de761565-7aff-49ea-9236-3eee2ebf543f\",\n                \"isActive\": true,\n                \"openUrl\": \"https://sathsawari.com/r/KndoTLFhMXT\"\n            },\n            {\n                \"id\": \"f3c5a9ba-44cc-4329-9135-f3dd5c30b2ed\",\n                \"driverId\": \"77d87035-ee86-4bd5-8d8a-0c20c5ebe3a1\",\n                \"driverName\": \"talha\",\n                \"driverMobile\": \"+923405421341\",\n                \"vehicleId\": \"6196d330-1efd-4bc1-a357-9504dec44aa9\",\n                \"vehicleNumber\": \"12345\",\n                \"vehicleInfo\": \"mehran\",\n                \"startDatetime\": \"2026-09-14 12:30:00\",\n                \"estimatedEndDatetime\": \"2026-09-14 13:00:00\",\n                \"numberOfSeats\": 3,\n                \"startLocation\": \"location a\",\n                \"endLocation\": \"location b\",\n                \"routePoints\": [\n                    \"location a\",\n                    \"locationa1\",\n                    \"locationa2\",\n                    \"locationa3\",\n                    \"locationa4\",\n                    \"locationa5\",\n                    \"location b\"\n                ],\n                \"fare\": 20.5,\n                \"routeDetails\": \"Via Highway 1\",\n                \"parent_id\": \"de761565-7aff-49ea-9236-3eee2ebf543f\",\n                \"isActive\": true,\n                \"openUrl\": \"https://sathsawari.com/r/CxAW6Q2hicX\"\n            }\n        ]\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Ride Templates",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/ride/templates",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ride",
+                "templates"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "SUCCESS",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base-url}}/api/v1/ride/templates",
+                  "host": [
+                    "{{base-url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "ride",
+                    "templates"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"code\": 200,\n    \"message\": \"Success\",\n    \"data\": [\n        {\n            \"id\": \"1b98fd19-e6c7-4802-a776-c0de23163c97\",\n            \"rideId\": \"1bfe0d9e-53ce-4f1b-bc32-16db5b23dee1\",\n            \"driverId\": \"779b0f4b-388f-4dd7-b17d-50993b7ceb24\",\n            \"vehicleId\": \"d213f526-6e8e-48a0-9eb4-f7f49ae0fc88\",\n            \"vehicleNumber\": \"FLEET-162046A\",\n            \"vehicleInfo\": \"Hiace van\",\n            \"startDatetime\": \"2026-09-07 15:30:00\",\n            \"estimatedEndDatetime\": \"2026-09-07 17:00:00\",\n            \"numberOfSeats\": 3,\n            \"seatsTaken\": 0,\n            \"startLocation\": \"Location A\",\n            \"endLocation\": \"Location B\",\n            \"fare\": 20.5,\n            \"routeDetails\": \"Via Highway 1\"\n        }\n    ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Ride",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/driver/ride/update?ride_id={{ride_id}}",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "driver",
+                "ride",
+                "update"
+              ],
+              "query": [
+                {
+                  "key": "ride_id",
+                  "value": "{{ride_id}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"numberOfSeats\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "SUCCESS",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [],
+                "url": {
+                  "raw": "{{base-url}}/api/v1/driver/ride/update?ride_id=1bfe0d9e-53ce-4f1b-bc32-16db5b23dee1",
+                  "host": [
+                    "{{base-url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "driver",
+                    "ride",
+                    "update"
+                  ],
+                  "query": [
+                    {
+                      "key": "ride_id",
+                      "value": "1bfe0d9e-53ce-4f1b-bc32-16db5b23dee1"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"numberOfSeats\": 2\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"code\": 200,\n    \"message\": \"Success\",\n    \"data\": null\n}"
+            }
+          ]
+        },
+        {
+          "name": "Passenger Ride Request",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{open_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/passenger/ride/request",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "ride",
+                "request"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"startDatetime\": \"2026-09-15 15:30:00\",\n    \"estimatedEndDatetime\": \"2026-09-15 17:00:00\",\n    \"numberOfSeats\": 2,\n    \"startLocation\": \"Location A\",\n    \"endLocation\": \"Location B\",\n    \"routeDetails\": \"via gt road\",\n    \"contactNumber\": \"+923301221121\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "SUCCESS",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base-url}}/api/v1/passenger/ride/request",
+                  "host": [
+                    "{{base-url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "passenger",
+                    "ride",
+                    "request"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"startDatetime\": \"2026-09-15 15:30:00\",\n    \"estimatedEndDatetime\": \"2026-09-15 17:00:00\",\n    \"numberOfSeats\": 2,\n    \"startLocation\": \"Location A\",\n    \"endLocation\": \"Location B\",\n    \"routeDetails\": \"via gt road\",\n    \"contactNumber\": \"+923301221121\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"code\": 200,\n    \"message\": \"Request broadcasted successfully\",\n    \"data\": {\n        \"openUrl\": \"0cd226d9-503d-4f70-b6e0-4d9ae9e21920\",\n        \"requestId\": \"https://sathsawari.com/rq/GtrcvKr4Pcf\"\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Ride Requests",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/driver/ride/requests?page=1",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "driver",
+                "ride",
+                "requests"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "SUCCESS",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base-url}}/api/v1/driver/ride/requests?page=1",
+                  "host": [
+                    "{{base-url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "driver",
+                    "ride",
+                    "requests"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"code\": 200,\n    \"message\": \"Success\",\n    \"data\": {\n        \"totalPages\": 1,\n        \"rides\": [\n            {\n                \"id\": \"967a227d-a223-4711-94df-5c0a9b04d92d\",\n                \"contactNumber\": \"+923301221121\",\n                \"startDatetime\": \"2026-09-15 15:30:00\",\n                \"estimatedEndDatetime\": \"2026-09-15 17:00:00\",\n                \"numberOfSeats\": 2,\n                \"startLocation\": \"Location A\",\n                \"endLocation\": \"Location B\",\n                \"routeDetails\": \"via gt road\",\n                \"openUrl\": \"https://sathsawari.com/rq/HRJqKzf68Zw\"\n            },\n            {\n                \"id\": \"12299e21-9ccd-43ba-b672-18ca53bd8766\",\n                \"contactNumber\": \"+923301221121\",\n                \"startDatetime\": \"2026-09-15 15:30:00\",\n                \"estimatedEndDatetime\": \"2026-09-15 17:00:00\",\n                \"numberOfSeats\": 2,\n                \"startLocation\": \"Location A\",\n                \"endLocation\": \"Location B\",\n                \"routeDetails\": \"via gt road\",\n                \"openUrl\": \"https://sathsawari.com/rq/yZm3lat4cp\"\n            },\n            {\n                \"id\": \"0cd226d9-503d-4f70-b6e0-4d9ae9e21920\",\n                \"contactNumber\": \"+923301221121\",\n                \"startDatetime\": \"2026-09-15 15:30:00\",\n                \"estimatedEndDatetime\": \"2026-09-15 17:00:00\",\n                \"numberOfSeats\": 2,\n                \"startLocation\": \"Location A\",\n                \"endLocation\": \"Location B\",\n                \"routeDetails\": \"via gt road\",\n                \"openUrl\": \"https://sathsawari.com/rq/GtrcvKr4Pcf\"\n            }\n        ]\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Announcements",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{open_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/announcements",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "announcements"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "SUCCESS",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base-url}}/api/v1/announcements",
+                  "host": [
+                    "{{base-url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "announcements"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"code\": 200,\n    \"message\": \"Success\",\n    \"data\": {\n        \"totalPages\": 1,\n        \"announcements\": [\n            {\n                \"id\": \"a0d37559-7b4a-4c3a-93c3-df3d4d27effb\",\n                \"title\": \"Rain Update\",\n                \"message\": \"Carry umberella\",\n                \"type\": \"\",\n                \"link\": \"\",\n                \"processed\": false,\n                \"created_at\": \"2026-08-05T21:18:53.763007+05:00\"\n            }\n        ]\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Driver Notifications",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{owner_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/user/notifications",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "user",
+                "notifications"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "SUCCESS",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base-url}}/api/v1/user/notifications",
+                  "host": [
+                    "{{base-url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "user",
+                    "notifications"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"code\": 200,\n    \"message\": \"Success\",\n    \"data\": {\n        \"totalPages\": 1,\n        \"notifications\": [\n            {\n                \"id\": \"ba40dd12-09de-4c8f-abe4-72b49167a1da\",\n                \"userId\": \"779b0f4b-388f-4dd7-b17d-50993b7ceb24\",\n                \"userType\": 1,\n                \"title\": \"Ride Created\",\n                \"message\": \"You have created a ride\",\n                \"data\": null,\n                \"createdAt\": \"2026-09-07T16:20:47.809981+05:00\"\n            },\n            {\n                \"id\": \"0b9d2853-db9d-40ce-b758-3c3a42f89136\",\n                \"userId\": \"779b0f4b-388f-4dd7-b17d-50993b7ceb24\",\n                \"userType\": 1,\n                \"title\": \"Shift Updated\",\n                \"message\": \"Your pickup shift on 2026-09-14 07:20:00. Vehicle FLEET-162046A with 1 passenger(s), 3 stop(s), starting Bahria Town Phase 4. For any issue contact Owner Driver (+923401620461).\",\n                \"data\": {\n                    \"groupId\": \"d68c4349-8495-4803-ad6d-7e8af7e61481\",\n                    \"shiftId\": \"186f1e7d-e556-4e9c-9f67-016e10548af8\"\n                },\n                \"createdAt\": \"2026-09-07T16:20:47.790303+05:00\"\n            },\n            {\n                \"id\": \"86ea9f29-8f5e-4e32-bdb5-a0dd7c1d6d9d\",\n                \"userId\": \"779b0f4b-388f-4dd7-b17d-50993b7ceb24\",\n                \"userType\": 1,\n                \"title\": \"Shift Updated\",\n                \"message\": \"Your pickup shift on 2026-09-14 07:00:00. Vehicle FLEET-162046A with 1 passenger(s), 3 stop(s), starting Bahria Town Phase 4. For any issue contact Owner Driver (+923401620461).\",\n                \"data\": {\n                    \"groupId\": \"d68c4349-8495-4803-ad6d-7e8af7e61481\",\n                    \"shiftId\": \"186f1e7d-e556-4e9c-9f67-016e10548af8\"\n                },\n                \"createdAt\": \"2026-09-07T16:20:47.786329+05:00\"\n            },\n            {\n                \"id\": \"12856047-7f60-42f8-b956-e89c9048ad73\",\n                \"userId\": \"779b0f4b-388f-4dd7-b17d-50993b7ceb24\",\n                \"userType\": 1,\n                \"title\": \"Shift Updated\",\n                \"message\": \"Your pickup shift on 2026-09-14 07:00:00. Vehicle FLEET-162046A with 2 passenger(s), 3 stop(s), starting Bahria Town Phase 4. For any issue contact Owner Driver (+923401620461).\",\n                \"data\": {\n                    \"groupId\": \"d68c4349-8495-4803-ad6d-7e8af7e61481\",\n                    \"shiftId\": \"186f1e7d-e556-4e9c-9f67-016e10548af8\"\n                },\n                \"createdAt\": \"2026-09-07T16:20:47.777774+05:00\"\n            },\n            {\n                \"id\": \"041029f7-7995-4fd1-b962-04e654fb870f\",\n                \"userId\": \"779b0f4b-388f-4dd7-b17d-50993b7ceb24\",\n                \"userType\": 1,\n                \"title\": \"Shift Scheduled\",\n                \"message\": \"Your drop shift on 2026-09-14 17:00:00. Vehicle FLEET-162046A with 2 passenger(s), 3 stop(s), starting Roots School F-8. For any issue contact Owner Driver (+923401620461).\",\n                \"data\": {\n                    \"groupId\": \"d68c4349-8495-4803-ad6d-7e8af7e61481\",\n                    \"shiftId\": \"21eb71e7-7717-4364-b356-91b507e3983e\"\n                },\n                \"createdAt\": \"2026-09-07T16:20:47.751244+05:00\"\n            },\n            {\n                \"id\": \"47b54bda-67db-4d9a-9459-07af1cee290a\",\n                \"userId\": \"779b0f4b-388f-4dd7-b17d-50993b7ceb24\",\n                \"userType\": 1,\n                \"title\": \"Shift Scheduled\",\n                \"message\": \"Your pickup shift on 2026-09-14 07:00:00. Vehicle FLEET-162046A with 2 passenger(s), 3 stop(s), starting Bahria Town Phase 4. For any issue contact Owner Driver (+923401620461).\",\n                \"data\": {\n                    \"groupId\": \"d68c4349-8495-4803-ad6d-7e8af7e61481\",\n                    \"shiftId\": \"186f1e7d-e556-4e9c-9f67-016e10548af8\"\n                },\n                \"createdAt\": \"2026-09-07T16:20:47.74015+05:00\"\n            },\n            {\n                \"id\": \"aba8fa99-53da-4097-b130-23e047095d40\",\n                \"userId\": \"779b0f4b-388f-4dd7-b17d-50993b7ceb24\",\n                \"userType\": 1,\n                \"title\": \"New Group Request\",\n                \"message\": \"Bilal has requested to join your group Morning School Fleet 162046\",\n                \"data\": {\n                    \"groupId\": \"d68c4349-8495-4803-ad6d-7e8af7e61481\"\n                },\n                \"createdAt\": \"2026-09-07T16:20:47.70394+05:00\"\n            },\n            {\n                \"id\": \"c8274a51-2358-4282-9a51-3f8b50f088ef\",\n                \"userId\": \"779b0f4b-388f-4dd7-b17d-50993b7ceb24\",\n                \"userType\": 1,\n                \"title\": \"New Group Request\",\n                \"message\": \"Ayesha has requested to join your group Morning School Fleet 162046\",\n                \"data\": {\n                    \"groupId\": \"d68c4349-8495-4803-ad6d-7e8af7e61481\"\n                },\n                \"createdAt\": \"2026-09-07T16:20:47.699612+05:00\"\n            },\n            {\n                \"id\": \"bcb11897-5254-43ea-97ed-2a9067bb5bea\",\n                \"userId\": \"779b0f4b-388f-4dd7-b17d-50993b7ceb24\",\n                \"userType\": 1,\n                \"title\": \"New Group Request\",\n                \"message\": \"Second Driver has requested to join your group Morning School Fleet 162046\",\n                \"data\": {\n                    \"groupId\": \"d68c4349-8495-4803-ad6d-7e8af7e61481\"\n                },\n                \"createdAt\": \"2026-09-07T16:20:47.694034+05:00\"\n            },\n            {\n                \"id\": \"88549a55-5441-4e6c-bea1-576596c456ee\",\n                \"userId\": \"779b0f4b-388f-4dd7-b17d-50993b7ceb24\",\n                \"userType\": 1,\n                \"title\": \"Pin Created\",\n                \"message\": \"Please remember your secure PIN \\u201c121212\\u201d for future operations in the app\",\n                \"data\": {\n                    \"message\": \"Please remember your secure PIN \\u201c121212\\u201d for future operations in the app\",\n                    \"mobileNumber\": \"+923401620461\"\n                },\n                \"createdAt\": \"2026-09-07T16:20:47.065861+05:00\"\n            }\n        ]\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Admin \u00b7 List Rides",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/admin/rides?page=1",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "rides"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "SUCCESS",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base-url}}/api/v1/admin/rides?page=1",
+                  "host": [
+                    "{{base-url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "rides"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"code\": 200,\n    \"message\": \"Success\",\n    \"data\": {\n        \"totalPages\": 6,\n        \"rides\": [\n            {\n                \"id\": \"1bfe0d9e-53ce-4f1b-bc32-16db5b23dee1\",\n                \"driver_id\": \"779b0f4b-388f-4dd7-b17d-50993b7ceb24\",\n                \"driver_name\": \"Owner Driver\",\n                \"driver_mobile\": \"+923401620461\",\n                \"rating\": \"\",\n                \"vehicle_number\": \"FLEET-162046A\",\n                \"vehicle_info\": \"Hiace van\",\n                \"start_datetime\": \"2026-09-15 15:30:00\",\n                \"estimated_end_datetime\": \"2026-09-15 17:00:00\",\n                \"number_of_seats\": 2,\n                \"seats_taken\": 0,\n                \"start_location\": \"location a\",\n                \"end_location\": \"location b\",\n                \"fare\": 20.5,\n                \"route_details\": \"Via Highway 1\",\n                \"is_active\": true\n            },\n            {\n                \"id\": \"478cbaab-7dc4-47fe-8e99-05ab852ef491\",\n                \"driver_id\": \"f6f6ef56-0ffd-4ef8-83a4-5e15473dfd4a\",\n                \"driver_name\": \"Owner Driver\",\n                \"driver_mobile\": \"+923401620171\",\n                \"rating\": \"\",\n                \"vehicle_number\": \"FLEET-162017A\",\n                \"vehicle_info\": \"Hiace van\",\n                \"start_datetime\": \"2026-09-15 15:30:00\",\n                \"estimated_end_datetime\": \"2026-09-15 17:00:00\",\n                \"number_of_seats\": 2,\n                \"seats_taken\": 0,\n                \"start_location\": \"location a\",\n                \"end_location\": \"location b\",\n                \"fare\": 20.5,\n                \"route_details\": \"Via Highway 1\",\n                \"is_active\": true\n            },\n            {\n                \"id\": \"e6ed6550-a927-4ea6-81c4-df7af3f6481c\",\n                \"driver_id\": \"dea5a19e-ae83-4613-86d2-ce35da682a93\",\n                \"driver_name\": \"Owner Driver\",\n                \"driver_mobile\": \"+923401618131\",\n                \"rating\": \"\",\n                \"vehicle_number\": \"FLEET-161813A\",\n                \"vehicle_info\": \"Hiace van\",\n                \"start_datetime\": \"2026-09-15 15:30:00\",\n                \"estimated_end_datetime\": \"2026-09-15 17:00:00\",\n                \"number_of_seats\": 2,\n                \"seats_taken\": 0,\n                \"start_location\": \"location a\",\n                \"end_location\": \"location b\",\n                \"fare\": 20.5,\n                \"route_details\": \"Via Highway 1\",\n                \"is_active\": true\n            },\n            {\n                \"id\": \"b02a7ee7-9dc9-4b9e-94f5-e68ae0801555\",\n                \"driver_id\": \"77d87035-ee86-4bd5-8d8a-0c20c5ebe3a1\",\n                \"driver_name\": \"talha\",\n                \"driver_mobile\": \"+923405421341\",\n                \"rating\": \"\",\n                \"vehicle_number\": \"12345\",\n                \"vehicle_info\": \"mehran\",\n                \"start_datetime\": \"2026-09-23 12:30:00\",\n                \"estimated_end_datetime\": \"2026-09-23 13:00:00\",\n                \"number_of_seats\": 3,\n                \"seats_taken\": 0,\n                \"start_location\": \"location a\",\n                \"end_location\": \"location b\",\n                \"fare\": 20.5,\n                \"route_details\": \"Via Highway 1\",\n                \"is_active\": true\n            },\n            {\n                \"id\": \"132d7402-7aea-4b1b-bbad-8eb42e9d3cfa\",\n                \"driver_id\": \"77d87035-ee86-4bd5-8d8a-0c20c5ebe3a1\",\n                \"driver_name\": \"talha\",\n                \"driver_mobile\": \"+923405421341\",\n                \"rating\": \"\",\n                \"vehicle_number\": \"12345\",\n                \"vehicle_info\": \"mehran\",\n                \"start_datetime\": \"2026-09-22 12:30:00\",\n                \"estimated_end_datetime\": \"2026-09-22 13:00:00\",\n                \"number_of_seats\": 3,\n                \"seats_taken\": 0,\n                \"start_location\": \"location a\",\n                \"end_location\": \"location b\",\n                \"fare\": 20.5,\n                \"route_details\": \"Via Highway 1\",\n                \"is_active\": true\n            },\n            {\n                \"id\": \"9879da46-741d-4485-8fd2-50844843d899\",\n                \"driver_id\": \"77d87035-ee86-4bd5-8d8a-0c20c5ebe3a1\",\n                \"driver_name\": \"talha\",\n                \"driver_mobile\": \"+923405421341\",\n                \"rating\": \"\",\n                \"vehicle_number\": \"12345\",\n                \"vehicle_info\": \"mehran\",\n                \"start_datetime\": \"2026-09-21 12:30:00\",\n                \"estimated_end_datetime\": \"2026-09-21 13:00:00\",\n                \"number_of_seats\": 3,\n                \"seats_taken\": 0,\n                \"start_location\": \"location a\",\n                \"end_location\": \"location b\",\n                \"fare\": 20.5,\n                \"route_details\": \"Via Highway 1\",\n                \"is_active\": true\n            },\n            {\n                \"id\": \"f829efdd-d402-4929-8622-c3c4726db1d0\",\n                \"driver_id\": \"77d87035-ee86-4bd5-8d8a-0c20c5ebe3a1\",\n                \"driver_name\": \"talha\",\n                \"driver_mobile\": \"+923405421341\",\n                \"rating\": \"\",\n                \"vehicle_number\": \"12345\",\n                \"vehicle_info\": \"mehran\",\n                \"start_datetime\": \"2026-09-20 12:30:00\",\n                \"estimated_end_datetime\": \"2026-09-20 13:00:00\",\n                \"number_of_seats\": 3,\n                \"seats_taken\": 0,\n                \"start_location\": \"location a\",\n                \"end_location\": \"location b\",\n                \"fare\": 20.5,\n                \"route_details\": \"Via Highway 1\",\n                \"is_active\": true\n            },\n            {\n                \"id\": \"4aa46480-7a7f-426f-9073-7c967cdf4825\",\n                \"driver_id\": \"77d87035-ee86-4bd5-8d8a-0c20c5ebe3a1\",\n                \"driver_name\": \"talha\",\n                \"driver_mobile\": \"+923405421341\",\n                \"rating\": \"\",\n                \"vehicle_number\": \"12345\",\n                \"vehicle_info\": \"mehran\",\n                \"start_datetime\": \"2026-09-19 12:30:00\",\n                \"estimated_end_datetime\": \"2026-09-19 13:00:00\",\n                \"number_of_seats\": 3,\n                \"seats_taken\": 0,\n                \"start_location\": \"location a\",\n                \"end_location\": \"location b\",\n                \"fare\": 20.5,\n                \"route_details\": \"Via Highway 1\",\n                \"is_active\": true\n            },\n            {\n                \"id\": \"97e63f2e-a35c-4f56-9bc7-213d3494896a\",\n                \"driver_id\": \"77d87035-ee86-4bd5-8d8a-0c20c5ebe3a1\",\n                \"driver_name\": \"talha\",\n                \"driver_mobile\": \"+923405421341\",\n                \"rating\": \"\",\n                \"vehicle_number\": \"12345\",\n                \"vehicle_info\": \"mehran\",\n                \"start_datetime\": \"2026-09-18 12:30:00\",\n                \"estimated_end_datetime\": \"2026-09-18 13:00:00\",\n                \"number_of_seats\": 3,\n                \"seats_taken\": 0,\n                \"start_location\": \"location a\",\n                \"end_location\": \"location b\",\n                \"fare\": 20.5,\n                \"route_details\": \"Via Highway 1\",\n                \"is_active\": true\n            },\n            {\n                \"id\": \"1a0d73c0-d422-455f-9810-4fb17bed4714\",\n                \"driver_id\": \"77d87035-ee86-4bd5-8d8a-0c20c5ebe3a1\",\n                \"driver_name\": \"talha\",\n                \"driver_mobile\": \"+923405421341\",\n                \"rating\": \"\",\n                \"vehicle_number\": \"12345\",\n                \"vehicle_info\": \"mehran\",\n                \"start_datetime\": \"2026-09-17 12:30:00\",\n                \"estimated_end_datetime\": \"2026-09-17 13:00:00\",\n                \"number_of_seats\": 3,\n                \"seats_taken\": 0,\n                \"start_location\": \"location a\",\n                \"end_location\": \"location b\",\n                \"fare\": 20.5,\n                \"route_details\": \"Via Highway 1\",\n                \"is_active\": true\n            }\n        ]\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Admin \u00b7 List Drivers",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/admin/drivers?page=1",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "drivers"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "SUCCESS",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base-url}}/api/v1/admin/drivers?page=1",
+                  "host": [
+                    "{{base-url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "drivers"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"code\": 200,\n    \"message\": \"Success\",\n    \"data\": {\n        \"totalPages\": 1,\n        \"details\": [\n            {\n                \"id\": \"e5cf0590-3a59-4d7b-9cf5-e5c61065b072\",\n                \"driverMobile\": \"+923401620462\",\n                \"driverName\": \"Second Driver\",\n                \"rating\": \"\",\n                \"numberOfVotes\": \"\",\n                \"status\": \"active\",\n                \"vehicles\": [\n                    {\n                        \"id\": \"c69f4067-e2f6-4153-9463-85cc5bea9fd7\",\n                        \"driverId\": \"e5cf0590-3a59-4d7b-9cf5-e5c61065b072\",\n                        \"vehicleNumber\": \"FLEET-162046B\",\n                        \"vehicleInfo\": \"Corolla\",\n                        \"status\": \"active\"\n                    }\n                ]\n            },\n            {\n                \"id\": \"779b0f4b-388f-4dd7-b17d-50993b7ceb24\",\n                \"driverMobile\": \"+923401620461\",\n                \"driverName\": \"Owner Driver\",\n                \"rating\": \"\",\n                \"numberOfVotes\": \"\",\n                \"status\": \"active\",\n                \"vehicles\": [\n                    {\n                        \"id\": \"d213f526-6e8e-48a0-9eb4-f7f49ae0fc88\",\n                        \"driverId\": \"779b0f4b-388f-4dd7-b17d-50993b7ceb24\",\n                        \"vehicleNumber\": \"FLEET-162046A\",\n                        \"vehicleInfo\": \"Hiace van\",\n                        \"status\": \"active\"\n                    }\n                ]\n            },\n            {\n                \"id\": \"9567dbfc-3ecd-4b1b-830d-0ba9288f341e\",\n                \"driverMobile\": \"+923401620172\",\n                \"driverName\": \"Second Driver\",\n                \"rating\": \"\",\n                \"numberOfVotes\": \"\",\n                \"status\": \"active\",\n                \"vehicles\": [\n                    {\n                        \"id\": \"1cd6d501-888a-43d3-a5f5-f778284aa6d3\",\n                        \"driverId\": \"9567dbfc-3ecd-4b1b-830d-0ba9288f341e\",\n                        \"vehicleNumber\": \"FLEET-162017B\",\n                        \"vehicleInfo\": \"Corolla\",\n                        \"status\": \"active\"\n                    }\n                ]\n            },\n            {\n                \"id\": \"f6f6ef56-0ffd-4ef8-83a4-5e15473dfd4a\",\n                \"driverMobile\": \"+923401620171\",\n                \"driverName\": \"Owner Driver\",\n                \"rating\": \"\",\n                \"numberOfVotes\": \"\",\n                \"status\": \"active\",\n                \"vehicles\": [\n                    {\n                        \"id\": \"c4f14b7b-251c-41a0-9fc9-856b52271dd3\",\n                        \"driverId\": \"f6f6ef56-0ffd-4ef8-83a4-5e15473dfd4a\",\n                        \"vehicleNumber\": \"FLEET-162017A\",\n                        \"vehicleInfo\": \"Hiace van\",\n                        \"status\": \"active\"\n                    }\n                ]\n            },\n            {\n                \"id\": \"913a1b9c-fc1a-46f2-a7ab-c6062ee124c1\",\n                \"driverMobile\": \"+923401618132\",\n                \"driverName\": \"Second Driver\",\n                \"rating\": \"\",\n                \"numberOfVotes\": \"\",\n                \"status\": \"active\",\n                \"vehicles\": [\n                    {\n                        \"id\": \"a82b987c-53a5-4271-bde4-40154c96b5c7\",\n                        \"driverId\": \"913a1b9c-fc1a-46f2-a7ab-c6062ee124c1\",\n                        \"vehicleNumber\": \"FLEET-161813B\",\n                        \"vehicleInfo\": \"Corolla\",\n                        \"status\": \"active\"\n                    }\n                ]\n            },\n            {\n                \"id\": \"dea5a19e-ae83-4613-86d2-ce35da682a93\",\n                \"driverMobile\": \"+923401618131\",\n                \"driverName\": \"Owner Driver\",\n                \"rating\": \"\",\n                \"numberOfVotes\": \"\",\n                \"status\": \"active\",\n                \"vehicles\": [\n                    {\n                        \"id\": \"96b1f363-360d-4448-98c3-94cc8d1a52c0\",\n                        \"driverId\": \"dea5a19e-ae83-4613-86d2-ce35da682a93\",\n                        \"vehicleNumber\": \"FLEET-161813A\",\n                        \"vehicleInfo\": \"Hiace van\",\n                        \"status\": \"active\"\n                    }\n                ]\n            },\n            {\n                \"id\": \"77d87035-ee86-4bd5-8d8a-0c20c5ebe3a1\",\n                \"driverMobile\": \"+923405421341\",\n                \"driverName\": \"talha\",\n                \"rating\": \"\",\n                \"numberOfVotes\": \"\",\n                \"status\": \"active\",\n                \"vehicles\": [\n                    {\n                        \"id\": \"6196d330-1efd-4bc1-a357-9504dec44aa9\",\n                        \"driverId\": \"77d87035-ee86-4bd5-8d8a-0c20c5ebe3a1\",\n                        \"vehicleNumber\": \"12345\",\n                        \"vehicleInfo\": \"mehran\",\n                        \"status\": \"active\"\n                    }\n                ]\n            },\n            {\n                \"id\": \"a2ceecfd-cf86-4d4e-9ecb-53bded9ece5c\",\n                \"driverMobile\": \"+923405421340\",\n                \"driverName\": \"talha\",\n                \"rating\": \"\",\n                \"numberOfVotes\": \"\",\n                \"status\": \"active\",\n                \"vehicles\": []\n            },\n            {\n                \"id\": \"f468777b-7d1f-47ea-ace8-ac7b3ce9e7f1\",\n                \"driverMobile\": \"DEL_2026-05-22 16:43:15.327130223 +0500 PKT m=+129.589767489%!(EXTRA string=+923405421340)\",\n                \"driverName\": \"DEL_2026-05-22 16:43:15.32967663 +0500 PKT m=+129.592313920%!(EXTRA string=talha)\",\n                \"rating\": \"\",\n                \"numberOfVotes\": \"\",\n                \"status\": \"inactive\",\n                \"vehicles\": []\n            },\n            {\n                \"id\": \"83fd447e-7700-45d5-a5c2-9f4eb9b90ca9\",\n                \"driverMobile\": \"DEL_2026-05-22 16:39:16.489163709 +0500 PKT m=+188.844894521%!(EXTRA string=+923405421340)\",\n                \"driverName\": \"DEL_2026-05-22 16:39:16.491004562 +0500 PKT m=+188.846735377%!(EXTRA string=talha)\",\n                \"rating\": \"\",\n                \"numberOfVotes\": \"\",\n                \"status\": \"inactive\",\n                \"vehicles\": []\n            }\n        ]\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Admin \u00b7 List Vehicles",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_session}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base-url}}/api/v1/admin/vehicles?page=1",
+              "host": [
+                "{{base-url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "vehicles"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Now carries numberOfSeats, hasAC and hasHeating, and its totalPages is correct (it used to count a query that already had the page limit applied)."
+          },
+          "response": [
+            {
+              "name": "SUCCESS",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base-url}}/api/v1/admin/vehicles?page=1",
+                  "host": [
+                    "{{base-url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "vehicles"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"code\": 200,\n    \"message\": \"Success\",\n    \"data\": {\n        \"totalPages\": 1,\n        \"vehicle\": [\n            {\n                \"id\": \"c69f4067-e2f6-4153-9463-85cc5bea9fd7\",\n                \"driverId\": \"e5cf0590-3a59-4d7b-9cf5-e5c61065b072\",\n                \"vehicleNumber\": \"FLEET-162046B\",\n                \"vehicleInfo\": \"Corolla\",\n                \"status\": \"active\"\n            },\n            {\n                \"id\": \"d213f526-6e8e-48a0-9eb4-f7f49ae0fc88\",\n                \"driverId\": \"779b0f4b-388f-4dd7-b17d-50993b7ceb24\",\n                \"vehicleNumber\": \"FLEET-162046A\",\n                \"vehicleInfo\": \"Hiace van\",\n                \"status\": \"active\"\n            },\n            {\n                \"id\": \"1cd6d501-888a-43d3-a5f5-f778284aa6d3\",\n                \"driverId\": \"9567dbfc-3ecd-4b1b-830d-0ba9288f341e\",\n                \"vehicleNumber\": \"FLEET-162017B\",\n                \"vehicleInfo\": \"Corolla\",\n                \"status\": \"active\"\n            },\n            {\n                \"id\": \"c4f14b7b-251c-41a0-9fc9-856b52271dd3\",\n                \"driverId\": \"f6f6ef56-0ffd-4ef8-83a4-5e15473dfd4a\",\n                \"vehicleNumber\": \"FLEET-162017A\",\n                \"vehicleInfo\": \"Hiace van\",\n                \"status\": \"active\"\n            },\n            {\n                \"id\": \"a82b987c-53a5-4271-bde4-40154c96b5c7\",\n                \"driverId\": \"913a1b9c-fc1a-46f2-a7ab-c6062ee124c1\",\n                \"vehicleNumber\": \"FLEET-161813B\",\n                \"vehicleInfo\": \"Corolla\",\n                \"status\": \"active\"\n            },\n            {\n                \"id\": \"96b1f363-360d-4448-98c3-94cc8d1a52c0\",\n                \"driverId\": \"dea5a19e-ae83-4613-86d2-ce35da682a93\",\n                \"vehicleNumber\": \"FLEET-161813A\",\n                \"vehicleInfo\": \"Hiace van\",\n                \"status\": \"active\"\n            },\n            {\n                \"id\": \"6196d330-1efd-4bc1-a357-9504dec44aa9\",\n                \"driverId\": \"77d87035-ee86-4bd5-8d8a-0c20c5ebe3a1\",\n                \"vehicleNumber\": \"12345\",\n                \"vehicleInfo\": \"mehran\",\n                \"status\": \"active\"\n            }\n        ]\n    }\n}"
+            }
+          ]
+        }
+      ]
     }
   ],
   "variable": [

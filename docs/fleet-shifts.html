@@ -381,6 +381,7 @@
       <div>branch <b>feature/shift-management</b></div>
       <div>tables <b>14 new</b></div>
       <div>endpoints <b>56 new</b></div>
+      <div>verified <b>109/109 live</b></div>
       <div>packages <b>group · shift</b></div>
     </div>
   </header>
@@ -393,7 +394,8 @@
     <a href="#rules"><span>05</span>Enforced rules</a>
     <a href="#flow"><span>06</span>Test flow</a>
     <a href="#admin"><span>07</span>Admin console</a>
-    <a href="#reference"><span>08</span>Endpoints</a>
+    <a href="#archive"><span>08</span>Records kept</a>
+    <a href="#reference"><span>09</span>Endpoints</a>
   </nav>
 
   <!-- ================================================== 1 -->
@@ -1016,10 +1018,41 @@
     </div>
   </section>
 
-  <!-- ================================================== 8 -->
+  <!-- ================================================== 7b -->
+  <section id="archive">
+    <div class="col">
+      <h2><span class="num">08 / records</span>Nothing that mattered is thrown away</h2>
+      <p class="lede">Deleting a row copies it to its own archive table first, the way this codebase already treated drivers, vehicles and rides.</p>
+      <p>The fleet feature added things worth keeping, and two of them were being dropped on the floor: a passenger's standing travel form, and a role an admin deleted. Both are now archived — the role together with the permission codes it held at that moment, written inline so the record still reads correctly long after those permissions have changed.</p>
+      <p>Shifts and memberships are never hard-deleted at all. A cancelled shift, a rejected request, a member who left: each is a status on a row that stays exactly where it was.</p>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>When this is deleted</th><th>What is kept</th><th>Added by</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">driver</td><td class="mono">del_drivers</td><td>already existed</td></tr>
+          <tr><td class="mono">vehicle</td><td class="mono">del_vehicles</td><td>already existed</td></tr>
+          <tr><td class="mono">ride</td><td class="mono">del_rides</td><td>already existed</td></tr>
+          <tr><td class="mono">passenger</td><td class="mono">del_passengers</td><td>this feature</td></tr>
+          <tr><td class="mono">passenger travel form</td><td class="mono">del_passenger_location_preferences</td><td>this feature</td></tr>
+          <tr><td class="mono">role</td><td class="mono">del_roles + its permission codes</td><td>this feature</td></tr>
+          <tr><td class="mono">shift</td><td class="no">never deleted — cancelled in place</td><td>—</td></tr>
+          <tr><td class="mono">membership</td><td class="no">never deleted — status moves to left / removed / rejected</td><td>—</td></tr>
+          <tr><td class="mono">shift template</td><td class="no">not archived, matching how ride templates already behave</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="col">
+      <p>The rule the archives protect is that a deletion must not leave anything pointing at what is gone. A verified count against the live database after the full run: <strong>zero</strong> seats still holding a passenger who no longer exists.</p>
+    </div>
+  </section>
+
+  <!-- ================================================== 9 -->
   <section id="reference">
     <div class="col">
-      <h2><span class="num">08 / reference</span>Every new endpoint</h2>
+      <h2><span class="num">09 / reference</span>Every new endpoint</h2>
       <p class="lede">Thirty-seven routes across four packages. Bulk wherever the domain allows it.</p>
     </div>
 
@@ -1105,9 +1138,10 @@
 
   <footer>
     <div class="col">
-      <p><strong>Not yet verified against a live database.</strong> The code builds, vets and formats clean, but the migration of the fourteen new tables and the boot-time seeding of roles and permissions have never been run against Postgres. That is the next thing worth doing.</p>
+      <p><strong>Driven end to end against a live database.</strong> One hundred and nine calls covering every endpoint — the fleet feature, the admin console and the existing carpool — all behaved as expected, including the refusals that prove each rule. Every saved response in the Postman collection is a real one captured from that run, not written by hand.</p>
+      <p>Two faults only the run could find. The app could not restart: seeding a permission passed a struct already carrying a fresh id, GORM folded that id into the lookup, so every boot after the first tried to insert a code that already existed and panicked. And no passenger could use their session: the token verifier knew driver, admin and open tokens and fell through to “invalid token type” for the passenger one, so every passenger route rejected a perfectly good login. Both fixed.</p>
       <p>One pre-existing typo left untouched, because changing it would alter responses your app may already match on: <code>Deleted_Successfully</code> and <code>DELETE_Failed</code> both read “updated”, so every delete endpoint — old and new — replies “updated successfully”.</p>
-    </div>
+      </div>
   </footer>
 
 </div>
