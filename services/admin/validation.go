@@ -62,6 +62,84 @@ func ValidateBoardcastRequest(request *AdminBroadcastRequest) error {
 	return nil
 }
 
+func ValidateRoleRequest(request *AdminRoleRequest) error {
+	var errMessage string
+	if utils.IsStringEmptyWithKey(request.Name, "Name", &errMessage) {
+		return fmt.Errorf(constants.Missing_Data, errMessage)
+	}
+
+	nameLen := len(request.Name)
+	if nameLen < constants.Role_Name_Min_Len || nameLen > constants.Role_Name_Max_Len {
+		return fmt.Errorf("length of the role name should be between %v and %v characters", constants.Role_Name_Min_Len, constants.Role_Name_Max_Len)
+	}
+
+	if len(request.Description) > constants.Description_Max_Len {
+		return fmt.Errorf("length of the description should not be more than %v characters", constants.Description_Max_Len)
+	}
+
+	return nil
+}
+
+func ValidateRoleUpdateRequest(roleId string, request *AdminRoleUpdateRequest) error {
+	if err := utils.ValidateId(roleId); err != nil {
+		return fmt.Errorf(constants.Invalid_Data, "role id")
+	}
+
+	if request.Name == nil && request.Description == nil {
+		return fmt.Errorf(constants.Missing_Data, "Name or description")
+	}
+
+	if request.Name != nil {
+		nameLen := len(*request.Name)
+		if nameLen < constants.Role_Name_Min_Len || nameLen > constants.Role_Name_Max_Len {
+			return fmt.Errorf("length of the role name should be between %v and %v characters", constants.Role_Name_Min_Len, constants.Role_Name_Max_Len)
+		}
+	}
+
+	if request.Description != nil && len(*request.Description) > constants.Description_Max_Len {
+		return fmt.Errorf("length of the description should not be more than %v characters", constants.Description_Max_Len)
+	}
+
+	return nil
+}
+
+func ValidatePermissionRequest(request *AdminPermissionRequest) error {
+	var errMessage string
+	if utils.IsStringEmptyWithKey(request.Code, "Code", &errMessage) {
+		return fmt.Errorf(constants.Missing_Data, errMessage)
+	}
+
+	codeLen := len(request.Code)
+	if codeLen < constants.Permission_Code_Min_Len || codeLen > constants.Permission_Code_Max_Len {
+		return fmt.Errorf("length of the permission code should be between %v and %v characters", constants.Permission_Code_Min_Len, constants.Permission_Code_Max_Len)
+	}
+
+	if len(request.Description) > constants.Description_Max_Len {
+		return fmt.Errorf("length of the description should not be more than %v characters", constants.Description_Max_Len)
+	}
+
+	return nil
+}
+
+func ValidateRolePermissionsRequest(request *AdminRolePermissionsRequest) error {
+	if err := utils.ValidateId(request.RoleId); err != nil {
+		return fmt.Errorf(constants.Invalid_Data, "role id")
+	}
+
+	if len(request.PermissionIds) > constants.Bulk_Request_Max_Len {
+		return fmt.Errorf("a role cannot be given more than %v permissions in one call", constants.Bulk_Request_Max_Len)
+	}
+
+	// an empty list is allowed on purpose, it strips a role back to no permissions
+	for _, permissionId := range request.PermissionIds {
+		if err := utils.ValidateId(permissionId); err != nil {
+			return fmt.Errorf(constants.Invalid_Data, "permission id")
+		}
+	}
+
+	return nil
+}
+
 func ValidateAnnouncementRequest(request *AnnouncementRequest) error {
 	var errMessage string
 	if utils.IsStringEmptyWithKey(request.Title, "Title", &errMessage) ||

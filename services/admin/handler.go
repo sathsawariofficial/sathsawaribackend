@@ -393,3 +393,265 @@ func GetApprochRequestsHandler(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, resp)
 }
+
+// creates a role an admin can hand out inside a group
+func CreateRoleHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in CreateRoleHandler", sessionId)
+
+	var request AdminRoleRequest
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		logger.LogError(sessionId, "binding error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Creation_Failed, "role"),
+		})
+		return
+	}
+
+	logger.LogDebug2("Request received in CreateRoleHandler", sessionId, request)
+
+	if err := ValidateRoleRequest(&request); err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	roleId, err := CreateRole(ctx, sessionId, request)
+	if err != nil {
+		logger.LogError(sessionId, "create role error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	roleResp := createdRoleResp(roleId)
+
+	logger.LogInfo("Response returned from CreateRoleHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, roleResp)
+}
+
+// lists every role with the permissions it currently holds
+func GetRolesHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetRolesHandler", sessionId)
+
+	page, err := utils.GetPageNumber(ctx)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get page number error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Invalid_Data, "page"),
+		})
+		return
+	}
+
+	roles, permissions, totalRows, err := GetRoles(ctx, sessionId, page)
+	if err != nil {
+		logger.LogError(sessionId, "get roles error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	rolesResp := rolesResp(roles, permissions, totalRows)
+
+	logger.LogInfo("Response returned from GetRolesHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, rolesResp)
+}
+
+// updates the name or the description of a role
+func UpdateRoleHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in UpdateRoleHandler", sessionId)
+
+	roleId := ctx.Query(constants.Role_Key)
+
+	var request AdminRoleUpdateRequest
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		logger.LogError(sessionId, "binding error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Update_Failed, "role"),
+		})
+		return
+	}
+
+	logger.LogDebug2("Request received in UpdateRoleHandler", sessionId, request)
+
+	if err := ValidateRoleUpdateRequest(roleId, &request); err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	if err := UpdateRole(ctx, sessionId, roleId, request); err != nil {
+		logger.LogError(sessionId, "update role error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	logger.LogInfo("Response returned from UpdateRoleHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(fmt.Sprintf(constants.Updated_Successfully, "Role")))
+}
+
+// deletes a role that is neither a system role nor still held by a member
+func DeleteRoleHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in DeleteRoleHandler", sessionId)
+
+	roleId := ctx.Query(constants.Role_Key)
+
+	if err := utils.ValidateId(roleId); err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Invalid_Data, "role id"),
+		})
+		return
+	}
+
+	if err := DeleteRole(ctx, sessionId, roleId); err != nil {
+		logger.LogError(sessionId, "delete role error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	logger.LogInfo("Response returned from DeleteRoleHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(fmt.Sprintf(constants.Deleted_Successfully, "Role")))
+}
+
+// creates a permission that can then be mapped onto any role
+func CreatePermissionHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in CreatePermissionHandler", sessionId)
+
+	var request AdminPermissionRequest
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		logger.LogError(sessionId, "binding error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Creation_Failed, "permission"),
+		})
+		return
+	}
+
+	logger.LogDebug2("Request received in CreatePermissionHandler", sessionId, request)
+
+	if err := ValidatePermissionRequest(&request); err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	permissionId, err := CreatePermission(ctx, sessionId, request)
+	if err != nil {
+		logger.LogError(sessionId, "create permission error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	permissionResp := createdPermissionResp(permissionId)
+
+	logger.LogInfo("Response returned from CreatePermissionHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, permissionResp)
+}
+
+// lists every permission the system knows about
+func GetPermissionsHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetPermissionsHandler", sessionId)
+
+	page, err := utils.GetPageNumber(ctx)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get page number error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Invalid_Data, "page"),
+		})
+		return
+	}
+
+	permissions, totalRows, err := GetPermissions(ctx, sessionId, page)
+	if err != nil {
+		logger.LogError(sessionId, "get permissions error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	permissionsResp := permissionsResp(permissions, totalRows)
+
+	logger.LogInfo("Response returned from GetPermissionsHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, permissionsResp)
+}
+
+// replaces the whole permission set of a role in one call
+func SetRolePermissionsHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in SetRolePermissionsHandler", sessionId)
+
+	var request AdminRolePermissionsRequest
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		logger.LogError(sessionId, "binding error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Update_Failed, "role permissions"),
+		})
+		return
+	}
+
+	logger.LogDebug2("Request received in SetRolePermissionsHandler", sessionId, request)
+
+	if err := ValidateRolePermissionsRequest(&request); err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	if err := SetRolePermissions(ctx, sessionId, request); err != nil {
+		logger.LogError(sessionId, "set role permissions error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	logger.LogInfo("Response returned from SetRolePermissionsHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(fmt.Sprintf(constants.Updated_Successfully, "Role permissions")))
+}

@@ -44,6 +44,30 @@ func CreateRide(ctx *gin.Context, sessionId string, request RideCreationRequest)
 		return
 	}
 
+	hasVehicleShift, err := database.VehicleHasShiftDuringTime(ctx, request.VehicleId, request.StartDatetime, request.EstimatedEndDatetime, "")
+	if err != nil {
+		logger.LogError(sessionId, "failed to determine if vehicle already has a shift error: "+err.Error())
+		err = errors.New(constants.Vehicle_Busy)
+		return
+	}
+	if hasVehicleShift {
+		err = errors.New(constants.Vehicle_Busy)
+		logger.LogError(sessionId, err)
+		return
+	}
+
+	hasDriverShift, err := database.DriverHasShiftDuringTime(ctx, request.EXTDriverId, request.StartDatetime, request.EstimatedEndDatetime, "")
+	if err != nil {
+		logger.LogError(sessionId, "failed to determine if driver already has a shift error: "+err.Error())
+		err = errors.New(constants.Driver_Busy)
+		return
+	}
+	if hasDriverShift {
+		err = errors.New(constants.Driver_Busy)
+		logger.LogError(sessionId, err)
+		return
+	}
+
 	// Save the ride in the database
 	ride := mapRideData(request, "", request.EXTDriverId, vehicle.ID)
 	if err = database.DatabaseConn.Postgres.Create(&ride).Error; err != nil {

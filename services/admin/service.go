@@ -172,3 +172,227 @@ func GetApprochRequest(ctx *gin.Context, sessionId, approchType string, page int
 
 	return
 }
+
+func CreateRole(ctx *gin.Context, sessionId string, request AdminRoleRequest) (roleId string, err error) {
+	logger.LogInfo("Request received in CreateRole", sessionId)
+
+	count, err := countRolesByName(ctx, request.Name, "")
+	if err != nil {
+		logger.LogError(sessionId, "failed to look for an existing role error: "+err.Error())
+		err = errors.New(constants.Unknown_Error)
+		return
+	}
+	if count > 0 {
+		err = fmt.Errorf(constants.Invalid_Data, "role name, it is already taken")
+		logger.LogError(sessionId, err)
+		return
+	}
+
+	role, err := createRole(ctx, sessionId, request)
+	if err != nil {
+		logger.LogError(sessionId, "failed to create role error: "+err.Error())
+		err = fmt.Errorf(constants.Creation_Failed, "role")
+		return
+	}
+	roleId = role.ID
+
+	logger.LogInfo("Response returned from CreateRole", sessionId)
+	logger.LogDebug2("Response returned from CreateRole", sessionId, roleId)
+
+	return
+}
+
+func GetRoles(ctx *gin.Context, sessionId string, page int) (roles []postgress.Role, permissions map[string][]adminRolePermissionRow, totalRows int64, err error) {
+	logger.LogInfo("Request received in GetRoles", sessionId)
+
+	roles, permissions, totalRows, err = getRolesPage(ctx, sessionId, page)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get roles error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the roles")
+		return
+	}
+
+	logger.LogInfo("Response returned from GetRoles", sessionId)
+	logger.LogDebug2("Response returned from GetRoles", sessionId, totalRows)
+
+	return
+}
+
+// UpdateRole edits a role. A system role may have its description changed but never
+// its name, the group permission checks look those roles up by name so a rename
+// would quietly cut every owner and sub manager off from their group.
+func UpdateRole(ctx *gin.Context, sessionId, roleId string, request AdminRoleUpdateRequest) (err error) {
+	logger.LogInfo("Request received in UpdateRole", sessionId)
+
+	role, err := getRoleById(ctx, roleId)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get role error: "+err.Error())
+		err = errors.New(constants.Role_Not_Found)
+		return
+	}
+
+	updates := map[string]interface{}{}
+
+	if request.Name != nil && !strings.EqualFold(*request.Name, role.Name) {
+		if role.IsSystem {
+			err = errors.New(constants.Operation_Not_Permitted)
+			logger.LogError(sessionId, "a system role cannot be renamed error: "+err.Error())
+			return
+		}
+
+		count, e := countRolesByName(ctx, *request.Name, roleId)
+		if e != nil {
+			logger.LogError(sessionId, "failed to look for an existing role error: "+e.Error())
+			err = errors.New(constants.Unknown_Error)
+			return
+		}
+		if count > 0 {
+			err = fmt.Errorf(constants.Invalid_Data, "role name, it is already taken")
+			logger.LogError(sessionId, err)
+			return
+		}
+
+		updates["name"] = *request.Name
+	}
+
+	if request.Description != nil {
+		updates["description"] = *request.Description
+	}
+
+	if len(updates) == 0 {
+		logger.LogInfo("Response returned from UpdateRole", sessionId)
+		return
+	}
+
+	if err = updateRole(ctx, sessionId, roleId, updates); err != nil {
+		logger.LogError(sessionId, "failed to update role error: "+err.Error())
+		err = fmt.Errorf(constants.Update_Failed, "role")
+		return
+	}
+
+	logger.LogInfo("Response returned from UpdateRole", sessionId)
+
+	return
+}
+
+func DeleteRole(ctx *gin.Context, sessionId, roleId string) (err error) {
+	logger.LogInfo("Request received in DeleteRole", sessionId)
+
+	role, err := getRoleById(ctx, roleId)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get role error: "+err.Error())
+		err = errors.New(constants.Role_Not_Found)
+		return
+	}
+
+	if role.IsSystem {
+		err = errors.New(constants.Not_System_Role)
+		logger.LogError(sessionId, err)
+		return
+	}
+
+	count, err := countMembersUsingRole(ctx, roleId)
+	if err != nil {
+		logger.LogError(sessionId, "failed to count the members holding the role error: "+err.Error())
+		err = errors.New(constants.Unknown_Error)
+		return
+	}
+	if count > 0 {
+		err = errors.New(constants.Operation_Not_Permitted)
+		logger.LogError(sessionId, fmt.Sprintf("role is still held by %d member(s) error: %s", count, err.Error()))
+		return
+	}
+
+	if err = deleteRole(ctx, sessionId, roleId); err != nil {
+		logger.LogError(sessionId, "failed to delete role error: "+err.Error())
+		err = fmt.Errorf(constants.DELETE_Failed, "role")
+		return
+	}
+
+	logger.LogInfo("Response returned from DeleteRole", sessionId)
+
+	return
+}
+
+func CreatePermission(ctx *gin.Context, sessionId string, request AdminPermissionRequest) (permissionId string, err error) {
+	logger.LogInfo("Request received in CreatePermission", sessionId)
+
+	count, err := countPermissionsByCode(ctx, request.Code)
+	if err != nil {
+		logger.LogError(sessionId, "failed to look for an existing permission error: "+err.Error())
+		err = errors.New(constants.Unknown_Error)
+		return
+	}
+	if count > 0 {
+		err = fmt.Errorf(constants.Invalid_Data, "permission code, it is already taken")
+		logger.LogError(sessionId, err)
+		return
+	}
+
+	permission, err := createPermission(ctx, sessionId, request)
+	if err != nil {
+		logger.LogError(sessionId, "failed to create permission error: "+err.Error())
+		err = fmt.Errorf(constants.Creation_Failed, "permission")
+		return
+	}
+	permissionId = permission.ID
+
+	logger.LogInfo("Response returned from CreatePermission", sessionId)
+	logger.LogDebug2("Response returned from CreatePermission", sessionId, permissionId)
+
+	return
+}
+
+func GetPermissions(ctx *gin.Context, sessionId string, page int) (permissions []postgress.Permission, totalRows int64, err error) {
+	logger.LogInfo("Request received in GetPermissions", sessionId)
+
+	permissions, totalRows, err = getPermissionsPage(ctx, sessionId, page)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get permissions error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the permissions")
+		return
+	}
+
+	logger.LogInfo("Response returned from GetPermissions", sessionId)
+	logger.LogDebug2("Response returned from GetPermissions", sessionId, totalRows)
+
+	return
+}
+
+// SetRolePermissions replaces the whole permission set of a role in one call. It is
+// deliberately allowed on system roles too, remapping what a role may do without a
+// code change is the entire point of keeping permissions in the database.
+func SetRolePermissions(ctx *gin.Context, sessionId string, request AdminRolePermissionsRequest) (err error) {
+	logger.LogInfo("Request received in SetRolePermissions", sessionId)
+
+	if _, err = getRoleById(ctx, request.RoleId); err != nil {
+		logger.LogError(sessionId, "failed to get role error: "+err.Error())
+		err = errors.New(constants.Role_Not_Found)
+		return
+	}
+
+	if len(request.PermissionIds) > 0 {
+		count, e := countPermissionsByIds(ctx, request.PermissionIds)
+		if e != nil {
+			logger.LogError(sessionId, "failed to validate the permissions error: "+e.Error())
+			err = errors.New(constants.Unknown_Error)
+			return
+		}
+
+		if int(count) != len(request.PermissionIds) {
+			err = errors.New(constants.Permission_Not_Found)
+			logger.LogError(sessionId, "one or more permissions do not exist error: "+err.Error())
+			return
+		}
+	}
+
+	if err = replaceRolePermissions(ctx, sessionId, request.RoleId, request.PermissionIds); err != nil {
+		logger.LogError(sessionId, "failed to set the role permissions error: "+err.Error())
+		err = fmt.Errorf(constants.Update_Failed, "role permissions")
+		return
+	}
+
+	logger.LogInfo("Response returned from SetRolePermissions", sessionId)
+
+	return
+}

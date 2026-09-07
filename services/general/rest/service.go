@@ -176,6 +176,30 @@ func VerifyOTP(ctx *gin.Context, sessionId string, request VerifyOTPRequest) (re
 			return
 		}
 		replyMessage = "Driver activated successfully"
+	case constants.ACTIVATE_PASSENGER_OPERATION:
+		err = activatePassengerByMobile(ctx, request.MobileNumber)
+		if err != nil {
+			logger.LogError(sessionId, "passenger activation error: "+err.Error())
+			err = fmt.Errorf(constants.Unable_To_Do_Job, "activate the passenger")
+			return
+		}
+		replyMessage = "Passenger activated successfully"
+	case constants.PASSENGER_FORGOT_PASSWORD_OPERATION:
+		err = updateForgottonPassengerPassword(ctx, sessionId, request.MobileNumber, request.Password, sentOTP)
+		if err != nil {
+			logger.LogError(sessionId, "update forgotton passenger password error: "+err.Error())
+			err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
+			return
+		}
+		replyMessage = "Your password was resetted successfully"
+	case constants.PASSENGER_UPDATE_PASSWORD_OPERATION:
+		err = updatePassengerPassword(ctx, sessionId, request.MobileNumber, sentOTP)
+		if err != nil {
+			logger.LogError(sessionId, "update passenger password error: "+err.Error())
+			err = fmt.Errorf(constants.Update_Failed, "password")
+			return
+		}
+		replyMessage = "Your password was updated successfully"
 	case constants.ACTIVATE_VEHICLE_OPERATION:
 		var driver postgress.Driver
 		driver, err = getActiveDriver(ctx, sessionId, request.MobileNumber)

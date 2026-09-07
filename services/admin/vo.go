@@ -151,3 +151,81 @@ func createApprochInfoResp(approches []postgress.ApprochInfo, totalRows int64) u
 
 	return approchInfoResp
 }
+
+func createdRoleResp(roleId string) utils.APIResponse {
+	return utils.APIResponse{
+		Code:    http.StatusOK,
+		Message: fmt.Sprintf(constants.Created_Successfully, "Role"),
+		Data: AdminRoleCreatedResponse{
+			Id: roleId,
+		},
+	}
+}
+
+func rolesResp(roles []postgress.Role, permissions map[string][]adminRolePermissionRow, totalRows int64) utils.APIResponse {
+	roleDetails := []AdminRoleDetail{}
+
+	for _, role := range roles {
+		permissionDetails := []AdminPermissionDetail{}
+		for _, permission := range permissions[role.ID] {
+			permissionDetails = append(permissionDetails, AdminPermissionDetail{
+				ID:          permission.ID,
+				Code:        permission.Code,
+				Description: permission.Description,
+				IsSystem:    permission.IsSystem,
+				CreatedAt:   permission.CreatedAt,
+			})
+		}
+
+		roleDetails = append(roleDetails, AdminRoleDetail{
+			ID:          role.ID,
+			Name:        role.Name,
+			Description: role.Description,
+			IsSystem:    role.IsSystem,
+			CreatedAt:   role.CreatedAt,
+			Permissions: permissionDetails,
+		})
+	}
+
+	return utils.APIResponse{
+		Code:    http.StatusOK,
+		Message: constants.Success,
+		Data: AdminRoleListResponse{
+			TotalPages: utils.CalculatePagesize(totalRows),
+			Roles:      roleDetails,
+		},
+	}
+}
+
+func createdPermissionResp(permissionId string) utils.APIResponse {
+	return utils.APIResponse{
+		Code:    http.StatusOK,
+		Message: fmt.Sprintf(constants.Created_Successfully, "Permission"),
+		Data: AdminPermissionCreatedResponse{
+			Id: permissionId,
+		},
+	}
+}
+
+func permissionsResp(permissions []postgress.Permission, totalRows int64) utils.APIResponse {
+	permissionDetails := []AdminPermissionDetail{}
+
+	for _, permission := range permissions {
+		permissionDetails = append(permissionDetails, AdminPermissionDetail{
+			ID:          permission.ID,
+			Code:        permission.Code,
+			Description: permission.Description,
+			IsSystem:    permission.IsSystem,
+			CreatedAt:   permission.CreatedAt,
+		})
+	}
+
+	return utils.APIResponse{
+		Code:    http.StatusOK,
+		Message: constants.Success,
+		Data: AdminPermissionListResponse{
+			TotalPages:  utils.CalculatePagesize(totalRows),
+			Permissions: permissionDetails,
+		},
+	}
+}

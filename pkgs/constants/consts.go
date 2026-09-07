@@ -293,7 +293,11 @@ const (
 	FORGOT_PIN_OPERATION       = "FORGOT_PIN"
 	BOOK_RIDE_OPERATION        = "BOOK_RIDE"
 
-	ACTIVATE_PASSENGER_OPERATION = "ACTIVATE_PASSENGER"
+	// a passenger account is a different record from a driver account even when
+	// both are held by the same mobile number, so they carry their own operations
+	ACTIVATE_PASSENGER_OPERATION        = "ACTIVATE_PASSENGER"
+	PASSENGER_UPDATE_PASSWORD_OPERATION = "PASSENGER_UPDATE_PASSWORD"
+	PASSENGER_FORGOT_PASSWORD_OPERATION = "PASSENGER_FORGOT_PASSWORD"
 )
 
 // SMS Keys

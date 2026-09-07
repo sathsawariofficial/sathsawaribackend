@@ -97,3 +97,77 @@ type AnnouncementRequest struct {
 	Type    string `json:"type"`
 	Link    string `json:"link"`
 }
+
+// AdminRoleRequest is the body of the admin create role api. A role created by an
+// admin is never a system role.
+type AdminRoleRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// AdminRoleUpdateRequest is the body of the admin update role api. Both fields are
+// pointers so that a caller can send only the one it wants changed.
+type AdminRoleUpdateRequest struct {
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+}
+
+// AdminPermissionRequest is the body of the admin create permission api.
+type AdminPermissionRequest struct {
+	Code        string `json:"code"`
+	Description string `json:"description"`
+}
+
+// AdminRolePermissionsRequest is the body of the admin bulk set permissions api, it
+// carries the complete permission set the role should hold after the call.
+type AdminRolePermissionsRequest struct {
+	RoleId        string   `json:"roleId"`
+	PermissionIds []string `json:"permissionIds"`
+}
+
+type AdminPermissionDetail struct {
+	ID          string    `json:"id"`
+	Code        string    `json:"code"`
+	Description string    `json:"description"`
+	IsSystem    bool      `json:"isSystem"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
+type AdminRoleDetail struct {
+	ID          string                  `json:"id"`
+	Name        string                  `json:"name"`
+	Description string                  `json:"description"`
+	IsSystem    bool                    `json:"isSystem"`
+	CreatedAt   time.Time               `json:"createdAt"`
+	Permissions []AdminPermissionDetail `json:"permissions"`
+}
+
+type AdminRoleListResponse struct {
+	TotalPages int               `json:"totalPages"`
+	Roles      []AdminRoleDetail `json:"roles"`
+}
+
+type AdminPermissionListResponse struct {
+	TotalPages  int                     `json:"totalPages"`
+	Permissions []AdminPermissionDetail `json:"permissions"`
+}
+
+type AdminRoleCreatedResponse struct {
+	Id string `json:"id"`
+}
+
+type AdminPermissionCreatedResponse struct {
+	Id string `json:"id"`
+}
+
+// adminRolePermissionRow is the scan projection of the single joined query that
+// loads the permissions of a whole page of roles at once, the role id is carried
+// on every row so the rows can be stitched back onto their roles in memory.
+type adminRolePermissionRow struct {
+	RoleID      string    `json:"role_id"`
+	ID          string    `json:"id"`
+	Code        string    `json:"code"`
+	Description string    `json:"description"`
+	IsSystem    bool      `json:"is_system"`
+	CreatedAt   time.Time `json:"created_at"`
+}

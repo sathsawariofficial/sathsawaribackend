@@ -141,3 +141,113 @@ func ValidateGetRideRequest(sessionId string, request GetRideRequest) error {
 
 	return nil
 }
+
+func ValidatePassengerRegistration(request *PassengerRegistrationRequest) error {
+	var errMessage string
+	if utils.IsStringEmptyWithKey(request.Name, "Name", &errMessage) ||
+		utils.IsStringEmptyWithKey(request.MobileNumber, "Mobile number", &errMessage) ||
+		utils.IsStringEmptyWithKey(request.Password, "Password", &errMessage) {
+		return fmt.Errorf(constants.Missing_Data, errMessage)
+	}
+
+	if !request.Gender.IsValid() {
+		return fmt.Errorf(constants.Invalid_Data, "gender")
+	}
+
+	nameLen := len(request.Name)
+	if !(nameLen >= constants.Name_Min_Len && nameLen <= constants.Name_Max_Len) {
+		return fmt.Errorf("length of the name should be between %v and %v characters", constants.Name_Min_Len, constants.Name_Max_Len)
+	}
+
+	if err := utils.IsValidMobileNumber(request.MobileNumber); err != nil {
+		return err
+	}
+
+	if !utils.IsValidPassword(request.Password) {
+		return fmt.Errorf(constants.Invalid_Data, "password")
+	}
+
+	return nil
+}
+
+func ValidatePassengerLogin(request *PassengerLoginRequest) error {
+	var errMessage string
+	if utils.IsStringEmptyWithKey(request.MobileNumber, "Mobile number", &errMessage) ||
+		utils.IsStringEmptyWithKey(request.Password, "Password", &errMessage) {
+		return fmt.Errorf(constants.Missing_Data, errMessage)
+	}
+
+	return utils.IsValidMobileNumber(request.MobileNumber)
+}
+
+func ValidatePassengerId(passengerId string) error {
+	if !utils.PKValidation(passengerId) {
+		return fmt.Errorf(constants.Invalid_Data, "passenger id")
+	}
+
+	return nil
+}
+
+func ValidatePassengerChangePassword(request *PassengerChangePasswordRequest) error {
+	var errMessage string
+	if utils.IsStringEmptyWithKey(request.OldPassword, "Old password", &errMessage) ||
+		utils.IsStringEmptyWithKey(request.NewPassword, "New password", &errMessage) {
+		return fmt.Errorf(constants.Missing_Data, errMessage)
+	}
+
+	if !utils.IsValidPassword(request.NewPassword) {
+		return fmt.Errorf(constants.Invalid_Data, "password")
+	}
+
+	return nil
+}
+
+// ValidatePassengerSchedule checks the whole weekly form in one pass. A day and a
+// direction may only appear once, otherwise the caller is silently asking for two
+// different pickups on the same leg.
+func ValidatePassengerSchedule(request *PassengerScheduleRequest) error {
+	if len(request.Preferences) == 0 {
+		return fmt.Errorf(constants.Missing_Data, "Preferences")
+	}
+
+	if len(request.Preferences) > constants.Bulk_Request_Max_Len {
+		return fmt.Errorf("no more than %v preferences can be sent in one call", constants.Bulk_Request_Max_Len)
+	}
+
+	seen := map[string]bool{}
+
+	for _, preference := range request.Preferences {
+		if preference.DayOfWeek < constants.Day_Of_Week_Min_Value || preference.DayOfWeek > constants.Day_Of_Week_Max_Value {
+			return fmt.Errorf(constants.Invalid_Data, "day of week")
+		}
+
+		if preference.Direction != constants.Shift_Direction_Pickup && preference.Direction != constants.Shift_Direction_Drop {
+			return fmt.Errorf(constants.Invalid_Data, "direction")
+		}
+
+		key := fmt.Sprintf("%d:%s", preference.DayOfWeek, preference.Direction)
+		if seen[key] {
+			return fmt.Errorf(constants.Invalid_Data, "preferences, a day and direction is repeated")
+		}
+		seen[key] = true
+
+		// a leg that is switched off carries no place and no time, the passenger is
+		// simply not travelling on that leg
+		if !preference.IsEnabled {
+			continue
+		}
+
+		var errMessage string
+		if utils.IsStringEmptyWithKey(preference.Location, "Location", &errMessage) ||
+			utils.IsStringEmptyWithKey(preference.ScheduledTime, "Scheduled time", &errMessage) {
+			return fmt.Errorf(constants.Missing_Data, errMessage)
+		}
+
+		locationLen := len(preference.Location)
+		if locationLen < constants.Location_Min_Len || locationLen > constants.Location_Max_Len {
+			return fmt.Errorf("length of the location should be between %v and %v characters", constants.Location_Min_Len, constants.Location_Max_Len)
+		}
+	}
+
+	return nil
+}

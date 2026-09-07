@@ -221,3 +221,80 @@ func getActiveDriver(orgCtx *gin.Context, sessionId, mobileNumber string) (drive
 	logger.LogInfo("Response returned from getActiveDriver", sessionId)
 	return
 }
+
+func activatePassengerByMobile(orgCtx *gin.Context, mobileNumber string) (err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	if err = database.DatabaseConn.Postgres.WithContext(ctx).Model(&postgress.Passenger{}).Where("passenger_mobile = ?", mobileNumber).
+		Updates(postgress.Passenger{
+			Status: constants.Status_Active,
+		}).Error; err != nil {
+		return
+	}
+
+	return
+}
+
+// updatePassengerPasswordByMobile only ever touches the passengers table. A person
+// may hold both a driver account and a passenger account on one mobile number, and
+// resetting one of them must never reach into the other.
+func updatePassengerPasswordByMobile(orgCtx *gin.Context, mobileNumber, password string) (err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	if err = database.DatabaseConn.Postgres.WithContext(ctx).Model(&postgress.Passenger{}).Where("passenger_mobile = ?", mobileNumber).
+		Updates(postgress.Passenger{
+			Password: password,
+		}).Error; err != nil {
+		return
+	}
+
+	return
+}
+
+func updateForgottonPassengerPassword(ctx *gin.Context, sessionId, mobileNumber, password, otp string) (err error) {
+	logger.LogInfo("Request recevied in updateForgottonPassengerPassword", sessionId)
+
+	excryptedPassword, err := utils.HashPassword(sessionId, password)
+	if err != nil {
+		logger.LogError(sessionId, err)
+		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
+		return
+	}
+
+	err = updatePassengerPasswordByMobile(ctx, mobileNumber, excryptedPassword)
+	if err != nil {
+		logger.LogError(sessionId, "update forgotton passenger password error: "+err.Error())
+		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
+		return
+	}
+
+	logger.LogInfo("Response returned from updateForgottonPassengerPassword", sessionId)
+
+	return nil
+}
+
+func updatePassengerPassword(ctx *gin.Context, sessionId, mobileNumber, otp string) (err error) {
+	logger.LogInfo("Request recevied in updatePassengerPassword", sessionId)
+
+	excryptedPassword, err := redis.GetRedisValue(database.DatabaseConn.RedisConn, otp)
+	if err != nil {
+		logger.LogError(sessionId, "otp not found error: "+err.Error())
+		err = fmt.Errorf(constants.Unable_To_Do_Job, constants.Perform_this_operation)
+		return
+	}
+
+	err = updatePassengerPasswordByMobile(ctx, mobileNumber, excryptedPassword)
+	if err != nil {
+		logger.LogError(sessionId, "update passenger password error: "+err.Error())
+		err = fmt.Errorf(constants.Unable_To_Do_Job, "update the password")
+		return
+	}
+
+	logger.LogInfo("Response returned from updatePassengerPassword", sessionId)
+
+	return nil
+}
