@@ -18,3 +18,11 @@ const (
 	RIDE_BASE_URL          = APP_BASE_URL + "r/"
 	RIDE_REQUEST_BASE_URL  = APP_BASE_URL + "rq/"
 )
+
+// place alerts
+const (
+	// settings read per page while looking up who follows a place
+	DEFAULT_PLACE_ALERT_PAGE_SIZE = 500
+	// pushes sent to firebase at once while a place alert fans out
+	DEFAULT_PLACE_ALERT_SENDERS = 8
+)

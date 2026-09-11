@@ -810,3 +810,14 @@ func countVehicles(ctx *gin.Context, driverID string) (int64, error) {
 
 	return count, nil
 }
+
+// a driver's setting belongs to the driver, who is reached through the fcm of their login
+func mapNotificationSetting(driverId string, request NotificationSettingsRequest) postgress.PlaceNotificationSetting {
+	return postgress.PlaceNotificationSetting{
+		ID:       database.GenerateUUID(),
+		UserType: constants.User_Driver,
+		UserId:   driverId,
+		Enabled:  request.Enabled,
+		Places:   request.Places,
+	}
+}

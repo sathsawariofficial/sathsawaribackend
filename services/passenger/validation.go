@@ -141,3 +141,32 @@ func ValidateGetRideRequest(sessionId string, request GetRideRequest) error {
 
 	return nil
 }
+
+func ValidateNotificationSettings(request *NotificationSettingsRequest) (err error) {
+	if err = ValidateDeviceId(request.DeviceId); err != nil {
+		return err
+	}
+
+	if utils.IsStringEmpty(request.FCM) {
+		return fmt.Errorf(constants.Missing_Data, "fcm")
+	}
+	if len(request.FCM) > constants.FCM_Max_Len {
+		return fmt.Errorf(constants.Invalid_Data, "fcm")
+	}
+
+	// places are kept in the form they are matched in
+	request.Places, err = utils.NormalizePlaces(request.Places)
+
+	return err
+}
+
+func ValidateDeviceId(deviceId string) error {
+	if utils.IsStringEmpty(deviceId) {
+		return fmt.Errorf(constants.Missing_Data, "device id")
+	}
+	if len(deviceId) > constants.DeviceId_Max_Len {
+		return fmt.Errorf(constants.Invalid_Data, "device id")
+	}
+
+	return nil
+}

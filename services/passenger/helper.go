@@ -99,6 +99,18 @@ func mapRideRequest(request RideRequest) postgress.RideRequest {
 	}
 }
 
+// a passenger has no account, the setting belongs to the device and carries its fcm
+func mapNotificationSetting(request NotificationSettingsRequest) postgress.PlaceNotificationSetting {
+	return postgress.PlaceNotificationSetting{
+		ID:       database.GenerateUUID(),
+		UserType: constants.User_Passenger,
+		UserId:   request.DeviceId,
+		FCM:      request.FCM,
+		Enabled:  request.Enabled,
+		Places:   request.Places,
+	}
+}
+
 func getFilterAndPaginateRideRequests(
 	orgCtx *gin.Context,
 	page int,

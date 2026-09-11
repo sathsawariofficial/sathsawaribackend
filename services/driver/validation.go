@@ -240,3 +240,14 @@ func ValidateReserveSeat(sessionId, bookingId string) error {
 
 	return nil
 }
+
+func ValidateNotificationSettings(driverId string, request *NotificationSettingsRequest) (err error) {
+	if !utils.PKValidation(driverId) {
+		return fmt.Errorf(constants.Invalid_Data, "driver id")
+	}
+
+	// places are kept in the form they are matched in
+	request.Places, err = utils.NormalizePlaces(request.Places)
+
+	return err
+}

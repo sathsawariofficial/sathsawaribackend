@@ -629,3 +629,36 @@ func ReserveSeat(ctx *gin.Context, sessionId, bookingID, driverID string) (err e
 
 	return
 }
+
+// SaveNotificationSettings keeps the places a driver wants to hear about, replacing
+// whatever they saved before.
+func SaveNotificationSettings(ctx *gin.Context, sessionId, driverId string, request NotificationSettingsRequest) (setting postgress.PlaceNotificationSetting, err error) {
+	logger.LogInfo("Request received in SaveNotificationSettings", sessionId)
+
+	setting = mapNotificationSetting(driverId, request)
+	if err = database.SavePlaceNotificationSetting(ctx, &setting); err != nil {
+		logger.LogError(sessionId, "failed to save notification settings error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "save the notification settings")
+		return
+	}
+
+	logger.LogInfo("Response returned from SaveNotificationSettings", sessionId)
+
+	return
+}
+
+// GetNotificationSettings returns what a driver saved, switched off with no places when
+// they never saved anything.
+func GetNotificationSettings(ctx *gin.Context, sessionId, driverId string) (setting postgress.PlaceNotificationSetting, err error) {
+	logger.LogInfo("Request received in GetNotificationSettings", sessionId)
+
+	if setting, err = database.GetPlaceNotificationSetting(ctx, constants.User_Driver, driverId); err != nil {
+		logger.LogError(sessionId, "failed to get notification settings error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the notification settings")
+		return
+	}
+
+	logger.LogInfo("Response returned from GetNotificationSettings", sessionId)
+
+	return
+}

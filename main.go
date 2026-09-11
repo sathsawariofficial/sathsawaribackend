@@ -89,6 +89,10 @@ func main() {
 			{
 				passengerPublic.POST("/seat/book", passenger.BookSeatHandler)
 				passengerPublic.POST("/ride/request", passenger.RideRequestHandler)
+
+				// a passenger has no account here, the places they follow belong to their device
+				passengerPublic.GET("/notification/settings", passenger.GetNotificationSettingsHandler)
+				passengerPublic.PUT("/notification/settings", passenger.SaveNotificationSettingsHandler)
 			}
 		}
 
@@ -122,6 +126,10 @@ func main() {
 				driverProtected.GET("/bookings", driver.GetBookSeatHandler)
 				driverProtected.GET("/ride/requests", passenger.GetRideRequestsHandler)
 				driverProtected.GET("/booking/reserve", driver.ReserveSeatHandler)
+
+				// the places a driver follows to hear about ride requests
+				driverProtected.GET("/notification/settings", driver.GetNotificationSettingsHandler)
+				driverProtected.PUT("/notification/settings", driver.SaveNotificationSettingsHandler)
 
 				/*
 					// NOTE: this feature is not needed atm

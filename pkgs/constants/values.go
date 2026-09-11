@@ -34,6 +34,10 @@ const (
 	NOTIFICATION_TYPE_BACKUP_SMS_TO_SERVICE = "sms_to_backup_service"
 	NOTIFICATION_TYPE_INFORMATION           = "information"
 	NOTIFICATION_TYPE_MARKETING             = "marketing"
+
+	// place alerts are pushed straight to the device and never kept in the notifications table
+	NOTIFICATION_TYPE_RIDE_PLACE_ALERT         = "ride_place_alert"
+	NOTIFICATION_TYPE_RIDE_REQUEST_PLACE_ALERT = "ride_request_place_alert"
 )
 
 const (

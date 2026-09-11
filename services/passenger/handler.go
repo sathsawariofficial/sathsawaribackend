@@ -191,3 +191,82 @@ func GetRideRequestHandler(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, rideRequestResp)
 }
+
+// SaveNotificationSettingsHandler saves the places a passenger's device follows. Rides
+// taking in one of them are pushed to the device with their link, and are never kept.
+func SaveNotificationSettingsHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in SaveNotificationSettingsHandler", sessionId)
+
+	var request NotificationSettingsRequest
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		logger.LogError(sessionId, "binding error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Unable_To_Do_Job, "save the notification settings"),
+		})
+		return
+	}
+
+	logger.LogDebug2("Request received in SaveNotificationSettingsHandler", sessionId, request)
+
+	err := ValidateNotificationSettings(&request)
+	if err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	setting, err := SaveNotificationSettings(ctx, sessionId, request)
+	if err != nil {
+		logger.LogError(sessionId, "failed to save notification settings error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	settingsResp := notificationSettingsResp(setting)
+
+	logger.LogInfo("Response returned from SaveNotificationSettingsHandler", sessionId)
+	logger.LogDebug2("Response returned from SaveNotificationSettingsHandler", sessionId, settingsResp)
+
+	ctx.JSON(http.StatusOK, settingsResp)
+}
+
+func GetNotificationSettingsHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetNotificationSettingsHandler", sessionId)
+
+	deviceId := ctx.Query(constants.Device_Key)
+	err := ValidateDeviceId(deviceId)
+	if err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	setting, err := GetNotificationSettings(ctx, sessionId, deviceId)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get notification settings error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	settingsResp := notificationSettingsResp(setting)
+
+	logger.LogInfo("Response returned from GetNotificationSettingsHandler", sessionId)
+	logger.LogDebug2("Response returned from GetNotificationSettingsHandler", sessionId, settingsResp)
+
+	ctx.JSON(http.StatusOK, settingsResp)
+}

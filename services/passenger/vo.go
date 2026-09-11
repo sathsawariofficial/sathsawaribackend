@@ -79,3 +79,20 @@ func rideRequestResponse(msg, requestId, openURL string) utils.APIResponse {
 		},
 	}
 }
+
+func notificationSettingsResp(setting postgress.PlaceNotificationSetting) utils.APIResponse {
+	places := []string(setting.Places)
+	if places == nil {
+		places = []string{}
+	}
+
+	return utils.APIResponse{
+		Code:    http.StatusOK,
+		Message: constants.Success,
+		Data: NotificationSettingsResponse{
+			DeviceId: setting.UserId,
+			Enabled:  setting.Enabled,
+			Places:   places,
+		},
+	}
+}

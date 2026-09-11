@@ -154,3 +154,16 @@ type BookedSeat struct {
 type BookedSeatsResponse struct {
 	Bookings []BookedSeat `json:"bookings"`
 }
+
+// NotificationSettingsRequest is a driver's whole place notification setting: while
+// enabled, ride requests taking in one of the places are pushed to the driver. What is
+// sent replaces what was saved before.
+type NotificationSettingsRequest struct {
+	Enabled bool     `json:"enabled"`
+	Places  []string `json:"places"`
+}
+
+type NotificationSettingsResponse struct {
+	Enabled bool     `json:"enabled"`
+	Places  []string `json:"places"`
+}

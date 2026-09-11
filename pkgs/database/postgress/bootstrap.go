@@ -60,6 +60,7 @@ func NewPortgress() (db *gorm.DB, err error) {
 		&RideBooking{},
 		&RideRequest{},
 		&AnnouncementRequests{},
+		&PlaceNotificationSetting{},
 
 		&DELVehicle{},
 		&DELRide{},
@@ -230,6 +231,13 @@ func NewPortgress() (db *gorm.DB, err error) {
 		CREATE INDEX IF NOT EXISTS idx_rides_route_points
 		ON rides
 		USING GIN(route_points)
+	`)
+
+	// a place alert looks settings up by any one of their places
+	db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_place_notification_settings_places
+		ON place_notification_settings
+		USING GIN(places)
 	`)
 
 	return
