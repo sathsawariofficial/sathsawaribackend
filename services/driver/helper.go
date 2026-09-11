@@ -127,7 +127,10 @@ func updateUserFCM(orgCtx *gin.Context, id, fcm string) error {
 			Columns:   []clause.Column{{Name: "user_id"}}, // conflict key
 			DoUpdates: clause.AssignmentColumns([]string{"fcm"}),
 		}).
+		// without an id of its own every insert after the first one would collide on the
+		// empty primary key, and no other driver's fcm would ever be kept
 		Create(&postgress.UserFCM{
+			ID:     database.GenerateUUID(),
 			UserId: id,
 			FCM:    fcm,
 		}).Error
