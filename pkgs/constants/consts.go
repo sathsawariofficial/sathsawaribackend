@@ -37,6 +37,7 @@ const (
 	Perform_this_operation  = "Perform this operation"
 	General_Unknown         = "Unknown %s"
 	Not_Found               = "%s not found"
+	Same_Start_End_Location = "start location and end location cannot be the same"
 )
 
 // keys

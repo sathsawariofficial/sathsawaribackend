@@ -55,6 +55,10 @@ func ValidateRideCreation(sessionId, driverId string, request *RideCreationReque
 	if endLocationLen < constants.General_Min_Len || endLocationLen > constants.General_Max_Len {
 		return fmt.Errorf("length of the end location should be between %v and %v characters", constants.General_Min_Len, constants.General_Max_Len)
 	}
+	// a ride has to go somewhere, the same place typed in another case is still the same place
+	if utils.NormalizePlace(request.StartLocation) == utils.NormalizePlace(request.EndLocation) {
+		return errors.New(constants.Same_Start_End_Location)
+	}
 	if routeDetailsLen < constants.RouteDetails_Min_Len || routeDetailsLen > constants.RouteDetails_Max_Len {
 		return fmt.Errorf("length of the route details should be between %v and %v characters", constants.RouteDetails_Min_Len, constants.RouteDetails_Max_Len)
 	}

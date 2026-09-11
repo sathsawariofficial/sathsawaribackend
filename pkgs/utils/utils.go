@@ -471,3 +471,9 @@ func IsUUID(s string) bool {
 	_, err := uuid.Parse(s)
 	return err == nil
 }
+
+// NormalizePlace is the form a place name is compared in: trimmed, inner runs of spaces
+// collapsed and lower cased, so "Saddar", " saddar " and "SADDAR" are the same place.
+func NormalizePlace(place string) string {
+	return strings.ToLower(strings.Join(strings.Fields(place), " "))
+}
