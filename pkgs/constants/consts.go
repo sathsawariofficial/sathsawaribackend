@@ -37,6 +37,7 @@ const (
 	Perform_this_operation  = "Perform this operation"
 	General_Unknown         = "Unknown %s"
 	Not_Found               = "%s not found"
+	Same_Start_End_Location = "start location and end location cannot be the same"
 
 	// ride share capacity errors
 	Ride_Seats_Exceed_Vehicle = "Number of seats cannot be more than the vehicle's %d seat(s)"
@@ -399,4 +400,33 @@ const (
 const (
 	LIKE_TYPE_RIDE_URL         = "RIDE_URL"
 	LIKE_TYPE_RIDE_REQUEST_URL = "RIDE_REQUEST_URL"
+)
+
+// place notifications: a passenger follows places to hear about the rides taking them
+// in, a driver follows places to hear about the ride requests that do
+const (
+	Device_Key = "device_id"
+
+	NOTIFICATION_TITLE_RIDE_PLACE_ALERT         = "New Ride For Your Places"
+	NOTIFICATION_TITLE_RIDE_REQUEST_PLACE_ALERT = "New Ride Request For Your Places"
+
+	NOTIFICATION_MESSAGE_RIDE_PLACE_ALERT         = "A ride from %s to %s leaves at %s"
+	NOTIFICATION_MESSAGE_RIDE_REQUEST_PLACE_ALERT = "%d seat(s) needed from %s to %s at %s"
+
+	// the data every place alert carries, the app draws the notification and its open
+	// button from it
+	NOTIFICATION_KEY_TYPE     = "type"
+	NOTIFICATION_KEY_TITLE    = "title"
+	NOTIFICATION_KEY_BODY     = "body"
+	NOTIFICATION_KEY_OPEN_URL = "openUrl"
+	NOTIFICATION_KEY_ACTION   = "action"
+
+	// the action of a place alert, also the category an iOS app registers its open button under
+	NOTIFICATION_ACTION_OPEN_URL = "OPEN_URL"
+
+	Notification_Places_Max_Count = 10
+	DeviceId_Max_Len              = 128
+	FCM_Max_Len                   = 512
+
+	DisplayDateTimeLayout = "02 Jan 03:04 PM"
 )

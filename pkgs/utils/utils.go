@@ -18,8 +18,11 @@ import (
 	"rideshare/pkgs/database/redis"
 	httpcall "rideshare/pkgs/externalCall/http"
 	"rideshare/pkgs/logger"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -643,4 +646,133 @@ func RoutePoints(locations []RouteLocation) []string {
 	}
 
 	return points
+}
+
+// NormalizePlace is the form a place name is compared in: trimmed, inner runs of spaces
+// collapsed and lower cased, so "Saddar", " saddar " and "SADDAR" are the same place.
+func NormalizePlace(place string) string {
+	return strings.ToLower(strings.Join(strings.Fields(place), " "))
+}
+
+// NormalizePlaces puts the places a user follows in the form they are matched in, dropping
+// blanks and repeats, and refuses a list that is too long or a name no location could have.
+func NormalizePlaces(places []string) ([]string, error) {
+	normalized := make([]string, 0, len(places))
+
+	for _, place := range places {
+		if place = NormalizePlace(place); place == "" || slices.Contains(normalized, place) {
+			continue
+		}
+		if len(place) > constants.General_Max_Len {
+			return nil, fmt.Errorf("length of a place should be between %v and %v characters", constants.General_Min_Len, constants.General_Max_Len)
+		}
+
+		normalized = append(normalized, place)
+	}
+
+	if len(normalized) > constants.Notification_Places_Max_Count {
+		return nil, fmt.Errorf("there cannot be more than %d places", constants.Notification_Places_Max_Count)
+	}
+
+	return normalized, nil
+}
+
+// DisplayDateTime turns a stored ride time into the short form a notification shows, and
+// hands the stored text back unchanged if it does not parse.
+func DisplayDateTime(dateTime string) string {
+	parsed, err := ConvertStrToTime(dateTime)
+	if err != nil {
+		return dateTime
+	}
+
+	return parsed.Format(constants.DisplayDateTimeLayout)
+}
+
+// NotifyPlaceSubscribers tells every user of a type who follows one of the places that a
+// ride, or a ride request, taking it in has just been put out, with the link that opens
+// it. Run it in its own goroutine once the ride or request is saved.
+//
+// Place alerts are never kept in the notifications table. They are pushed to firebase
+// from here, a few at a time, rather than queued on the notification channel: that
+// channel has a single subscriber that also relays OTPs, and a place followed by
+// thousands would hold every OTP up behind it.
+func NotifyPlaceSubscribers(sessionId string, userType int, notificationType string, places []string, title, message, openURL string, data map[string]string) {
+	logger.LogInfo("Request received in NotifyPlaceSubscribers", sessionId)
+
+	defer func() {
+		if r := recover(); r != nil {
+			logger.LogError(sessionId, fmt.Errorf("panic recovered in NotifyPlaceSubscribers: %v", r))
+		}
+	}()
+
+	matched := make([]string, 0, len(places))
+	for _, place := range places {
+		if place = NormalizePlace(place); place != "" && !slices.Contains(matched, place) {
+			matched = append(matched, place)
+		}
+	}
+	if len(matched) == 0 {
+		return
+	}
+
+	payload := make(map[string]string, len(data)+5)
+	for key, value := range data {
+		payload[key] = value
+	}
+	payload[constants.NOTIFICATION_KEY_TYPE] = notificationType
+	payload[constants.NOTIFICATION_KEY_TITLE] = title
+	payload[constants.NOTIFICATION_KEY_BODY] = message
+	payload[constants.NOTIFICATION_KEY_OPEN_URL] = openURL
+	payload[constants.NOTIFICATION_KEY_ACTION] = constants.NOTIFICATION_ACTION_OPEN_URL
+
+	var (
+		wg      sync.WaitGroup
+		failed  atomic.Int64
+		senders = make(chan struct{}, constants.DEFAULT_PLACE_ALERT_SENDERS)
+		// a device reached through more than one setting is still told once
+		notified = make(map[string]bool)
+	)
+
+	afterId := ""
+	for {
+		recipients, err := database.GetPlaceAlertRecipients(context.Background(), userType, matched, afterId, constants.DEFAULT_PLACE_ALERT_PAGE_SIZE)
+		if err != nil {
+			logger.LogError(sessionId, "failed to get place alert recipients error: "+err.Error())
+			break
+		}
+
+		for _, recipient := range recipients {
+			if notified[recipient.FCM] {
+				continue
+			}
+			notified[recipient.FCM] = true
+
+			wg.Add(1)
+			senders <- struct{}{}
+			go func(token string) {
+				defer func() {
+					if r := recover(); r != nil {
+						failed.Add(1)
+						logger.LogError(sessionId, fmt.Errorf("panic recovered sending a place alert: %v", r))
+					}
+					<-senders
+					wg.Done()
+				}()
+
+				if err := SendLinkPush(token, title, message, payload); err != nil {
+					failed.Add(1)
+					logger.LogDebug("place alert not delivered", sessionId, err.Error())
+				}
+			}(recipient.FCM)
+		}
+
+		if len(recipients) < constants.DEFAULT_PLACE_ALERT_PAGE_SIZE {
+			break
+		}
+		afterId = recipients[len(recipients)-1].SettingId
+	}
+
+	wg.Wait()
+
+	logger.LogInfo(fmt.Sprintf("place alert %s sent to %d device(s), %d failed", notificationType, len(notified), failed.Load()), sessionId)
 }

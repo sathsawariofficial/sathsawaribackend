@@ -760,6 +760,37 @@ ride_body = {
 }
 
 rideshare = {"name": "8 · Ride Share", "item": [
+    req("Driver Follows Places", "PUT", "/api/v1/driver/notification/settings", "owner_session",
+        body={"enabled": True, "places": ["Location A", "Location B"]},
+        desc=("The places this driver follows. While enabled, every passenger ride request that starts or ends at "
+              "one of them is pushed to the driver with the request's openUrl, as long as the driver is active and "
+              "logged in with an fcm. Places are matched case blind: trimmed, inner spaces collapsed and lower "
+              "cased, blanks and repeats dropped, and they come back in that form. At most 10, each up to 50 "
+              "characters. What is sent replaces what was saved before. Place alerts are never stored, so they "
+              "never show up in Driver Notifications.\n\n"
+              "Push data: type, title, body, openUrl, action OPEN_URL and requestId. Android receives a data only, "
+              "high priority message so the app draws the notification with its open button, iOS an alert in "
+              "the OPEN_URL category."),
+        examples=["Save driver notification settings", "Driver notification settings with more than 10 places (refused)",
+                  "Driver notification settings with a place too long (refused)"]),
+    req("Driver's Followed Places", "GET", "/api/v1/driver/notification/settings", "owner_session",
+        desc="A driver who never saved any gets enabled false and no places.",
+        examples=["Get driver notification settings", "Driver notification settings before saving"]),
+    req("Passenger Device Follows Places", "PUT", "/api/v1/passenger/notification/settings", "open_token",
+        body={"deviceId": "flow-device", "fcm": "<device fcm token>", "enabled": True,
+              "places": ["LocationA1", "Location B"]},
+        desc=("Passengers follow places from their device, no account needed: deviceId and fcm are required, and "
+              "saving again with a new fcm moves the setting to it. While enabled, every ride whose start "
+              "location, end location or one of its route points is one of the places is pushed to the fcm with "
+              "the ride's openUrl, a recurring series once. Matching, limits and the push data are the same as "
+              "for a driver, with rideId instead of requestId."),
+        examples=["Passenger device notification settings", "Passenger device settings without an fcm (refused)",
+                  "Passenger device settings without a device id (refused)"]),
+    req("Passenger Device's Followed Places", "GET", "/api/v1/passenger/notification/settings", "open_token",
+        query=[q("device_id", "flow-device")],
+        desc="A device that never saved any gets enabled false and no places.",
+        examples=["Get passenger device notification settings", "Passenger device settings never saved"]),
+
     req("Create Ride", "POST", "/api/v1/ride/create", "owner_session", body=ride_body,
         tests=save("ride_id", "r.data.id"),
         desc=("A ride goes on the driver's own vehicle and never offers more seats than it has. A vehicle whose "
@@ -767,8 +798,11 @@ rideshare = {"name": "8 · Ride Share", "item": [
               "another ride at the same time on any vehicle, the vehicle cannot carry another ride, and "
               "neither can be on a shift trip. A recurring series is checked date by date, against "
               "everything already booked and against its own rides, before anything is written, and one "
-              "clashing date refuses the whole series and names that date. Touching times do not overlap."),
-        examples=["Create carpool ride", "Ride with more seats than the vehicle (refused)",
+              "clashing date refuses the whole series and names that date. Touching times do not overlap. "
+              "The start and end location cannot be the same place, compared case blind. Passenger devices "
+              "following a place the ride takes in are pushed its openUrl."),
+        examples=["Create carpool ride", "Ride from a place to itself (refused)",
+                  "Ride with more seats than the vehicle (refused)",
                   "Ride on another driver's vehicle (refused)", "Ride on top of a shift trip (refused)",
                   "Overlapping ride on the same vehicle (refused)",
                   "Same driver on another vehicle at the same time (refused)", "Ride right after another ride",

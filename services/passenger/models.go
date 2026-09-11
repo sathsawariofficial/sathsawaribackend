@@ -121,3 +121,19 @@ type AvailabilityResponse struct {
 	ServiceId string            `json:"serviceId"`
 	Days      []AvailabilityDay `json:"days"`
 }
+
+// NotificationSettingsRequest is the whole place notification setting of a passenger's
+// device: while enabled, rides taking in one of the places are pushed to the fcm. What
+// is sent replaces what was saved before.
+type NotificationSettingsRequest struct {
+	DeviceId string   `json:"deviceId"`
+	FCM      string   `json:"fcm"`
+	Enabled  bool     `json:"enabled"`
+	Places   []string `json:"places"`
+}
+
+type NotificationSettingsResponse struct {
+	DeviceId string   `json:"deviceId"`
+	Enabled  bool     `json:"enabled"`
+	Places   []string `json:"places"`
+}

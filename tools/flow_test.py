@@ -601,6 +601,54 @@ r = call("My shift requests in a time window", "GET", "/api/v1/passenger/shift/r
 check("A passenger's own list filters by time too", ENV["shift_request"] in ids_of(data(r, "requests"), "id"))
 call("Delete shift request", "DELETE", f"/api/v1/passenger/shift/request?request_id={ENV['shift_request']}", P3)
 
+section("PLACE NOTIFICATIONS")
+# a driver follows places to hear about ride requests and a passenger device follows places to
+# hear about rides; the push carries the link to open and is never stored. The ride and the
+# ride request below start at Location A, which both of them follow.
+PA_M = "+92340" + SUF + "7"
+r = call("Register place alerts driver", "POST", "/api/v1/driver/register", OPEN_TOKEN,
+         {"deviceId": "flow-pa", "mobile": PA_M, "name": "Place Alerts Driver", "password": "Golang@12122", "gender": "male"})
+call("Verify place alerts driver otp", "POST", "/api/v1/otp/verify", OPEN_TOKEN,
+     {"mobile": PA_M, "otp": data(r, "tempOTP"), "operation": "ACTIVATE_DRIVER"})
+r = call("Login place alerts driver with an fcm", "POST", "/api/v1/driver/login", OPEN_TOKEN,
+         {"deviceId": "flow-pa", "mobile": PA_M, "password": "Golang@12122", "fcm": "flow-fcm-driver-" + SUF})
+PA = data(r, "sessionId")
+call("Place alerts driver pin", "POST", "/api/v1/driver/pin?pin=141414", PA)
+
+r = call("Driver notification settings before saving", "GET", "/api/v1/driver/notification/settings", PA)
+check("A driver who never saved follows nothing", data(r, "enabled") is False and data(r, "places") == [],
+      json.dumps(data(r)))
+r = call("Save driver notification settings", "PUT", "/api/v1/driver/notification/settings", PA,
+         {"enabled": True, "places": ["  location a ", "LOCATION   B", "Location A", ""]},
+         note="places come back trimmed, lower cased, spaces collapsed, blanks and repeats dropped")
+check("A driver's places are kept case blind and without repeats",
+      data(r, "places") == ["location a", "location b"], json.dumps(data(r)))
+r = call("Get driver notification settings", "GET", "/api/v1/driver/notification/settings", PA)
+check("The driver's places read back", data(r, "enabled") is True and data(r, "places") == ["location a", "location b"],
+      json.dumps(data(r)))
+call("Driver notification settings with more than 10 places (refused)", "PUT", "/api/v1/driver/notification/settings", PA,
+     {"enabled": True, "places": [f"place {i}" for i in range(11)]}, expect=400)
+call("Driver notification settings with a place too long (refused)", "PUT", "/api/v1/driver/notification/settings", PA,
+     {"enabled": True, "places": ["x" * 51]}, expect=400, note="a place is at most 50 characters, like a ride location")
+
+DEVICE = "flow-device-" + SUF
+r = call("Passenger device notification settings", "PUT", "/api/v1/passenger/notification/settings", OPEN_TOKEN,
+         {"deviceId": DEVICE, "fcm": "flow-fcm-device-" + SUF, "enabled": True, "places": ["LocationA1", "Location B"]},
+         note="a passenger needs no account for this, the setting belongs to the device")
+check("A device's places are kept case blind",
+      data(r, "places") == ["locationa1", "location b"] and data(r, "deviceId") == DEVICE, json.dumps(data(r)))
+r = call("Get passenger device notification settings", "GET",
+         f"/api/v1/passenger/notification/settings?device_id={DEVICE}", OPEN_TOKEN)
+check("The device's places read back", data(r, "places") == ["locationa1", "location b"], json.dumps(data(r)))
+r = call("Passenger device settings never saved", "GET",
+         f"/api/v1/passenger/notification/settings?device_id=never-saved-{SUF}", OPEN_TOKEN)
+check("A device that never saved follows nothing", data(r, "enabled") is False and data(r, "places") == [],
+      json.dumps(data(r)))
+call("Passenger device settings without an fcm (refused)", "PUT", "/api/v1/passenger/notification/settings", OPEN_TOKEN,
+     {"deviceId": DEVICE, "enabled": True, "places": ["Location B"]}, expect=400, note="the fcm is where the alerts go")
+call("Passenger device settings without a device id (refused)", "PUT", "/api/v1/passenger/notification/settings",
+     OPEN_TOKEN, {"fcm": "flow-fcm-device-" + SUF, "enabled": True, "places": ["Location B"]}, expect=400)
+
 section("RIDE SHARE")
 ride_body = {
     "startDatetime": f"{D_RIDE} 12:00:00", "estimatedEndDatetime": f"{D_RIDE} 13:00:00",
@@ -610,6 +658,11 @@ ride_body = {
     "makeTemplate": True, "isRecurring": False, "frequency": 1, "period": 1, "daysOfWeek": [1]}
 r = call("Create carpool ride", "POST", "/api/v1/ride/create", OWNER, ride_body)
 ENV["ride"] = data(r, "id")
+r = call("Ride from a place to itself (refused)", "POST", "/api/v1/ride/create", OWNER,
+         dict(ride_body, endLocation="  LOCATION a ", makeTemplate=False), expect=400,
+         note="start and end are compared case blind")
+check("The refusal says the start and end are the same place", "cannot be the same" in str(r.get("message")),
+      str(r.get("message")))
 call("Ride with more seats than the vehicle (refused)", "POST", "/api/v1/ride/create", OWNER,
      dict(ride_body, numberOfSeats=12, makeTemplate=False), expect=400, note="the vehicle has 8 seats")
 call("Ride on another driver's vehicle (refused)", "POST", "/api/v1/ride/create", OWNER,
@@ -695,6 +748,12 @@ call("Get ride requests", "GET", "/api/v1/driver/ride/requests?page=1", OWNER)
 call("Get announcements", "GET", "/api/v1/announcements", OPEN_TOKEN)
 call("Driver notifications", "GET", "/api/v1/user/notifications", OWNER)
 call("Passenger notifications", "GET", "/api/v1/passenger/notifications", P1)
+r = call("Place alerts driver notifications", "GET", "/api/v1/user/notifications", PA,
+         note="the ride request above starts at a place this driver follows, and place alerts are never stored")
+notes = data(r, "notifications") or []
+check("A driver's own notifications are stored, their place alerts never are",
+      len(notes) > 0 and not any("For Your Places" in (n.get("title") or "") for n in notes),
+      f"{len(notes)} stored: {[n.get('title') for n in notes]}")
 
 section("LEGACY SEAT BOOKING")
 r = call("Get one ride", "GET", f"/api/v1/ride?ride_id={ENV['ride']}", OPEN_TOKEN)

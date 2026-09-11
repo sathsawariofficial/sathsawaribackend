@@ -59,7 +59,48 @@ func RequestRide(ctx *gin.Context, sessionId string, request RideRequest) (reque
 	openURL = utils.CreateOpenRideLink(constants.LIKE_TYPE_RIDE_REQUEST_URL, shortCode)
 	redis.SetRedisValue(database.DatabaseConn.RedisConn, shortCode, rideRequest.ID)
 
+	// drivers following the pick up or the drop off place hear about the request, with its link
+	go utils.NotifyPlaceSubscribers(sessionId, constants.User_Driver, constants.NOTIFICATION_TYPE_RIDE_REQUEST_PLACE_ALERT,
+		[]string{request.StartLocation, request.EndLocation},
+		constants.NOTIFICATION_TITLE_RIDE_REQUEST_PLACE_ALERT,
+		fmt.Sprintf(constants.NOTIFICATION_MESSAGE_RIDE_REQUEST_PLACE_ALERT, request.NumberOfSeats, request.StartLocation, request.EndLocation, utils.DisplayDateTime(request.StartDatetime)),
+		openURL, map[string]string{constants.NOTIFICATION_KEY_REQUEST_ID: requestId})
+
 	logger.LogInfo("Response returned from RequestRide", sessionId)
+
+	return
+}
+
+// SaveNotificationSettings keeps the places a passenger's device wants to hear about,
+// replacing whatever the device saved before.
+func SaveNotificationSettings(ctx *gin.Context, sessionId string, request NotificationSettingsRequest) (setting postgress.PlaceNotificationSetting, err error) {
+	logger.LogInfo("Request received in SaveNotificationSettings", sessionId)
+
+	setting = mapNotificationSetting(request)
+	if err = database.SavePlaceNotificationSetting(ctx, &setting); err != nil {
+		logger.LogError(sessionId, "failed to save notification settings error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "save the notification settings")
+		return
+	}
+
+	logger.LogInfo("Response returned from SaveNotificationSettings", sessionId)
+
+	return
+}
+
+// GetNotificationSettings returns what a passenger's device saved, switched off with no
+// places when it never saved anything.
+func GetNotificationSettings(ctx *gin.Context, sessionId, deviceId string) (setting postgress.PlaceNotificationSetting, err error) {
+	logger.LogInfo("Request received in GetNotificationSettings", sessionId)
+
+	if setting, err = database.GetPlaceNotificationSetting(ctx, constants.User_Passenger, deviceId); err != nil {
+		logger.LogError(sessionId, "failed to get notification settings error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the notification settings")
+		return
+	}
+	setting.UserId = deviceId
+
+	logger.LogInfo("Response returned from GetNotificationSettings", sessionId)
 
 	return
 }

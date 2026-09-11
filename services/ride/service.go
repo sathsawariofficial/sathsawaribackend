@@ -77,10 +77,10 @@ func CreateRide(ctx *gin.Context, sessionId string, request RideCreationRequest)
 		template := mapRideToRideTemplateData(request, rideId, request.EXTDriverId, vehicle.ID)
 		logger.LogDebug("template", sessionId, template)
 
-		if err = database.DatabaseConn.Postgres.Create(&template).Error; err != nil {
-			logger.LogWarning(sessionId, "failed to create ride template error: "+err.Error())
-			err = nil
-			return
+		// the ride is already created, a template that fails to save must not keep the
+		// ride's link or its notifications from going out
+		if e := database.DatabaseConn.Postgres.Create(&template).Error; e != nil {
+			logger.LogWarning(sessionId, "failed to create ride template error: "+e.Error())
 		}
 	}
 
@@ -89,6 +89,14 @@ func CreateRide(ctx *gin.Context, sessionId string, request RideCreationRequest)
 	redis.SetRedisValue(database.DatabaseConn.RedisConn, shortCode, rideId)
 
 	utils.SendNotification(ctx, sessionId, constants.NOTIFICATION_TYPE_RIDE_CREATED, request.EXTDriverId, constants.NOTIFICATION_TITLE_RIDE_CREATION, constants.NOTIFICATION_MESSAGE_RIDE_CREATION, nil)
+
+	// passengers following a place the ride takes in hear about it, a recurring series
+	// once, through its first ride, whose link opens the repeats as well
+	places := append(append([]string{request.StartLocation}, request.RoutePoints...), request.EndLocation)
+	go utils.NotifyPlaceSubscribers(sessionId, constants.User_Passenger, constants.NOTIFICATION_TYPE_RIDE_PLACE_ALERT, places,
+		constants.NOTIFICATION_TITLE_RIDE_PLACE_ALERT,
+		fmt.Sprintf(constants.NOTIFICATION_MESSAGE_RIDE_PLACE_ALERT, request.StartLocation, request.EndLocation, utils.DisplayDateTime(request.StartDatetime)),
+		openURL, map[string]string{constants.NOTIFICATION_KEY_RIDE_ID: rideId})
 
 	logger.LogInfo("Response returned from CreateRide", sessionId)
 	logger.LogDebug2("Response returned from CreateRide", sessionId, rideId)

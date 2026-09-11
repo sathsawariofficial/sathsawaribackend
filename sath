@@ -69,6 +69,12 @@ HOUSE STYLE:
   every error path.
 - Notifications are sent with utils.SendUserNotification AFTER the transaction
   commits, never inside it.
+- Place alerts are the one exception: a ride or ride request touching a place that
+  passenger devices (rides) or drivers (ride requests) follow is announced with
+  utils.NotifyPlaceSubscribers in its own goroutine, pushed straight to firebase
+  with its openUrl, and never stored. Places are compared through
+  utils.NormalizePlace (trimmed, spaces collapsed, lower cased), which is also how
+  a ride is refused for starting and ending at the same place.
 
 DELETION — the owner is explicit about this:
 - Anything that matters is copied into its own DEL* archive table before the row

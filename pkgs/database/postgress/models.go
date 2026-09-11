@@ -256,6 +256,23 @@ type NotificationRequest struct {
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 
+// PlaceNotificationSetting holds the places one user follows. A passenger is told when a
+// ride takes in one of their places, a driver when a ride request does. A passenger has
+// no account, so their setting belongs to their device (UserId is the device id) and
+// keeps the device's fcm, while a driver's belongs to the driver and reaches them
+// through user_fcms. Places are kept normalized (utils.NormalizePlace), which is what
+// makes matching them case blind.
+type PlaceNotificationSetting struct {
+	ID        string         `json:"id" gorm:"primary_key"`
+	UserType  int            `json:"user_type" gorm:"not null;uniqueIndex:idx_place_notification_user"`
+	UserId    string         `json:"user_id" gorm:"not null;uniqueIndex:idx_place_notification_user"`
+	FCM       string         `json:"fcm"`
+	Enabled   bool           `json:"enabled" gorm:"not null"`
+	Places    pq.StringArray `json:"places" gorm:"type:text[];not null"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+}
+
 type MissingLocations struct {
 	DeviceId string  `json:"device_id"`
 	Place    string  `json:"place"`

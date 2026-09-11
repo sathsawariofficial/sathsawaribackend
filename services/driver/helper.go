@@ -144,7 +144,10 @@ func updateUserFCM(orgCtx *gin.Context, id, fcm string) error {
 			Columns:   []clause.Column{{Name: "user_id"}}, // conflict key
 			DoUpdates: clause.AssignmentColumns([]string{"fcm"}),
 		}).
+		// without an id of its own every insert after the first one would collide on the
+		// empty primary key, and no other driver's fcm would ever be kept
 		Create(&postgress.UserFCM{
+			ID:     database.GenerateUUID(),
 			UserId: id,
 			FCM:    fcm,
 		}).Error
@@ -924,4 +927,15 @@ func countVehicles(ctx *gin.Context, driverID string) (int64, error) {
 	}
 
 	return count, nil
+}
+
+// a driver's setting belongs to the driver, who is reached through the fcm of their login
+func mapNotificationSetting(driverId string, request NotificationSettingsRequest) postgress.PlaceNotificationSetting {
+	return postgress.PlaceNotificationSetting{
+		ID:       database.GenerateUUID(),
+		UserType: constants.User_Driver,
+		UserId:   driverId,
+		Enabled:  request.Enabled,
+		Places:   request.Places,
+	}
 }

@@ -1423,3 +1423,64 @@ func MaterializeOccurrences(db *gorm.DB, fromDate, toDate, shiftId string) error
 
 	return FillOccurrenceAttendance(db, fromDate, toDate, shiftId)
 }
+
+// GetPlaceNotificationSetting returns the place notification setting of one user, a
+// setting with no id when they never saved one.
+func GetPlaceNotificationSetting(orgCtx *gin.Context, userType int, userId string) (setting postgress.PlaceNotificationSetting, err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	err = DatabaseConn.Postgres.WithContext(ctx).
+		Where(`user_type = ? AND user_id = ?`, userType, userId).
+		Limit(1).
+		Find(&setting).Error
+	return
+}
+
+// SavePlaceNotificationSetting writes a user's whole setting in one statement, the places
+// sent replace the ones kept before.
+func SavePlaceNotificationSetting(orgCtx *gin.Context, setting *postgress.PlaceNotificationSetting) (err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	err = DatabaseConn.Postgres.WithContext(ctx).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "user_type"}, {Name: "user_id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"fcm", "enabled", "places", "updated_at"}),
+		}).
+		Create(setting).Error
+	return
+}
+
+// GetPlaceAlertRecipients returns one page of the devices that follow any of the places:
+// users of the type with place notifications switched on, and for drivers only active
+// ones with an fcm on record. The places overlap is served by the GIN index on places.
+// Pages are walked by setting id, pass the last id of a page to read the next one.
+func GetPlaceAlertRecipients(orgCtx context.Context, userType int, places []string, afterId string, limit int) (recipients []PlaceAlertRecipient, err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	query := DatabaseConn.Postgres.WithContext(ctx).
+		Table("place_notification_settings AS s").
+		Where("s.user_type = ? AND s.enabled = ? AND s.places && ?", userType, true, pq.Array(places)).
+		Where("s.id > ?", afterId).
+		Order("s.id").
+		Limit(limit)
+
+	if userType == constants.User_Driver {
+		query = query.
+			Select("s.id AS setting_id, f.fcm AS fcm").
+			Joins("JOIN drivers d ON d.id = s.user_id AND d.status = ?", constants.Status_Active).
+			Joins("JOIN user_fcms f ON f.user_id = s.user_id AND f.fcm <> ''")
+	} else {
+		query = query.
+			Select("s.id AS setting_id, s.fcm AS fcm").
+			Where("s.fcm <> ''")
+	}
+
+	err = query.Scan(&recipients).Error
+	return
+}

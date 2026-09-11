@@ -94,6 +94,10 @@ func main() {
 				passengerPublic.POST("/register", passenger.RegisterPassengerHandler)
 				passengerPublic.POST("/login", passenger.LoginPassengerHandler)
 				passengerPublic.GET("/password/forgot", passenger.ForgotPasswordHandler)
+
+				// a passenger has no account here, the places they follow belong to their device
+				passengerPublic.GET("/notification/settings", passenger.GetNotificationSettingsHandler)
+				passengerPublic.PUT("/notification/settings", passenger.SaveNotificationSettingsHandler)
 			}
 
 			// Pick & Drop advertisements, searchable by anybody looking for a service
@@ -153,6 +157,10 @@ func main() {
 				driverProtected.GET("/bookings", driver.GetBookSeatHandler)
 				driverProtected.GET("/ride/requests", passenger.GetRideRequestsHandler)
 				driverProtected.GET("/booking/reserve", driver.ReserveSeatHandler)
+
+				// the places a driver follows to hear about ride requests
+				driverProtected.GET("/notification/settings", driver.GetNotificationSettingsHandler)
+				driverProtected.PUT("/notification/settings", driver.SaveNotificationSettingsHandler)
 
 				/*
 					// NOTE: this feature is not needed atm

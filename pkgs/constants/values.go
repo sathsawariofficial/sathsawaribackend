@@ -57,6 +57,10 @@ const (
 	NOTIFICATION_TYPE_SHIFT_ABSENCE       = "shift_absence"
 	NOTIFICATION_TYPE_SHIFT_DRIVER_UPDATE = "shift_driver_update"
 	NOTIFICATION_TYPE_SHIFT_REMINDER      = "shift_reminder"
+
+	// place alerts are pushed straight to the device and never kept in the notifications table
+	NOTIFICATION_TYPE_RIDE_PLACE_ALERT         = "ride_place_alert"
+	NOTIFICATION_TYPE_RIDE_REQUEST_PLACE_ALERT = "ride_request_place_alert"
 )
 
 const (
