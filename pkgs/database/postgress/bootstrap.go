@@ -7,7 +7,6 @@ import (
 	"rideshare/pkgs/logger"
 	"time"
 
-	"github.com/google/uuid"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -43,6 +42,12 @@ func NewPortgress() (db *gorm.DB, err error) {
 	sqlDB.SetConnMaxLifetime(time.Hour)
 	sqlDB.SetConnMaxIdleTime(10 * time.Minute)
 
+	// the first group and shift design never reached production and its shifts table
+	// has a different shape, so it has to go before the new one is migrated over it
+	if err = dropLegacyFleetTables(db); err != nil {
+		panic("failed to drop the legacy fleet tables: " + err.Error())
+	}
+
 	// Auto migrate models
 	err = db.AutoMigrate(
 		&Admin{},
@@ -63,35 +68,41 @@ func NewPortgress() (db *gorm.DB, err error) {
 		&AnnouncementRequests{},
 
 		&Passenger{},
-		&PassengerLocationPreference{},
-		&Role{},
-		&Permission{},
-		&RolePermission{},
-		&Group{},
-		&GroupMember{},
-		&GroupVehicle{},
-		&GroupPassenger{},
+		&PassengerAvailability{},
+		&PassengerAvailabilityLocation{},
+
+		&PickDropService{},
+		&PickDropDriver{},
+		&PickDropVehicle{},
+		&PickDropPassenger{},
+		&PickDropAdvertisement{},
+		&PickDropAdvertisementLocation{},
+
+		&ShiftRequest{},
+		&ShiftRequestLocation{},
 		&Shift{},
-		&ShiftStop{},
-		&ShiftSeat{},
-		&ShiftTemplate{},
-		&ShiftTemplateStop{},
-		&ShiftTemplateSeat{},
+		&ShiftLocation{},
+		&ShiftPassenger{},
+		&ShiftOccurrence{},
+		&ShiftAttendance{},
+		&ShiftDriverUpdate{},
 
 		&DELVehicle{},
 		&DELRide{},
 		&DELDriver{},
 		&DELPassenger{},
-		&DELPassengerLocationPreference{},
-		&DELRole{},
+		&DELPassengerAvailability{},
+		&DELPassengerAvailabilityLocation{},
+		&DELPickDropAdvertisement{},
+		&DELPickDropAdvertisementLocation{},
+		&DELShiftRequest{},
+		&DELShiftRequestLocation{},
+		&DELShift{},
+		&DELShiftLocation{},
 	)
 
 	if err != nil {
 		panic(err)
-	}
-
-	if err = seedRolesAndPermissions(db); err != nil {
-		panic("failed to seed roles and permissions: " + err.Error())
 	}
 
 	if db == nil {
@@ -146,11 +157,11 @@ func NewPortgress() (db *gorm.DB, err error) {
 
                 INSERT INTO ride_searches (ride_id, start_location, end_location, route_points, start_datetime, available_seats, is_active)
                 VALUES (
-                    NEW.id, 
-                    NEW.start_location, 
-                    NEW.end_location, 
-                    NEW.route_points, 
-                    NEW.start_datetime, 
+                    NEW.id,
+                    NEW.start_location,
+                    NEW.end_location,
+                    NEW.route_points,
+                    NEW.start_datetime,
                     (NEW.number_of_seats - NEW.seats_taken), -- Compute actual available seats
                     NEW.is_active
                 )
@@ -256,104 +267,91 @@ func NewPortgress() (db *gorm.DB, err error) {
 		USING GIN(route_points)
 	`)
 
+	if err = createPickDropConstraints(db); err != nil {
+		panic("failed to create the pick & drop constraints: " + err.Error())
+	}
+
 	return
 }
 
-// seedRolesAndPermissions puts the built in group roles and permissions in place.
-// Permissions are kept up to date on every boot, but a role's default permission
-// map is only written the first time that role is created, so that a mapping an
-// admin has changed later is never silently reset back on the next restart.
-func seedRolesAndPermissions(db *gorm.DB) error {
-	systemPermissions := map[string]string{
-		constants.PERMISSION_GROUP_MANAGE_MEMBERS:     "Approve, reject and remove drivers, vehicles and passengers of a group",
-		constants.PERMISSION_GROUP_MANAGE_VEHICLES:    "Approve, reject and remove the vehicles of a group",
-		constants.PERMISSION_GROUP_MANAGE_SUBMANAGERS: "Appoint and remove the sub managers of a group",
-		constants.PERMISSION_GROUP_DELETE:             "Delete a group",
-		constants.PERMISSION_SHIFT_CREATE:             "Create a shift for a group",
-		constants.PERMISSION_SHIFT_ASSIGN_SEATS:       "Assign drivers, vehicles and passengers to the seats of a shift",
-		constants.PERMISSION_SHIFT_CANCEL:             "Cancel a shift of a group",
-		constants.PERMISSION_SHIFT_MANAGE_TEMPLATES:   "Create and delete the shift templates of a group",
+// dropLegacyFleetTables removes the first group and shift design. It only ever runs
+// against a database that still has that design, recognised by the old shifts table
+// carrying a group_id column, so on production, which never had it, and on every
+// boot after the first, it does nothing.
+func dropLegacyFleetTables(db *gorm.DB) error {
+	var legacyColumns int64
+	if err := db.Raw(`
+		SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = current_schema()
+		  AND table_name = 'shifts'
+		  AND column_name = 'group_id'
+	`).Scan(&legacyColumns).Error; err != nil {
+		return err
 	}
 
-	defaultRolePermissions := map[string][]string{
-		constants.ROLE_GROUP_OWNER: {
-			constants.PERMISSION_GROUP_MANAGE_MEMBERS,
-			constants.PERMISSION_GROUP_MANAGE_VEHICLES,
-			constants.PERMISSION_GROUP_MANAGE_SUBMANAGERS,
-			constants.PERMISSION_GROUP_DELETE,
-			constants.PERMISSION_SHIFT_CREATE,
-			constants.PERMISSION_SHIFT_ASSIGN_SEATS,
-			constants.PERMISSION_SHIFT_CANCEL,
-			constants.PERMISSION_SHIFT_MANAGE_TEMPLATES,
-		},
-		// a sub manager only takes the shift building load off the manager, it can
-		// not change who is in the group
-		constants.ROLE_GROUP_SUBMANAGER: {
-			constants.PERMISSION_SHIFT_CREATE,
-			constants.PERMISSION_SHIFT_ASSIGN_SEATS,
-			constants.PERMISSION_SHIFT_CANCEL,
-			constants.PERMISSION_SHIFT_MANAGE_TEMPLATES,
-		},
+	if legacyColumns == 0 {
+		return nil
 	}
 
-	roleDescriptions := map[string]string{
-		constants.ROLE_GROUP_OWNER:      "Owner and manager of a group, holds every group permission",
-		constants.ROLE_GROUP_SUBMANAGER: "Sub manager of a group, builds and manages shifts only",
+	logger.LogWarning(constants.DEFAULT_SESSION, "dropping the legacy group and shift tables, they are replaced by pick & drop")
+
+	return db.Exec(`
+		DROP TABLE IF EXISTS
+			shift_template_seats,
+			shift_template_stops,
+			shift_templates,
+			shift_seats,
+			shift_stops,
+			shifts,
+			group_passengers,
+			group_vehicles,
+			group_members,
+			groups,
+			role_permissions,
+			permissions,
+			roles,
+			del_roles,
+			passenger_location_preferences,
+			del_passenger_location_preferences
+	`).Error
+}
+
+// createPickDropConstraints puts the rules the business depends on into the database
+// itself, so they hold even if two requests race past the checks in the code:
+// one open membership per driver, passenger and vehicle, one active service per
+// owner, one active place per passenger per shift, and never more passengers than
+// seats. Everything here is idempotent.
+func createPickDropConstraints(db *gorm.DB) error {
+	statements := []string{
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_pick_drop_services_active_owner
+			ON pick_drop_services (owner_driver_id) WHERE status = 'active'`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_pick_drop_drivers_open
+			ON pick_drop_drivers (driver_id) WHERE status IN ('pending', 'approved')`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_pick_drop_passengers_open
+			ON pick_drop_passengers (passenger_id) WHERE status IN ('pending', 'approved')`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_pick_drop_vehicles_open
+			ON pick_drop_vehicles (vehicle_id) WHERE status IN ('pending', 'approved')`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_shift_passengers_active
+			ON shift_passengers (shift_id, passenger_id) WHERE status = 'active'`,
+		`CREATE INDEX IF NOT EXISTS idx_shifts_days_of_week ON shifts USING gin (days_of_week)`,
+		`CREATE INDEX IF NOT EXISTS idx_pick_drop_ads_route_points ON pick_drop_advertisements USING gin (route_points)`,
+		`CREATE INDEX IF NOT EXISTS idx_pick_drop_ads_start_loc ON pick_drop_advertisements USING gin (start_location gin_trgm_ops)`,
+		`CREATE INDEX IF NOT EXISTS idx_pick_drop_ads_end_loc ON pick_drop_advertisements USING gin (end_location gin_trgm_ops)`,
+		`CREATE INDEX IF NOT EXISTS idx_shift_requests_route_points ON shift_requests USING gin (route_points)`,
+		`CREATE INDEX IF NOT EXISTS idx_shift_requests_start_loc ON shift_requests USING gin (start_location gin_trgm_ops)`,
+		`CREATE INDEX IF NOT EXISTS idx_shift_requests_end_loc ON shift_requests USING gin (end_location gin_trgm_ops)`,
+		`DO $$
+		BEGIN
+			IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_shifts_occupied_seats') THEN
+				ALTER TABLE shifts ADD CONSTRAINT chk_shifts_occupied_seats
+					CHECK (occupied_seats >= 0 AND occupied_seats <= seat_capacity);
+			END IF;
+		END $$`,
 	}
 
 	return db.Transaction(func(tx *gorm.DB) error {
-		permissionIds := map[string]string{}
-
-		for code, description := range systemPermissions {
-			// the id and the description are Attrs, not part of the struct passed in,
-			// because gorm folds a populated struct's fields into the lookup: a fresh
-			// id in there matches nothing, so every boot after the first tried to
-			// insert a permission whose code already existed and brought the app down
-			var permission Permission
-			if err := tx.
-				Where(Permission{Code: code}).
-				Attrs(Permission{
-					ID:          uuid.New().String(),
-					Description: description,
-					IsSystem:    true,
-				}).
-				FirstOrCreate(&permission).Error; err != nil {
-				return err
-			}
-
-			permissionIds[code] = permission.ID
-		}
-
-		for roleName, permissionCodes := range defaultRolePermissions {
-			var count int64
-			if err := tx.Model(&Role{}).Where("name = ?", roleName).Count(&count).Error; err != nil {
-				return err
-			}
-			if count > 0 {
-				continue
-			}
-
-			role := Role{
-				ID:          uuid.New().String(),
-				Name:        roleName,
-				Description: roleDescriptions[roleName],
-				IsSystem:    true,
-			}
-
-			if err := tx.Create(&role).Error; err != nil {
-				return err
-			}
-
-			rolePermissions := make([]RolePermission, 0, len(permissionCodes))
-			for _, code := range permissionCodes {
-				rolePermissions = append(rolePermissions, RolePermission{
-					ID:           uuid.New().String(),
-					RoleID:       role.ID,
-					PermissionID: permissionIds[code],
-				})
-			}
-
-			if err := tx.Create(&rolePermissions).Error; err != nil {
+		for _, statement := range statements {
+			if err := tx.Exec(statement).Error; err != nil {
 				return err
 			}
 		}

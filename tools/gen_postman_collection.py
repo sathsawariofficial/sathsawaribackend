@@ -1,10 +1,17 @@
 import json
+import os
+from datetime import datetime, timedelta, timezone
 
 BASE = "{{base-url}}"
-import os
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # the responses captured by tools/flow_test.py against a live server
 RECORDED_PATH = os.path.join(ROOT, ".sath", "responses.json")
+
+# dates the bodies start from, editable as collection variables
+PKT_TODAY = (datetime.now(timezone.utc) + timedelta(hours=5)).date()
+START_DATE = (PKT_TODAY + timedelta(days=2)).isoformat()
+END_DATE = (PKT_TODAY + timedelta(days=16)).isoformat()
+RIDE_DATE = (PKT_TODAY + timedelta(days=10)).isoformat()
 
 
 def url(path, query=None):
@@ -23,8 +30,20 @@ def q(key, value, disabled=False):
     return d
 
 
+def at(name, lat, lng, time):
+    return {"location": name, "lat": lat, "lng": lng, "time": time}
+
+
+BAHRIA = ("Bahria Town Phase 4", 33.5121, 73.0951)
+DHA = ("DHA Phase 2", 33.5350, 73.1350)
+ROOTS = ("Roots School F-8", 33.7101, 73.0441)
+MARKAZ = ("F-8 Markaz", 33.7090, 73.0400)
+G11 = ("G-11 Markaz", 33.6680, 72.9980)
+BLUE = ("Blue Area", 33.7100, 73.0600)
+
+
 # Real responses captured by driving the whole product against a live database
-# (tools/flow.py). Keyed by the label used there, so an example is never invented.
+# (tools/flow_test.py). Keyed by the label used there, so an example is never invented.
 try:
     with open(RECORDED_PATH) as _f:
         RECORDED = {r["label"]: r for r in json.load(_f)["results"]}
@@ -39,7 +58,7 @@ def example(label):
         return None
 
     status_text = {200: "OK", 400: "Bad Request", 401: "Unauthorized"}.get(rec["status"], "Response")
-    name = "SUCCESS" if rec["status"] == 200 else "ERROR"
+    name = ("SUCCESS" if rec["status"] == 200 else "ERROR") + " · " + label
     if rec.get("note"):
         name += " · " + rec["note"][:70]
 
@@ -70,109 +89,9 @@ def example(label):
     }
 
 
-
-# Collection request name -> the label(s) it was recorded under in tools/flow.py.
-# A request can carry several examples, typically the success plus the refusal that
-# proves a rule.
-EXAMPLE_MAP = {
-    "Admin Login": ["Admin login"],
-    "Platform Overview": ["Admin overview (populated)"],
-    "List Passengers": ["Admin list passengers"],
-    "Passenger Profile": ["Admin passenger profile"],
-    "Suspend A Passenger": ["Admin suspend passenger", "Suspended passenger cannot log in"],
-    "Suspend A Driver": ["Admin suspend driver"],
-    "Delete A Passenger": ["Admin deletes a passenger"],
-    "List Groups": ["Admin list groups"],
-    "Group Details": ["Admin group details"],
-    "Shut A Group Down": ["Admin shut a fleet down"],
-    "List Shifts": ["Admin list shifts"],
-    "Shift Details": ["Admin shift details"],
-    "Get Roles": ["List roles"],
-    "Get Permissions": ["List permissions"],
-    "Create Role": ["Create role"],
-    "Set Role Permissions (bulk)": ["Set role permissions"],
-    "Update Role": ["Update role", "Rename a system role (refused)"],
-    "Delete Role": ["Delete custom role", "Delete a system role (refused)"],
-
-    "Owner Driver · Register": ["Register owner driver"],
-    "Owner Driver · Verify OTP": ["Verify driver otp"],
-    "Owner Driver · Login": ["Login owner driver"],
-    "Owner Driver · Set Pin": ["Set pin"],
-    "Owner Driver · Register Vehicle (7 seats, AC)": ["Register vehicle (7 seats)"],
-    "Second Driver · Register": ["Register second driver"],
-    "Second Driver · Verify OTP": ["Verify driver 2 otp"],
-    "Second Driver · Login": ["Login second driver"],
-    "Second Driver · Set Pin": ["Second driver pin"],
-    "Second Driver · Register Vehicle (4 seats)": ["Register second vehicle"],
-    "Update Vehicle (seats / AC / heating)": ["Update vehicle comfort", "Shrink the vehicle under a shift (refused)"],
-    "Get Vehicles": ["Get vehicles"],
-    "Passenger · Register (female)": ["Register passenger (female)"],
-    "Passenger · Verify OTP": ["Verify passenger otp"],
-    "Passenger · Login": ["Login passenger Ayesha"],
-    "Passenger 2 · Register (male)": ["Register passenger (male)"],
-    "Passenger 2 · Verify OTP": ["Verify passenger otp"],
-    "Passenger 2 · Login": ["Login passenger Bilal"],
-    "Passenger · Profile": ["Passenger profile"],
-    "Passenger · Forgot Password": ["Passenger forgot password"],
-    "Passenger · Logout": ["Passenger logout"],
-    "Passenger · Reset Password (change)": ["Passenger reset password"],
-
-    "Set Weekly Form (bulk)": ["Set weekly travel form", "Bad day of week (refused)"],
-    "Get Weekly Form": ["Get weekly travel form"],
-    "Passenger 2 · Set Weekly Form": ["Passenger 2 travel form"],
-
-    "Create Group": ["Create group", "Create group with no vehicle (refused)"],
-    "My Groups": ["My groups"],
-    "Find Groups To Join (driver)": ["Search groups (driver)"],
-    "Driver · Request To Join (driver + vehicle)": ["Driver join request", "Duplicate join request (refused)"],
-    "Passenger · Request To Join": ["Passenger join request"],
-    "Passenger 2 · Request To Join": ["Passenger 2 join request"],
-    "List Pending Requests": ["List pending requests"],
-    "Decide Requests (bulk)": ["Decide requests in bulk", "Re-approve the same rows (all skipped)"],
-    "Promote Sub Manager (bulk)": ["Promote sub manager", "Promote an outsider (skipped)"],
-    "Group Details (rosters)": ["Group details", "Passenger token on a driver route (refused)"],
-    "Passenger Travel Forms (manager view)": ["Passenger travel forms (manager view)"],
-    "Find Groups To Join (passenger)": ["Search groups (passenger)"],
-    "My Groups (passenger)": ["Passenger my groups"],
-    "Driver Leaves The Group": ["Driver leaves the fleet", "Leave while still driving (refused)",
-                                "Leave while a lent vehicle is on a shift (refused)"],
-    "Passenger Leaves The Group": ["Passenger leaves the fleet"],
-    "Delete Group": ["Delete the group", "Delete the group with shifts (refused)"],
-
-    "Create Morning PICKUP Shift (+ template)": ["Create pickup shift (+template)", "Wrong gender on a seat (refused)",
-                                                 "Shift in the past (refused)",
-                                                 "Passenger already on another shift (refused)"],
-    "Create Evening DROP Shift": ["Create drop shift"],
-    "Shift Detail": ["Shift detail"],
-    "Group Shift Roster": ["Group shift roster"],
-    "My Shifts (driver)": ["My shifts (driver)"],
-    "My Shifts (passenger)": ["My shifts (passenger)"],
-    "Passenger · Shift Detail": ["Passenger reads shift detail"],
-    "Swap Male Rider For Female (one call)": ["Swap male rider for female", "Seat a passenger twice (refused)"],
-    "Free A Seat": ["Free a seat"],
-    "Sub Manager Builds A Shift": ["Sub manager builds a shift", "Sub manager decides membership (refused)"],
-    "Owner Drives A Lent Vehicle": ["Owner drives a lent vehicle"],
-    "Clash Check · Same Vehicle, Overlapping Time": ["Overlapping vehicle (refused)"],
-    "Reschedule Shift (move the time)": ["Reschedule the shift", "Reschedule into the past (refused)"],
-    "Cancel Shift": ["Cancel the shift they drive"],
-    "Get Shift Templates": ["Get shift templates"],
-    "Delete Shift Template": ["Delete shift template"],
-    "Create Ride": ["Create carpool ride", "Carpool ride clashing with a shift (refused)"],
-    "Driver Rides": ["Driver rides"],
-    "Get One Ride": ["Get one ride"],
-    "Filtered Rides": ["Filtered rides"],
-    "Ride Templates": ["Ride templates"],
-    "Update Ride": ["Update ride seats"],
-    "Passenger Ride Request": ["Passenger ride request"],
-    "Get Ride Requests": ["Get ride requests"],
-    "Get Announcements": ["Get announcements"],
-    "Driver Notifications": ["Driver notifications"],
-    "Admin · List Rides": ["Admin list rides"],
-    "Admin · List Drivers": ["Admin list drivers"],
-    "Admin · List Vehicles": ["Admin list vehicles"],
-}
-
 def req(name, method, path, token, body=None, query=None, tests=None, desc=None, examples=None):
+    """One request. examples are the flow_test labels whose recorded responses it
+    carries, typically the success plus the refusals that prove its rules."""
     r = {
         "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{" + token + "}}", "type": "string"}]},
         "method": method,
@@ -189,7 +108,7 @@ def req(name, method, path, token, body=None, query=None, tests=None, desc=None,
         r["description"] = desc
 
     saved = []
-    for label in (examples or EXAMPLE_MAP.get(name) or [name]):
+    for label in (examples or [name]):
         block = example(label)
         if block:
             saved.append(block)
@@ -215,724 +134,851 @@ def save(var, expr, label=None):
     ]
 
 
-items = []
+def save_from_list(var, list_expr, match_field, match_var, value_field):
+    """Picks one row out of a list response by an id already in the environment."""
+    return [
+        "const r = pm.response.json();",
+        f"const rows = (r.data && {list_expr}) || [];",
+        f'const row = rows.find(x => x.{match_field} === pm.environment.get("{match_var}"));',
+        "if (row) {",
+        f'    pm.environment.set("{var}", row.{value_field});',
+        f'    console.log("{var} saved:", row.{value_field});',
+        "} else {",
+        f'    console.error("{var} not found in response");',
+        "}",
+    ]
+
+
+def driver_account(prefix, label, name, mobile, device, pin, session_var, id_var, otp_var):
+    return [
+        req(f"{prefix} · Register", "POST", "/api/v1/driver/register", "open_token",
+            body={"deviceId": device, "mobile": mobile, "name": name, "password": "Golang@12122", "gender": "male"},
+            tests=save(otp_var, "r.data.tempOTP"), examples=[f"Register {label}"]),
+        req(f"{prefix} · Verify OTP", "POST", "/api/v1/otp/verify", "open_token",
+            body={"mobile": mobile, "otp": "{{" + otp_var + "}}", "operation": "ACTIVATE_DRIVER"},
+            examples=["Verify driver otp" if label == "owner driver" else "Verify driver 2 otp"]),
+        req(f"{prefix} · Login", "POST", "/api/v1/driver/login", "open_token",
+            body={"deviceId": device, "mobile": mobile, "password": "Golang@12122"},
+            tests=save(session_var, "r.data.sessionId") + save(id_var, "r.data.driver.id"),
+            examples=["Login owner driver" if label == "owner driver" else "Login second driver"]),
+        req(f"{prefix} · Set Pin", "POST", "/api/v1/driver/pin", session_var,
+            query=[q("pin", pin)], examples=["Set pin" if label == "owner driver" else "Second driver pin"]),
+    ]
+
+
+def passenger_account(prefix, name, gender, mobile, device, session_var, id_var, otp_var):
+    return [
+        req(f"{prefix} · Register", "POST", "/api/v1/passenger/register", "open_token",
+            body={"deviceId": device, "mobile": mobile, "name": name, "gender": gender, "password": "Golang@12122"},
+            tests=save(otp_var, "r.data.tempOTP"), examples=[f"Register passenger {name}"]),
+        req(f"{prefix} · Verify OTP", "POST", "/api/v1/otp/verify", "open_token",
+            body={"mobile": mobile, "otp": "{{" + otp_var + "}}", "operation": "ACTIVATE_PASSENGER"},
+            examples=[f"Verify passenger {name} otp"]),
+        req(f"{prefix} · Login", "POST", "/api/v1/passenger/login", "open_token",
+            body={"deviceId": device, "mobile": mobile, "password": "Golang@12122"},
+            tests=save(session_var, "r.data.sessionId") + save(id_var, "r.data.passenger.id"),
+            examples=[f"Login passenger {name}"]),
+    ]
+
 
 # ---------------------------------------------------------------- 0 admin ----
 admin = {"name": "0 · Admin Console", "item": [
     req("Admin Login", "POST", "/api/v1/admin/login", "open_token",
         body={"username": "twssawari", "password": "vR7!xK2@pQ9#Lm4$Zw8^Ty1&Nc5*Hs3%Df6!Ba"},
-        tests=save("admin_session", "r.data.sessionId"),
-        desc="Saves admin_session. Run this first if you want to touch roles or permissions."),
+        tests=save("admin_session", "r.data.sessionId"), examples=["Admin login"]),
 
     req("Platform Overview", "GET", "/api/v1/admin/overview", "admin_session",
-        desc=("The whole product counted in one query: drivers, passengers, vehicles, fleets, "
-              "shifts and carpool rides, each as a total with the live slice of it, plus how many "
-              "join requests are sitting unanswered across every fleet.\n\n"
-              "This is the admin's first screen.")),
+        desc=("Drivers, passengers, vehicles, carpool rides, Pick & Drop services and shifts, each as a total "
+              "with the live slice of it, plus advertisements, open shift requests and join requests still "
+              "waiting on a decision. Pick & Drop stays run by each service's owner, the admin only ever looks."),
+        examples=["Admin overview (populated)", "Admin overview"]),
 
     req("List Passengers", "GET", "/api/v1/admin/passengers", "admin_session",
         query=[q("page", "1"), q("search", "", True), q("status", "", True)],
-        tests=[
-            "const r = pm.response.json();",
-            "if (r.data && r.data.passengers && r.data.passengers.length) {",
-            '    pm.environment.set("admin_passenger_id", r.data.passengers[0].id);',
-            "}",
-        ],
-        desc=("Passengers were invisible to the admin until this feature gave them real accounts. "
-              "search matches the name or the mobile number, status filters active, inactive or "
-              "pending.")),
+        desc="search matches the name or the mobile number, status filters active, inactive or pending.",
+        examples=["Admin list passengers"]),
 
     req("Passenger Profile", "GET", "/api/v1/admin/passenger", "admin_session",
-        query=[q("passenger_id", "{{passenger1_id}}")],
-        desc="One account explained: the fleets they ride with and the standing travel form they filled in, which is what a support call actually needs."),
+        query=[q("passenger_id", "{{passenger1_id}}")], examples=["Admin passenger profile"]),
 
     req("Suspend A Passenger", "PATCH", "/api/v1/admin/passenger/status", "admin_session",
-        query=[q("passenger_id", "{{passenger1_id}}")],
-        body={"status": "inactive"},
-        desc=("The softer moderation tool. A suspended account cannot log in or be seated on a "
-              "shift, but nothing it was part of is destroyed. Send active to bring it back.")),
+        query=[q("passenger_id", "{{passenger3_id}}")], body={"status": "inactive"},
+        desc="A suspended account cannot log in, nothing it was part of is destroyed. Send active to restore it.",
+        examples=["Admin suspend passenger", "Suspended passenger's session is refused",
+                  "Suspended passenger cannot log in", "Admin restore passenger"]),
 
     req("Suspend A Driver", "PATCH", "/api/v1/admin/driver/status", "admin_session",
-        query=[q("driver_id", "{{driver2_id}}")],
-        body={"status": "inactive"},
-        desc="Same idea for a driver, the alternative to deleting them outright."),
+        query=[q("driver_id", "{{driver2_id}}")], body={"status": "inactive"},
+        examples=["Admin suspend driver", "Admin restore driver"]),
+
+    req("Delete A Driver", "DELETE", "/api/v1/admin/driver", "admin_session",
+        query=[q("user_id", "{{owner_id}}")],
+        desc="Refused while the driver owns a Pick & Drop service or drives an active shift.",
+        examples=["Delete a driver who owns a service (refused)"]),
 
     req("Delete A Passenger", "DELETE", "/api/v1/admin/passenger", "admin_session",
-        query=[q("passenger_id", "{{admin_passenger_id}}")],
-        desc=("Permanent. The account is archived, its seats on upcoming shifts are freed with the "
-              "taken counts corrected, its fleet memberships end and its travel form is cleared, "
-              "so nothing anywhere is left pointing at somebody who no longer exists.")),
+        query=[q("passenger_id", "{{passenger3_id}}")],
+        desc=("Archives the account, takes it off its active shifts, ends its Pick & Drop membership and "
+              "archives its availability and shift requests. Its travel history stays."),
+        examples=["Admin deletes a passenger"]),
 
-    req("List Groups", "GET", "/api/v1/admin/groups", "admin_session",
+    req("List Vehicles", "GET", "/api/v1/admin/vehicles", "admin_session", query=[q("page", "1")],
+        examples=["Admin list vehicles"]),
+    req("List Drivers", "GET", "/api/v1/admin/drivers", "admin_session", query=[q("page", "1")],
+        examples=["Admin list drivers"]),
+    req("List Rides", "GET", "/api/v1/admin/rides", "admin_session", query=[q("page", "1")],
+        examples=["Admin list rides"]),
+
+    req("Broadcast A Notification", "POST", "/api/v1/admin/broadcast", "admin_session",
+        body={"userType": 1, "title": "Fare update", "message": "Fares are unchanged this month",
+              "notificationType": "information"},
+        desc="userType is 1 (driver) or 2 (passenger). notificationType is information or marketing.",
+        examples=["Admin broadcasts a notification"]),
+
+    req("Post An Announcement", "POST", "/api/v1/admin/announcement", "admin_session",
+        body={"title": "Eid holiday hours", "message": "Reduced service Eid week", "type": "general", "link": ""},
+        desc="Shows up on GET /api/v1/announcements, the public board every app reads on launch.",
+        examples=["Admin posts an announcement"]),
+
+    req("Get-In-Touch Requests", "GET", "/api/v1/admin/approch", "admin_session",
+        query=[q("type", "contact"), q("page", "1")],
+        desc="Submissions from the public get-in-touch form. type is contact or complain.",
+        examples=["Get-in-touch requests"]),
+
+    req("List Pick & Drop Services", "GET", "/api/v1/admin/pickdrop/services", "admin_session",
         query=[q("page", "1"), q("search", "", True), q("status", "", True)],
-        desc="Every fleet with who runs it and how big it is. The member, vehicle, passenger and shift counts come back as subselects, so the page costs one query."),
-
-    req("Group Details", "GET", "/api/v1/admin/group", "admin_session",
-        query=[q("group_id", "{{group_id}}")],
-        desc=("The full rosters, and unlike the manager's own view this is NOT filtered by status "
-              "— an admin looking into a complaint needs to see who was turned away and who left, "
-              "not just who is in.")),
-
-    req("Shut A Group Down", "PATCH", "/api/v1/admin/group/status", "admin_session",
-        query=[q("group_id", "{{group_id}}")],
-        body={"status": "inactive"},
-        desc=("The right hammer for a fleet that is misbehaving. Switched off it cannot be found, "
-              "joined or built on, while its history stays intact. Send active to restore it.")),
-
-    req("List Shifts", "GET", "/api/v1/admin/shifts", "admin_session",
-        query=[q("page", "1"), q("group_id", "", True), q("driver_id", "", True),
-               q("direction", "", True), q("status", "", True),
-               q("start_time", "", True), q("estimated_end_time", "", True)],
-        tests=[
-            "const r = pm.response.json();",
-            "if (r.data && r.data.shifts && r.data.shifts.length) {",
-            '    pm.environment.set("admin_shift_id", r.data.shifts[0].id);',
-            "}",
-        ],
-        desc="Every shift on the platform, filterable the way somebody chasing a complaint would want it."),
-
-    req("Shift Details", "GET", "/api/v1/admin/shift", "admin_session",
-        query=[q("shift_id", "{{shift_id}}")],
-        desc="The whole trip: who is driving, who is aboard, and the route in the order it is driven."),
-
-    req("Get Roles", "GET", "/api/v1/admin/roles", "admin_session",
-        query=[q("page", "1")],
-        tests=[
-            "const r = pm.response.json();",
-            "if (r.data && r.data.roles) {",
-            '    const owner = r.data.roles.find(x => x.name === "group_owner");',
-            '    const sub = r.data.roles.find(x => x.name === "group_submanager");',
-            '    if (owner) pm.environment.set("owner_role_id", owner.id);',
-            '    if (sub) pm.environment.set("submanager_role_id", sub.id);',
-            '    console.log("seeded roles:", r.data.roles.map(x => x.name));',
-            "}",
-        ],
-        desc="group_owner and group_submanager are seeded at boot with their permissions already mapped. This also saves their ids."),
-
-    req("Get Permissions", "GET", "/api/v1/admin/permissions", "admin_session",
-        query=[q("page", "1")],
-        tests=[
-            "const r = pm.response.json();",
-            "if (r.data && r.data.permissions) {",
-            "    const byCode = {};",
-            "    r.data.permissions.forEach(p => byCode[p.code] = p.id);",
-            '    pm.environment.set("permission_ids_json", JSON.stringify(byCode));',
-            '    console.log("permissions:", Object.keys(byCode));',
-            "}",
-        ],
-        desc="The eight seeded permission codes. Saves a code -> id map you can use when remapping a role."),
-
-    req("Create Role", "POST", "/api/v1/admin/role", "admin_session",
-        body={"name": "group_dispatcher", "description": "Can build shifts but not cancel them"},
-        tests=save("custom_role_id", "r.data.id"),
-        desc="Proves point 14: a brand new role can be added with no code change."),
-
-    req("Set Role Permissions (bulk)", "PUT", "/api/v1/admin/role/permissions", "admin_session",
-        body={"roleId": "{{custom_role_id}}", "permissionIds": ["{{permission_create_shift_id}}"]},
-        desc="Replaces the whole permission set of a role in one call. Read permission_ids_json from Get Permissions and paste the ids you want. Sending an empty list strips the role back to nothing."),
-
-    req("Update Role", "PATCH", "/api/v1/admin/role", "admin_session",
-        query=[q("role_id", "{{custom_role_id}}")],
-        body={"description": "Builds shifts for a fleet"},
-        desc="A system role can have its description changed but never its name, because the group checks look those roles up by name."),
-
-    req("Delete Role", "DELETE", "/api/v1/admin/role", "admin_session",
-        query=[q("role_id", "{{custom_role_id}}")],
-        desc="Refused for a system role, and refused while any member still holds the role."),
-]}
-
-# ------------------------------------------------------- 1 accounts ----------
-accounts = {"name": "1 · Accounts & Vehicles", "item": [
-    req("Owner Driver · Register", "POST", "/api/v1/driver/register", "open_token",
-        body={"deviceId": "post_man", "mobile": "+923405421301", "name": "Owner Driver",
-              "password": "Golang@12122", "gender": "male"},
-        tests=save("owner_otp", "r.data.tempOTP") + ['pm.environment.set("owner_mobile", "+923405421301");'],
-        desc="Step 1 of the flow. The owner of the fleet is an ordinary driver."),
-
-    req("Owner Driver · Verify OTP", "POST", "/api/v1/otp/verify", "open_token",
-        body={"mobile": "{{owner_mobile}}", "otp": "{{owner_otp}}", "operation": "ACTIVATE_DRIVER"}),
-
-    req("Owner Driver · Login", "POST", "/api/v1/driver/login", "open_token",
-        body={"deviceId": "post_man", "mobile": "{{owner_mobile}}", "password": "Golang@12122"},
-        tests=save("owner_session", "r.data.sessionId") + [
-            'if (r.data && r.data.driver) pm.environment.set("owner_driver_id", r.data.driver.id);'],
-        desc="Saves owner_session and owner_driver_id."),
-
-    req("Owner Driver · Set Pin", "POST", "/api/v1/driver/pin", "owner_session",
-        query=[q("pin", "121212")],
-        desc="The pin is needed to register a vehicle."),
-
-    req("Owner Driver · Register Vehicle (7 seats, AC)", "POST", "/api/v1/vehicle/register", "owner_session",
-        body={"vehicleNumber": "FLEET-001", "vehicleInfo": "Hiace van",
-              "numberOfSeats": 7, "hasAC": True, "hasHeating": False, "pin": "121212"},
-        tests=save("owner_vehicle_id", "r.data.vehicleId"),
-        desc=("numberOfSeats, hasAC and hasHeating are what let this vehicle join a fleet. Seats are counted excluding the driver, so this van seats 7 passengers.\n\nNOTE: a vehicle is created already active and registration sends NO otp, so tempOTP comes back empty. There is no ACTIVATE_VEHICLE step to run.")),
-
-    req("Second Driver · Register", "POST", "/api/v1/driver/register", "open_token",
-        body={"deviceId": "post_man_2", "mobile": "+923405421302", "name": "Second Driver",
-              "password": "Golang@12122", "gender": "male"},
-        tests=save("driver2_otp", "r.data.tempOTP") + ['pm.environment.set("driver2_mobile", "+923405421302");'],
-        desc="This driver will ask to join the fleet and later be made a sub manager."),
-
-    req("Second Driver · Verify OTP", "POST", "/api/v1/otp/verify", "open_token",
-        body={"mobile": "{{driver2_mobile}}", "otp": "{{driver2_otp}}", "operation": "ACTIVATE_DRIVER"}),
-
-    req("Second Driver · Login", "POST", "/api/v1/driver/login", "open_token",
-        body={"deviceId": "post_man_2", "mobile": "{{driver2_mobile}}", "password": "Golang@12122"},
-        tests=save("driver2_session", "r.data.sessionId") + [
-            'if (r.data && r.data.driver) pm.environment.set("driver2_id", r.data.driver.id);']),
-
-    req("Second Driver · Set Pin", "POST", "/api/v1/driver/pin", "driver2_session",
-        query=[q("pin", "131313")]),
-
-    req("Second Driver · Register Vehicle (4 seats)", "POST", "/api/v1/vehicle/register", "driver2_session",
-        body={"vehicleNumber": "FLEET-002", "vehicleInfo": "Corolla",
-              "numberOfSeats": 4, "hasAC": True, "hasHeating": True, "pin": "131313"},
-        tests=save("driver2_vehicle_id", "r.data.vehicleId")),
-
-    req("Update Vehicle (seats / AC / heating)", "PATCH", "/api/v1/vehicle/update", "owner_session",
-        body={"vehicleId": "{{owner_vehicle_id}}", "numberOfSeats": 7, "hasAC": True,
-              "hasHeating": True, "pin": "121212"},
-        desc="hasAC and hasHeating are pointers on update, so leaving one out is different from switching it off."),
-
-    req("Get Vehicles", "GET", "/api/v1/vehicle", "owner_session",
-        desc="Now returns numberOfSeats, hasAC and hasHeating."),
-
-    req("Passenger · Register (female)", "POST", "/api/v1/passenger/register", "open_token",
-        body={"deviceId": "post_man_p1", "mobile": "+923405421401", "name": "Ayesha",
-              "gender": "female", "password": "Golang@12122"},
-        tests=save("passenger1_otp", "r.data.tempOTP") + [
-            'pm.environment.set("passenger1_mobile", "+923405421401");',
-            'if (r.data) pm.environment.set("passenger1_id", r.data.passengerId);'],
-        desc="Passengers had no account at all before this feature. Gender matters because seats are gender locked."),
-
-    req("Passenger · Verify OTP", "POST", "/api/v1/otp/verify", "open_token",
-        body={"mobile": "{{passenger1_mobile}}", "otp": "{{passenger1_otp}}", "operation": "ACTIVATE_PASSENGER"},
-        desc="ACTIVATE_PASSENGER is its own operation, separate from ACTIVATE_DRIVER, so one number can hold both kinds of account."),
-
-    req("Passenger · Login", "POST", "/api/v1/passenger/login", "open_token",
-        body={"deviceId": "post_man_p1", "mobile": "{{passenger1_mobile}}", "password": "Golang@12122"},
-        tests=save("passenger_session", "r.data.sessionId") + [
-            'if (r.data && r.data.passenger) pm.environment.set("passenger1_id", r.data.passenger.id);'],
-        desc="Issues a passenger_token, a different token type from a driver's."),
-
-    req("Passenger 2 · Register (male)", "POST", "/api/v1/passenger/register", "open_token",
-        body={"deviceId": "post_man_p2", "mobile": "+923405421402", "name": "Bilal",
-              "gender": "male", "password": "Golang@12122"},
-        tests=save("passenger2_otp", "r.data.tempOTP") + [
-            'pm.environment.set("passenger2_mobile", "+923405421402");',
-            'if (r.data) pm.environment.set("passenger2_id", r.data.passengerId);'],
-        desc="A second passenger of the other gender, used later to show the gender swap on a seat."),
-
-    req("Passenger 2 · Verify OTP", "POST", "/api/v1/otp/verify", "open_token",
-        body={"mobile": "{{passenger2_mobile}}", "otp": "{{passenger2_otp}}", "operation": "ACTIVATE_PASSENGER"}),
-
-    req("Passenger 2 · Login", "POST", "/api/v1/passenger/login", "open_token",
-        body={"deviceId": "post_man_p2", "mobile": "{{passenger2_mobile}}", "password": "Golang@12122"},
-        tests=save("passenger2_session", "r.data.sessionId") + [
-            'if (r.data && r.data.passenger) pm.environment.set("passenger2_id", r.data.passenger.id);']),
-
-    req("Passenger · Profile", "GET", "/api/v1/passenger/info", "passenger_session"),
-
-    req("Passenger · Forgot Password", "GET", "/api/v1/passenger/password/forgot", "open_token",
-        query=[q("mobile_number", "{{passenger1_mobile}}")],
-        tests=save("passenger_reset_otp", "r.data.tempOTP"),
-        desc="Verify with operation PASSENGER_FORGOT_PASSWORD and send the new password in the same body."),
-
-    req("Passenger · Reset Password (change)", "POST", "/api/v1/passenger/password/reset", "passenger_session",
-        body={"oldPassword": "Golang@12122", "newPassword": "AbC!123456"},
-        tests=save("passenger_change_otp", "r.data.tempOTP"),
-        desc="Parks the new password against the otp. Confirm it with operation PASSENGER_UPDATE_PASSWORD on /otp/verify."),
-
-    req("Passenger · Logout", "GET", "/api/v1/passenger/logout", "passenger_session"),
-]}
-
-# -------------------------------------------------- 2 travel form ------------
-form = {"name": "2 · Passenger Travel Form (point 7)", "item": [
-    req("Set Weekly Form (bulk)", "PUT", "/api/v1/passenger/schedule", "passenger_session",
-        body={"preferences": [
-            {"dayOfWeek": 1, "direction": "pickup", "isEnabled": True, "location": "Bahria Town Phase 4",
-             "lat": 33.5121, "lng": 73.0951, "scheduledTime": "07:15:00"},
-            {"dayOfWeek": 1, "direction": "drop", "isEnabled": True, "location": "F-8 Markaz",
-             "lat": 33.7101, "lng": 73.0441, "scheduledTime": "17:30:00"},
-            {"dayOfWeek": 2, "direction": "pickup", "isEnabled": True, "location": "Bahria Town Phase 4",
-             "lat": 33.5121, "lng": 73.0951, "scheduledTime": "07:15:00"},
-            {"dayOfWeek": 2, "direction": "drop", "isEnabled": False, "location": "", "lat": 0, "lng": 0,
-             "scheduledTime": ""},
-            {"dayOfWeek": 3, "direction": "pickup", "isEnabled": True, "location": "Gulberg Greens",
-             "lat": 33.6180, "lng": 73.1560, "scheduledTime": "07:40:00"},
-            {"dayOfWeek": 3, "direction": "drop", "isEnabled": True, "location": "Blue Area",
-             "lat": 33.7180, "lng": 73.0640, "scheduledTime": "18:00:00"},
-        ]},
-        desc=("The whole week in one call, one row per day per direction.\n\n"
-              "Tuesday shows requirement 17.2: pickup is on, drop is off, so this passenger rides in "
-              "the morning and makes their own way home.\n\n"
-              "Wednesday shows requirement 17.3: picked up from Gulberg Greens but dropped at Blue Area, "
-              "a different place from the morning.\n\n"
-              "This form never creates a shift. It is only the sheet the manager reads while building one.")),
-
-    req("Get Weekly Form", "GET", "/api/v1/passenger/schedule", "passenger_session"),
-
-    req("Passenger 2 · Set Weekly Form", "PUT", "/api/v1/passenger/schedule", "passenger2_session",
-        body={"preferences": [
-            {"dayOfWeek": 1, "direction": "pickup", "isEnabled": True, "location": "DHA Phase 2",
-             "lat": 33.5350, "lng": 73.1350, "scheduledTime": "07:20:00"},
-            {"dayOfWeek": 1, "direction": "drop", "isEnabled": True, "location": "F-8 Markaz",
-             "lat": 33.7101, "lng": 73.0441, "scheduledTime": "17:30:00"},
-        ]}),
-]}
-
-# ------------------------------------------------------- 3 group -------------
-group = {"name": "3 · Group (Fleet)", "item": [
-    req("Create Group", "POST", "/api/v1/group", "owner_session",
-        body={"name": "Morning School Fleet", "description": "Islamabad school run",
-              "vehicleIds": ["{{owner_vehicle_id}}"]},
-        tests=save("group_id", "r.data.groupId"),
-        desc=("The creating driver becomes the owner, which in this product is the same thing as the "
-              "manager. A group must be born with at least one vehicle, and every vehicle must already "
-              "have declared its seats.")),
-
-    req("My Groups", "GET", "/api/v1/group/mine", "owner_session",
-        query=[q("page", "1")]),
-
-    req("Find Groups To Join (driver)", "GET", "/api/v1/group/search", "driver2_session",
+        desc=("Every service on the platform, active or disabled, with the same roster counts an owner sees on "
+              "their own. Read only — Pick & Drop stays run by each service's owner."),
+        examples=["Admin lists every Pick & Drop service", "Admin searches services by name"]),
+    req("Pick & Drop Service Detail", "GET", "/api/v1/admin/pickdrop/service", "admin_session",
+        query=[q("service_id", "{{service_id}}")],
+        desc="The service, its full roster breakdown (approved by kind, pending, vehicles-only counted apart), and every active shift it runs.",
+        examples=["Admin reads one service", "Read a service that does not exist (refused)"]),
+    req("List Advertisements", "GET", "/api/v1/admin/pickdrop/advertisements", "admin_session",
         query=[q("page", "1"), q("search", "", True)],
-        tests=[
-            "const r = pm.response.json();",
-            "if (r.data && r.data.groups && r.data.groups.length) {",
-            '    pm.environment.set("group_id", r.data.groups[0].id);',
-            '    console.log("found:", r.data.groups.map(g => g.name + " [" + (g.myStatus || "not requested") + "]"));',
-            "}",
-            "",
-        ],
-        desc=("This is how a group id is discovered at all. Without it a driver could never "
-              "learn the id that the join request needs.\n\n"
-              "Each row carries myStatus, so the app can tell 'ask to join' apart from 'waiting' "
-              "without a second call. Empty means they have never asked.\n\n"
-              "Pass search to filter by name. Passengers hit the same thing at "
-              "GET /api/v1/passenger/groups/search.")),
-
-    req("Driver · Request To Join (driver + vehicle)", "POST", "/api/v1/group/request/driver", "driver2_session",
-        body={"groupId": "{{group_id}}", "joinType": "both", "vehicleIds": ["{{driver2_vehicle_id}}"]},
-        desc=("joinType is one of both, driver_only or vehicle_only (requirement 3).\n\n"
-              "driver_only must carry no vehicles. vehicle_only and both must carry at least one.\n\n"
-              "Nothing is granted here, the owner still decides. A driver who was turned down before "
-              "can simply ask again.")),
-
-    req("Passenger · Request To Join", "POST", "/api/v1/passenger/group/request", "passenger_session",
-        body={"groupId": "{{group_id}}"},
-        desc="Requirement 23. Note this runs on a passenger token, not a driver one."),
-
-    req("Passenger 2 · Request To Join", "POST", "/api/v1/passenger/group/request", "passenger2_session",
-        body={"groupId": "{{group_id}}"}),
-
-    req("List Pending Requests", "GET", "/api/v1/group/requests", "owner_session",
-        query=[q("group_id", "{{group_id}}")],
-        tests=[
-            "const r = pm.response.json();",
-            "if (r.data) {",
-            '    if (r.data.members && r.data.members.length) pm.environment.set("member_request_id", r.data.members[0].id);',
-            '    if (r.data.vehicles && r.data.vehicles.length) pm.environment.set("vehicle_request_id", r.data.vehicles[0].id);',
-            "    if (r.data.passengers && r.data.passengers.length) {",
-            '        pm.environment.set("passenger_request_id", r.data.passengers[0].id);',
-            '        if (r.data.passengers.length > 1) pm.environment.set("passenger2_request_id", r.data.passengers[1].id);',
-            "    }",
-            '    console.log("pending:", (r.data.members||[]).length, "drivers,", (r.data.vehicles||[]).length, "vehicles,", (r.data.passengers||[]).length, "passengers");',
-            "}",
-        ],
-        desc="Needs group.manage_members. Saves the membership row ids the next call decides on."),
-
-    req("Decide Requests (bulk)", "PATCH", "/api/v1/group/requests", "owner_session",
-        body={"groupId": "{{group_id}}", "decisions": [
-            {"memberType": "driver", "memberId": "{{member_request_id}}", "action": "approve"},
-            {"memberType": "vehicle", "memberId": "{{vehicle_request_id}}", "action": "approve"},
-            {"memberType": "passenger", "memberId": "{{passenger_request_id}}", "action": "approve"},
-            {"memberType": "passenger", "memberId": "{{passenger2_request_id}}", "action": "approve"},
-        ]},
-        desc=("One call settles the whole queue. memberId is the id of the membership row, not of the "
-              "driver or passenger behind it.\n\n"
-              "action is approve, reject or remove. approve and reject only act on somebody still "
-              "waiting, remove only on somebody already inside.\n\n"
-              "The response splits into applied and skipped, and every skipped line says why, so a "
-              "half valid batch still tells you exactly what happened. Deciding on a vehicle "
-              "additionally needs group.manage_vehicles.")),
-
-    req("Promote Sub Manager (bulk)", "PATCH", "/api/v1/group/submanagers", "owner_session",
-        body={"groupId": "{{group_id}}", "promote": ["{{driver2_id}}"], "demote": []},
-        desc=("Requirement 16. The rule you insisted on is enforced here: a driver can only be promoted "
-              "if they are ALREADY an approved member of this same fleet. Anybody else comes back in "
-              "skipped with the reason, never promoted.\n\n"
-              "The owner can never be demoted, that would leave the fleet with nobody in charge.\n\n"
-              "A sub manager gets the four shift permissions and none of the membership ones.")),
-
-    req("Group Details (rosters)", "GET", "/api/v1/group", "owner_session",
-        query=[q("group_id", "{{group_id}}")],
-        desc="The fleet with its driver, vehicle and passenger rosters. Only somebody already inside the fleet may look."),
-
-    req("Passenger Travel Forms (manager view)", "GET", "/api/v1/group/passengers/schedules", "owner_session",
-        query=[q("group_id", "{{group_id}}"), q("day_of_week", "1"), q("direction", "pickup"), q("page", "1")],
-        desc=("This is the sheet requirement 10 describes: who wants to travel on this day in this "
-              "direction, from where, at what time, and which gender seat they need.\n\n"
-              "Leave day_of_week and direction off to get the whole week.\n\n"
-              "Gated on shift.assign_seats rather than plain membership, since it carries home "
-              "addresses, so the owner and sub managers see it and an ordinary joined driver does not.")),
-
-    req("Find Groups To Join (passenger)", "GET", "/api/v1/passenger/groups/search", "passenger_session",
-        query=[q("page", "1")],
-        desc="The same discovery list seen through a passenger token."),
-
-    req("My Groups (passenger)", "GET", "/api/v1/passenger/groups", "passenger_session",
-        query=[q("page", "1")],
-        desc="The fleets a passenger has been let into or is still waiting on, so they can see where their request stands."),
-
-    req("Driver Leaves The Group", "DELETE", "/api/v1/group/leave", "driver2_session",
-        query=[q("group_id", "{{group_id}}")],
-        desc=("The brief says people can join AND leave, and until now only the manager could "
-              "take somebody out.\n\n"
-              "Refused while shifts are still expecting this driver behind the wheel, since a "
-              "driver cannot be swapped out automatically. Cancel or reassign those first.\n\n"
-              "Their vehicles leave the fleet with them, and any sub manager role is dropped. "
-              "The owner can never leave, they delete the group instead.\n\n"
-              "Run this AFTER you have finished with the sub manager shift, or it will refuse.")),
-
-    req("Passenger Leaves The Group", "DELETE", "/api/v1/passenger/group/leave", "passenger_session",
-        query=[q("group_id", "{{group_id}}")],
-        desc=("A departing passenger's seats on upcoming shifts are freed automatically and each "
-              "affected shift's taken count is put back in step, so they never leave a ghost "
-              "sitting in a seat nobody can fill.\n\n"
-              "The same release happens when a manager removes a passenger through the bulk "
-              "decide endpoint.")),
-
-    req("Delete Group", "DELETE", "/api/v1/group", "owner_session",
-        query=[q("group_id", "{{group_id}}")],
-        desc="Refused while the fleet still has shifts ahead of it. Cancel those first. Run this last, it ends the flow."),
+        examples=["Admin lists advertisements"]),
+    req("List Shifts", "GET", "/api/v1/admin/shifts", "admin_session",
+        query=[q("page", "1"), q("search", "", True), q("day_of_week", "", True),
+               q("start_time", "", True), q("end_time", "", True), q("status", "", True)],
+        desc="Every shift on the platform, in any service, filtered exactly like the owner's own shift search. status is active, completed or all (default all).",
+        examples=["Admin lists every shift on the platform", "Admin searches shifts by service name"]),
+    req("List Open Shift Requests", "GET", "/api/v1/admin/shift/requests", "admin_session",
+        query=[q("page", "1"), q("search", "", True), q("day_of_week", "", True),
+               q("start_time", "", True), q("end_time", "", True)],
+        desc="Every rider requirement not yet met by a shift, addressed to one service or still open to any of them.",
+        examples=["Admin lists open shift requests"]),
 ]}
 
-# ------------------------------------------------------- 4 shifts ------------
-shifts = {"name": "4 · Shifts", "item": [
-    req("Create Morning PICKUP Shift (+ template)", "POST", "/api/v1/shift", "owner_session",
-        body={
-            "groupId": "{{group_id}}",
-            "vehicleId": "{{owner_vehicle_id}}",
-            "driverId": "{{owner_driver_id}}",
-            "direction": "pickup",
-            "startDatetime": "2026-09-14 07:00:00",
-            "estimatedEndDatetime": "2026-09-14 08:30:00",
-            "startLocation": "Bahria Town Phase 4",
-            "endLocation": "Roots School F-8",
-            "routeDetails": "Via Expressway",
-            "makeTemplate": True,
-            "templateName": "Monday morning pickup",
-            "daysOfWeek": [1, 2, 3, 4, 5],
-            "stops": [
-                {"location": "Bahria Town Phase 4", "lat": 33.5121, "lng": 73.0951,
-                 "scheduledTime": "07:15:00",
-                 "seats": [{"seatNumber": 1, "gender": "female", "passengerId": "{{passenger1_id}}"}]},
-                {"location": "DHA Phase 2", "lat": 33.5350, "lng": 73.1350,
-                 "scheduledTime": "07:35:00",
-                 "seats": [{"seatNumber": 2, "gender": "male", "passengerId": "{{passenger2_id}}"}]},
-                {"location": "Roots School F-8", "lat": 33.7101, "lng": 73.0441,
-                 "scheduledTime": "08:20:00", "seats": []},
-            ],
-        },
-        tests=save("shift_id", "r.data.shiftId") + ['if (r.data) pm.environment.set("template_id", r.data.templateId);'],
-        desc=("The stops are the route, in the order you send them, and each seat hangs off the stop "
-              "its passenger waits at (your ordered stop requirement). The last stop here is the "
-              "destination and carries nobody.\n\n"
-              "Every seat of the vehicle gets a row, so this 7 seat van comes back with 2 assigned "
-              "and 5 empty seats a manager can fill later.\n\n"
-              "makeTemplate saves the shape for reuse, exactly like ride templates. There is no "
-              "separate build from template api, the app refetches a template and posts it back here.\n\n"
-              "Rejected if the vehicle or the driver is already promised at that hour, on another "
-              "shift OR on a carpool ride (requirements 19 to 22).")),
+# ------------------------------------------------------------- 1 accounts ----
+accounts = {"name": "1 · Accounts", "item": (
+    driver_account("Owner Driver", "owner driver", "Owner Driver", "+923400000001", "flow", "121212",
+                   "owner_session", "owner_id", "owner_otp") + [
+        req("Owner Driver · Profile", "GET", "/api/v1/driver/info", "owner_session", examples=["Driver profile"]),
+        req("Owner Driver · Register Vehicle (7 seats)", "POST", "/api/v1/vehicle/register", "owner_session",
+            body={"vehicleNumber": "PD-0001A", "vehicleInfo": "Hiace van", "numberOfSeats": 7,
+                  "hasAC": True, "hasHeating": False, "pin": "121212"},
+            tests=save("vehicle_id", "r.data.vehicleId"),
+            desc="A vehicle needs a seat count before it can go on a shift, and a ride can never offer more seats than it has.",
+            examples=["Register vehicle (7 seats)"]),
+        req("Owner Driver · Register Small Vehicle (1 seat)", "POST", "/api/v1/vehicle/register", "owner_session",
+            body={"vehicleNumber": "PD-0001C", "vehicleInfo": "Mehran", "numberOfSeats": 1,
+                  "hasAC": False, "hasHeating": False, "pin": "121212"},
+            tests=save("vehicle3_id", "r.data.vehicleId"), examples=["Register small vehicle (1 seat)"]),
+        req("Owner Driver · Get Vehicles", "GET", "/api/v1/vehicle/", "owner_session", examples=["Get vehicles"]),
+        req("Update Vehicle (seats / number)", "PATCH", "/api/v1/vehicle/update", "owner_session",
+            body={"vehicleId": "{{vehicle_id}}", "numberOfSeats": 8, "hasAC": True, "hasHeating": False, "pin": "121212"},
+            desc=("Every active shift on the vehicle takes the new seat count, and the vehicle cannot drop below "
+                  "the passengers an active shift already carries in it. A shift is named after its vehicle, so "
+                  "a new vehicleNumber renames its active shifts and their upcoming trips."),
+            examples=["Grow the vehicle", "Shrink the vehicle under a seated shift (refused)", "Rename the vehicle"]),
+    ] +
+    driver_account("Second Driver", "second driver", "Second Driver", "+923400000002", "flow2", "131313",
+                   "driver2_session", "driver2_id", "driver2_otp") + [
+        req("Second Driver · Register Vehicle (4 seats)", "POST", "/api/v1/vehicle/register", "driver2_session",
+            body={"vehicleNumber": "PD-0001B", "vehicleInfo": "Corolla", "numberOfSeats": 4,
+                  "hasAC": True, "hasHeating": True, "pin": "131313"},
+            tests=save("vehicle2_id", "r.data.vehicleId"), examples=["Register second vehicle"]),
+        req("Second Driver · Register Another Vehicle", "POST", "/api/v1/vehicle/register", "driver2_session",
+            body={"vehicleNumber": "PD-0001D", "vehicleInfo": "Cultus", "numberOfSeats": 4,
+                  "hasAC": True, "hasHeating": False, "pin": "131313"},
+            tests=save("vehicle4_id", "r.data.vehicleId"), examples=["Register fourth vehicle"]),
+        req("Vehicle Owner · Register", "POST", "/api/v1/driver/register", "open_token",
+            body={"deviceId": "flow3", "mobile": "+923400000006", "name": "Vehicle Owner",
+                  "password": "Golang@12122", "gender": "male"},
+            tests=save("driver3_otp", "r.data.tempOTP"),
+            desc="A driver who will join a service with their vehicles only.",
+            examples=["Register vehicle owner"]),
+        req("Vehicle Owner · Verify OTP", "POST", "/api/v1/otp/verify", "open_token",
+            body={"mobile": "+923400000006", "otp": "{{driver3_otp}}", "operation": "ACTIVATE_DRIVER"},
+            examples=["Verify vehicle owner otp"]),
+        req("Vehicle Owner · Login", "POST", "/api/v1/driver/login", "open_token",
+            body={"deviceId": "flow3", "mobile": "+923400000006", "password": "Golang@12122"},
+            tests=save("driver3_session", "r.data.sessionId") + save("driver3_id", "r.data.driver.id"),
+            examples=["Login vehicle owner"]),
+        req("Vehicle Owner · Set Pin", "POST", "/api/v1/driver/pin", "driver3_session",
+            query=[q("pin", "141414")], examples=["Vehicle owner pin"]),
+        req("Vehicle Owner · Register A Van", "POST", "/api/v1/vehicle/register", "driver3_session",
+            body={"vehicleNumber": "PD-0001E", "vehicleInfo": "Hiace van", "numberOfSeats": 10,
+                  "hasAC": True, "hasHeating": False, "pin": "141414"},
+            tests=save("vehicle5_id", "r.data.vehicleId"), examples=["Vehicle owner registers a van"]),
+        req("Vehicle Owner · Register A Car", "POST", "/api/v1/vehicle/register", "driver3_session",
+            body={"vehicleNumber": "PD-0001F", "vehicleInfo": "Corolla", "numberOfSeats": 4,
+                  "hasAC": True, "hasHeating": True, "pin": "141414"},
+            tests=save("vehicle6_id", "r.data.vehicleId"), examples=["Vehicle owner registers a car"]),
+    ] +
+    passenger_account("Passenger 1", "Ayesha", "female", "+923400000003", "p1",
+                      "passenger_session", "passenger1_id", "passenger1_otp") +
+    passenger_account("Passenger 2", "Bilal", "male", "+923400000004", "p2",
+                      "passenger2_session", "passenger2_id", "passenger2_otp") +
+    passenger_account("Passenger 3", "Sana", "female", "+923400000005", "p3",
+                      "passenger3_session", "passenger3_id", "passenger3_otp") + [
+        req("Passenger · Profile", "GET", "/api/v1/passenger/info", "passenger_session", examples=["Passenger profile"]),
+        req("Passenger · Forgot Password", "GET", "/api/v1/passenger/password/forgot", "open_token",
+            query=[q("mobile_number", "%2B923400000003")], examples=["Passenger forgot password"]),
+        req("Passenger · Logout", "GET", "/api/v1/passenger/logout", "passenger_session", examples=["Passenger logout"]),
+        req("Driver · Logout", "GET", "/api/v1/driver/logout", "owner_session", examples=["Driver logout"]),
+    ]
+)}
 
-    req("Create Evening DROP Shift", "POST", "/api/v1/shift", "owner_session",
-        body={
-            "groupId": "{{group_id}}",
-            "vehicleId": "{{owner_vehicle_id}}",
-            "driverId": "{{owner_driver_id}}",
-            "direction": "drop",
-            "startDatetime": "2026-09-14 17:00:00",
-            "estimatedEndDatetime": "2026-09-14 18:30:00",
-            "startLocation": "Roots School F-8",
-            "endLocation": "Bahria Town Phase 4",
-            "routeDetails": "Via Kashmir Highway",
-            "makeTemplate": False,
-            "daysOfWeek": [1, 2, 3, 4, 5],
-            "stops": [
-                {"location": "Roots School F-8", "lat": 33.7101, "lng": 73.0441,
-                 "scheduledTime": "17:00:00", "seats": []},
-                {"location": "F-8 Markaz", "lat": 33.7101, "lng": 73.0441,
-                 "scheduledTime": "17:30:00",
-                 "seats": [{"seatNumber": 1, "gender": "female", "passengerId": "{{passenger1_id}}"}]},
-                {"location": "DHA Phase 2", "lat": 33.5350, "lng": 73.1350,
-                 "scheduledTime": "18:10:00",
-                 "seats": [{"seatNumber": 2, "gender": "male", "passengerId": "{{passenger2_id}}"}]},
-            ],
-        },
-        tests=save("drop_shift_id", "r.data.shiftId"),
-        desc=("The same people going home is a COMPLETELY SEPARATE shift with its own route "
-              "(requirements 12, 13 and 17.4). Note the stop order is reversed and the drop points "
-              "differ from the morning pickup points.\n\n"
-              "It does not clash with the morning shift because the time windows do not overlap.")),
+# ------------------------------------------------------ 2 pick & drop owner ----
+owner = {"name": "2 · Pick & Drop · Owner", "item": [
+    req("Enable Pick & Drop", "POST", "/api/v1/pickdrop", "owner_session",
+        body={"name": "Islamabad School Run", "description": "Morning and afternoon school runs",
+              "vehicleIds": ["{{vehicle_id}}"]},
+        tests=save("service_id", "r.data.serviceId"),
+        desc=("The driver becomes the one and only owner of the service. vehicleIds is optional, vehicles can "
+              "be added later. A driver owns or belongs to at most one service, so this is refused for an "
+              "owner, a member, or a driver with a request waiting."),
+        examples=["Enable Pick & Drop", "Enable a second service (refused)",
+                  "Enable a service while a request is open (refused)", "Vehicles only member enables a service (refused)"]),
+
+    req("My Service", "GET", "/api/v1/pickdrop", "owner_session",
+        desc=("role is owner, driver or none. An owner gets the counts, including the advertisement limit, "
+              "which is the approved vehicles times two, worked out on every read."),
+        examples=["My service (owner)", "My service after adding a vehicle", "My service after disabling",
+                  "Passenger token on a driver route (refused)"]),
+
+    req("Add Own Vehicles", "POST", "/api/v1/pickdrop/vehicles", "owner_session",
+        body={"vehicleIds": ["{{vehicle3_id}}"]},
+        desc="The owner's own vehicles go straight in, approved.",
+        examples=["Add another own vehicle", "Member driver adds vehicles as owner (refused)"]),
+
+    req("Remove A Vehicle", "DELETE", "/api/v1/pickdrop/vehicle", "owner_session",
+        query=[q("vehicle_id", "{{vehicle3_id}}")],
+        desc="Refused while the vehicle is on an active shift.", examples=["Owner takes a vehicle out"]),
+
+    req("Join Requests · Drivers", "GET", "/api/v1/pickdrop/requests", "owner_session",
+        query=[q("type", "driver"), q("page", "1"), q("status", "", True)],
+        tests=save_from_list("driver2_request_id", "r.data.requests", "driverId", "driver2_id", "requestId"),
+        desc="status defaults to pending, send all or any membership status to see decided ones.",
+        examples=["Pending driver requests"]),
+
+    req("Join Requests · Vehicles", "GET", "/api/v1/pickdrop/requests", "owner_session",
+        query=[q("type", "vehicle"), q("page", "1")],
+        tests=save_from_list("vehicle2_request_id", "r.data.requests", "vehicleId", "vehicle2_id", "requestId"),
+        desc=("ownerJoinType is owner, driver or vehicles. A vehicle whose owner joined with vehicles only is "
+              "always driven by somebody else."),
+        examples=["Pending vehicle requests", "Pending vehicle requests (vehicles only member)"]),
+
+    req("Join Requests · Passengers", "GET", "/api/v1/pickdrop/requests", "owner_session",
+        query=[q("type", "passenger"), q("page", "1")],
+        tests=(save_from_list("passenger1_request_id", "r.data.requests", "passengerId", "passenger1_id", "requestId") +
+               ["{"] + save_from_list("passenger2_request_id", "r.data.requests", "passengerId", "passenger2_id", "requestId") + ["}"]),
+        desc="Each passenger comes with the weekly demand they filled in, once they have.",
+        examples=["Pending passenger requests"]),
+
+    req("Join Request Detail", "GET", "/api/v1/pickdrop/request", "owner_session",
+        query=[q("type", "driver"), q("request_id", "{{driver2_request_id}}")], examples=["Join request detail"]),
+
+    req("Decide Requests (bulk)", "PATCH", "/api/v1/pickdrop/requests", "owner_session",
+        body={"decisions": [
+            {"type": "driver", "requestId": "{{driver2_request_id}}", "action": "approve"},
+            {"type": "vehicle", "requestId": "{{vehicle2_request_id}}", "action": "approve"},
+            {"type": "passenger", "requestId": "{{passenger1_request_id}}", "action": "approve"},
+            {"type": "passenger", "requestId": "{{passenger2_request_id}}", "action": "approve"},
+        ]},
+        desc=("approve, reject or remove, for drivers, vehicles and passengers in one call. Drivers are settled "
+              "first, then vehicles, then passengers, whatever order they are sent in. A line that cannot be "
+              "applied comes back in skipped with the reason instead of failing the call: a vehicle whose "
+              "driver is not approved, a request already decided, removing somebody who is not approved. "
+              "Removing a passenger takes them off the service's shifts, removing a driver or vehicle is "
+              "refused while they are on an active shift."),
+        examples=["Decide requests in bulk", "Approve a vehicle before its driver (skipped)",
+                  "Remove a rejected passenger (skipped)", "Re-decide the same requests (all skipped)",
+                  "Approve a vehicles only member and their vehicles"]),
+
+    req("Available Drivers", "GET", "/api/v1/pickdrop/drivers/available", "owner_session",
+        query=[q("page", "1"), q("days_of_week", "1,2,3,4,5,6,7", True), q("start_date", "{{start_date}}", True),
+               q("end_date", "", True), q("start_time", "07:00", True), q("end_time", "08:00", True),
+               q("exclude_shift_id", "", True)],
+        desc=("The owner and the approved drivers, never a member who joined with vehicles only. Send the "
+              "schedule of the shift you are about to build, all of days_of_week, start_date, start_time and "
+              "end_time, and each driver says isAvailable and, if not, the conflict."),
+        examples=["Available drivers", "Available drivers for a schedule", "Available drivers leave out vehicles only members"]),
+
+    req("Available Vehicles", "GET", "/api/v1/pickdrop/vehicles/available", "owner_session",
+        query=[q("page", "1"), q("days_of_week", "", True), q("start_date", "", True),
+               q("start_time", "", True), q("end_time", "", True)],
+        desc=("Approved vehicles with hasValidSeats, a vehicle without seats cannot go on a shift. ownerJoinType "
+              "vehicles means the vehicle's owner does not drive, pick another driver for it."),
+        examples=["Available vehicles"]),
+
+    req("Available Passengers (weekly demand)", "GET", "/api/v1/pickdrop/passengers/available", "owner_session",
+        query=[q("page", "1"), q("day_of_week", "", True)],
+        desc="Approved passengers with the days and places they need the service.",
+        examples=["Available passengers with weekly demand"]),
+
+    req("Create Advertisement", "POST", "/api/v1/pickdrop/advertisement", "owner_session",
+        body={"title": "Bahria to F-8 school run", "description": "Morning pick up in an AC van", "fare": 6000,
+              "daysOfWeek": [1, 2, 3, 4, 5], "startTime": "06:30", "endTime": "08:30",
+              "locations": [at(*BAHRIA, "06:45"), at(*DHA, "07:10"), at(*ROOTS, "08:00")]},
+        tests=save("advertisement_id", "r.data.advertisementId"),
+        desc=("Up to ten places, each with the time it is reached, all between startTime and endTime. An owner "
+              "may hold approved vehicles times two advertisements."),
+        examples=["Create advertisement", "Create second advertisement", "Advertisement over the limit (refused)",
+                  "Advertisement with eleven places (refused)"]),
+
+    req("My Advertisements", "GET", "/api/v1/pickdrop/advertisements", "owner_session",
+        query=[q("page", "1")], examples=["My advertisements"]),
+
+    req("Delete Advertisement", "DELETE", "/api/v1/pickdrop/advertisement", "owner_session",
+        query=[q("advertisement_id", "{{advertisement_id}}")],
+        desc="Archived to del_pick_drop_advertisements, then deleted.",
+        examples=["Delete advertisement", "Delete the last advertisement"]),
+
+    req("Leave (owner)", "DELETE", "/api/v1/pickdrop/leave", "owner_session",
+        desc="An owner cannot leave, they disable the service instead.",
+        examples=["Owner leaves their own service (refused)"]),
+
+    req("Disable Pick & Drop", "DELETE", "/api/v1/pickdrop", "owner_session",
+        desc=("Refused while the service has active shifts. Otherwise every open request and membership is "
+              "closed and its advertisements archived, so its drivers and passengers are free to join another."),
+        examples=["Disable the service", "Disable the service with active shifts (refused)"]),
+]}
+
+# ----------------------------------------------------- 3 pick & drop driver ----
+member = {"name": "3 · Pick & Drop · Joining Driver", "item": [
+    req("Find Services", "GET", "/api/v1/pickdrop/search", "driver2_session",
+        query=[q("page", "1"), q("search", "School", True)], examples=["Search services (driver)"]),
+
+    req("Request To Join", "POST", "/api/v1/pickdrop/request", "driver2_session",
+        body={"serviceId": "{{service_id}}", "joinType": "driver", "vehicleIds": ["{{vehicle2_id}}"]},
+        desc=("joinType driver (the default) joins as somebody who can drive the service's shifts. vehicleIds "
+              "is optional, each proposed vehicle becomes its own request the owner approves separately, after "
+              "the driver."),
+        examples=["Driver join request (with a vehicle)", "Duplicate join request (refused)",
+                  "Owner asks to join a service (refused)"]),
+
+    req("Request To Join (vehicles only)", "POST", "/api/v1/pickdrop/request", "driver3_session",
+        body={"serviceId": "{{service_id}}", "joinType": "vehicles", "vehicleIds": ["{{vehicle5_id}}", "{{vehicle6_id}}"]},
+        desc=("joinType vehicles joins only through the vehicles offered, at least one. The driver belongs to the "
+              "service but is never put behind the wheel of its shifts and never listed as an available driver. "
+              "The owner approves the driver, then each vehicle, and puts the vehicles on shifts with other "
+              "drivers, different vehicles on different shifts. The last vehicle cannot be taken out, the member "
+              "leaves the service instead. Belonging to one service still rules out owning or joining another."),
+        examples=["Join with vehicles only", "Join with vehicles only and no vehicle (refused)"]),
+
+    req("My Service (member)", "GET", "/api/v1/pickdrop", "driver2_session",
+        desc="membership.joinType is driver or vehicles.",
+        examples=["My service (member driver)", "My service (vehicles only member)"]),
+
+    req("Offer Vehicles", "POST", "/api/v1/pickdrop/vehicles/offer", "driver2_session",
+        body={"vehicleIds": ["{{vehicle4_id}}"]},
+        desc="A member driver proposes more of their vehicles, each waits for the owner.",
+        examples=["Offer another vehicle"]),
+
+    req("Withdraw A Vehicle", "DELETE", "/api/v1/pickdrop/vehicle/offer", "driver2_session",
+        query=[q("vehicle_id", "{{vehicle4_id}}")],
+        desc=("Withdraws a waiting offer, or takes an approved vehicle out when it is on no active shift. A member "
+              "who joined with vehicles only keeps at least one."),
+        examples=["Withdraw the offered vehicle", "Vehicles only member takes a vehicle out",
+                  "Withdraw a vehicle that is not offered (refused)", "Withdraw a vehicle that is on a shift (refused)",
+                  "Take the last vehicle of a vehicles only member out (refused)"]),
+
+    req("Leave The Service", "DELETE", "/api/v1/pickdrop/leave", "driver2_session",
+        desc="Refused while the driver, or a vehicle they brought, is on an active shift.",
+        examples=["Driver leaves the service", "Vehicles only member leaves the service",
+                  "Driver leaves while on a shift (refused)"]),
+]}
+
+# -------------------------------------------------- 4 pick & drop passenger ----
+passenger = {"name": "4 · Pick & Drop · Passenger", "item": [
+    req("Search Advertisements (public)", "GET", "/api/v1/pickdrop/advertisements/search", "open_token",
+        query=[q("page", "1"), q("search", "Bahria", True), q("day_of_week", "1", True),
+               q("start_time", "", True), q("end_time", "", True)],
+        desc="Open to anybody. search matches the advertised places, day_of_week and the time window narrow it further.",
+        examples=["Search advertisements (public)"]),
+
+    req("Find Services", "GET", "/api/v1/passenger/pickdrop/search", "passenger_session",
+        query=[q("page", "1"), q("search", "School", True)], examples=["Search services (passenger)"]),
+
+    req("Request To Join", "POST", "/api/v1/passenger/pickdrop/request", "passenger_session",
+        body={"serviceId": "{{service_id}}"},
+        desc="A passenger belongs to at most one service and holds one open request at a time.",
+        examples=["Passenger Ayesha join request", "Passenger duplicate join request (refused)"]),
+
+    req("Passenger 2 · Request To Join", "POST", "/api/v1/passenger/pickdrop/request", "passenger2_session",
+        body={"serviceId": "{{service_id}}"}, examples=["Passenger Bilal join request"]),
+
+    req("Passenger 3 · Request To Join", "POST", "/api/v1/passenger/pickdrop/request", "passenger3_session",
+        body={"serviceId": "{{service_id}}"}, examples=["Passenger Sana join request"]),
+
+    req("My Membership", "GET", "/api/v1/passenger/pickdrop", "passenger_session",
+        examples=["Passenger membership (approved)", "Passenger membership (pending)"]),
+
+    req("Set Weekly Availability", "PUT", "/api/v1/passenger/availability", "passenger_session",
+        body={"days": [
+            {"dayOfWeek": 1, "isRequired": True, "locations": [at(*BAHRIA, "06:55"), at(*ROOTS, "13:30")]},
+            {"dayOfWeek": 2, "isRequired": True, "locations": [at(*BAHRIA, "06:55")]},
+            {"dayOfWeek": 3, "isRequired": False, "locations": []},
+        ]},
+        desc=("Open once the owner has approved the passenger. Each day is required or not, a required day "
+              "carries one to six places each with a time. Days not sent stay as they were."),
+        examples=["Set weekly availability", "Availability before approval (refused)",
+                  "Seven places in a day (refused)", "Places on a day that is not required (refused)"]),
+
+    req("Get Weekly Availability", "GET", "/api/v1/passenger/availability", "passenger_session",
+        desc="Always the whole week, Monday (1) to Sunday (7).", examples=["Get weekly availability"]),
+
+    req("Passenger 2 · Set Weekly Availability", "PUT", "/api/v1/passenger/availability", "passenger2_session",
+        body={"days": [{"dayOfWeek": d, "isRequired": True, "locations": [at(*DHA, "07:20")]} for d in (1, 2, 3, 4, 5)]},
+        examples=["Passenger 2 weekly availability"]),
+
+    req("Leave The Service", "DELETE", "/api/v1/passenger/pickdrop/leave", "passenger2_session",
+        desc="Withdraws a waiting request, or leaves: the passenger is taken off every active shift of the service and the owner is told.",
+        examples=["Passenger leaves the service"]),
+]}
+
+# -------------------------------------------------------- 5 shifts owner ----
+shift_body = {
+    "driverId": "{{owner_id}}", "vehicleId": "{{vehicle_id}}",
+    "daysOfWeek": [1, 2, 3, 4, 5, 6, 7], "startDate": "{{start_date}}", "endDate": "{{end_date}}",
+    "locations": [at(*BAHRIA, "07:00"), at(*DHA, "07:25"), at(*ROOTS, "08:00")],
+    "passengers": [{"passengerId": "{{passenger1_id}}", "locationSequence": 1},
+                   {"passengerId": "{{passenger2_id}}", "locationSequence": 2}],
+}
+
+shifts_owner = {"name": "5 · Shifts · Owner", "item": [
+    req("Create Shift", "POST", "/api/v1/shift", "owner_session", body=shift_body,
+        tests=save("shift_id", "r.data.shiftId"),
+        desc=("One recurring shift, named after its vehicle's number: the days it runs, from startDate until endDate (empty runs until changed), "
+              "and a route of 2 to 20 places reached one after another. The trip lasts from the first place's "
+              "time to the last. Each passenger waits at the place with their locationSequence.\n\n"
+              "Only the owner creates shifts. The driver is the owner or an approved driver, the vehicle an "
+              "approved vehicle with seats, the passengers approved passengers who fit in it. None of them may be "
+              "on another shift whose trips overlap on a date both run, in any service, and the driver and "
+              "vehicle may not be on a carpool ride during a trip. Touching times do not overlap."),
+        examples=["Create shift", "Shift in the past (refused)", "More passengers than seats (refused)",
+                  "Passenger outside the service (refused)", "Member driver builds a shift (refused)",
+                  "Vehicles only member put behind the wheel (refused)"]),
+
+    req("Clash · Same Driver", "POST", "/api/v1/shift", "owner_session",
+        body=dict(shift_body, vehicleId="{{vehicle3_id}}", passengers=[],
+                  locations=[at(*DHA, "07:30"), at(*ROOTS, "08:30")]),
+        desc="MEANT TO FAIL: the owner is already driving the morning run at that time.",
+        examples=["Driver on an overlapping shift (refused)"]),
+
+    req("Clash · Same Vehicle", "POST", "/api/v1/shift", "owner_session",
+        body=dict(shift_body, driverId="{{driver2_id}}", passengers=[],
+                  locations=[at(*DHA, "07:30"), at(*ROOTS, "08:30")]),
+        desc="MEANT TO FAIL: the vehicle is on the morning run at that time.",
+        examples=["Vehicle on an overlapping shift (refused)"]),
+
+    req("Clash · Same Passenger", "POST", "/api/v1/shift", "owner_session",
+        body=dict(shift_body, driverId="{{driver2_id}}", vehicleId="{{vehicle2_id}}",
+                  locations=[at(*DHA, "07:30"), at(*ROOTS, "08:30")],
+                  passengers=[{"passengerId": "{{passenger1_id}}", "locationSequence": 1}]),
+        desc="MEANT TO FAIL: another driver and vehicle, but the passenger is on the morning run.",
+        examples=["Passenger on an overlapping shift (refused)"]),
+
+    req("Clash · A Carpool Ride", "POST", "/api/v1/shift", "owner_session",
+        body=dict(shift_body, vehicleId="{{vehicle3_id}}", passengers=[],
+                  daysOfWeek=[datetime.fromisoformat(RIDE_DATE).isoweekday()],
+                  startDate="{{ride_date}}", endDate="{{ride_date}}",
+                  locations=[at(*BAHRIA, "12:10"), at(*ROOTS, "12:40")]),
+        desc="MEANT TO FAIL: the owner drives a carpool ride at that hour (create it in folder 8 first).",
+        examples=["Shift on top of a ride (refused)"]),
+
+    req("Create Touching Shift", "POST", "/api/v1/shift", "owner_session",
+        body=dict(shift_body, driverId="{{driver2_id}}", vehicleId="{{vehicle2_id}}",
+                  locations=[at(*ROOTS, "08:00"), at(*MARKAZ, "08:30")],
+                  passengers=[{"passengerId": "{{passenger1_id}}", "locationSequence": 1}]),
+        tests=save("shift_c_id", "r.data.shiftId"),
+        desc="Starts the minute the morning run ends. Touching trips do not overlap, so the same passenger fits.",
+        examples=["Create touching shift (member driver)"]),
+
+    req("Shifts On A Vehicles Only Member's Vehicles", "POST", "/api/v1/shift", "owner_session",
+        body=dict(shift_body, driverId="{{driver2_id}}", vehicleId="{{vehicle6_id}}", passengers=[],
+                  locations=[at(*DHA, "10:00"), at(*ROOTS, "10:30")]),
+        desc=("A member who joined with vehicles only never drives, so their vehicles go on shifts with the "
+              "owner or another driver behind the wheel. Two of their vehicles can be on two shifts at the "
+              "same time, each with its own driver. The vehicle's owner is told, sees those shifts under "
+              "/shift/mine and can read them."),
+        examples=["Shift on the member's van, owner driving", "Shift on the member's car at the same time, second driver"]),
 
     req("Shift Detail", "GET", "/api/v1/shift/detail", "owner_session",
         query=[q("shift_id", "{{shift_id}}")],
-        desc=("Returns the shift, its stops in order, and every seat.\n\n"
-              "The shift carries both the driver's number and the number of the manager who built it, "
-              "which is the contact information you asked to be on every shift.\n\n"
-              "Visible to any approved member of the fleet, and to a passenger holding a seat on it.")),
+        desc="For the owner and the driver of the shift: route, passengers with their stops and numbers, seats.",
+        examples=["Shift detail (owner)", "Shift detail after the vehicle grew", "Shift detail after the vehicle was renamed",
+                  "Shift after a passenger left", "Read a deleted shift (refused)"]),
 
-    req("Group Shift Roster", "GET", "/api/v1/shift", "owner_session",
-        query=[q("group_id", "{{group_id}}"), q("direction", "pickup"), q("status", "active"),
-               q("page", "1"), q("driver_id", "", True),
-               q("start_time", "2026-09-14 00:00:00", True),
-               q("estimated_end_time", "2026-09-20 23:59:59", True)],
-        desc="The manager's roster view. Every filter is optional."),
+    req("Service Shifts", "GET", "/api/v1/shift", "owner_session",
+        query=[q("page", "1"), q("status", "", True), q("day_of_week", "", True), q("search", "", True),
+               q("start_time", "06:30", True), q("end_time", "08:05", True)],
+        desc=("status is active (default), completed or all. day_of_week keeps the shifts running that day. "
+              "search matches the vehicle number (which is the shift's name) or any place on the route. "
+              "start_time and end_time work like the ride search: trips starting at or after start_time and "
+              "over by end_time, either can be sent alone."),
+        examples=["Service shifts", "Service shifts for a day", "Service shifts in a time window",
+                  "Service shifts by vehicle number"]),
 
-    req("My Shifts (driver)", "GET", "/api/v1/shift/mine", "owner_session",
-        query=[q("page", "1")],
-        desc="What this driver is driving."),
+    req("Edit Shift", "PATCH", "/api/v1/shift", "owner_session",
+        body={"shiftId": "{{shift_id}}",
+              "locations": [at(*BAHRIA, "06:55"), at(*DHA, "07:20"), at(*ROOTS, "07:55")]},
+        desc=("Send only what changes: driverId, vehicleId (the shift is renamed after the new vehicle), "
+              "daysOfWeek, startDate, endDate (empty makes it open ended) or locations (replaces the route). "
+              "Every edit runs the same checks as creating, trips not yet started are rewritten, and the "
+              "driver, the passengers and the owner of the vehicle are told."),
+        examples=["Edit the route", "Move a shift onto another (refused)", "Member driver edits a shift (refused)"]),
 
-    req("My Shifts (passenger)", "GET", "/api/v1/passenger/shifts", "passenger_session",
-        query=[q("page", "1")],
-        desc="The same handler seen through a passenger token: the shifts they hold a seat on, morning and evening both."),
+    req("Change Passengers (bulk)", "PUT", "/api/v1/shift/passengers", "owner_session",
+        body={"shiftId": "{{shift_id}}", "add": [{"passengerId": "{{passenger2_id}}", "locationSequence": 2}],
+              "move": [{"passengerId": "{{passenger1_id}}", "locationSequence": 3}], "remove": []},
+        desc=("Adds, moves and removes in one transaction, judged against the seats once every change lands. "
+              "A removed passenger's row is kept as history, adding them again starts a new one."),
+        examples=["Add and move passengers", "Remove a passenger", "Add a passenger already on the shift (refused)",
+                  "Add a passenger outside the service (refused)"]),
 
-    req("Passenger · Shift Detail", "GET", "/api/v1/passenger/shift/detail", "passenger_session",
+    req("Attendance Of A Trip", "GET", "/api/v1/shift/attendance", "owner_session",
+        query=[q("shift_id", "{{shift_id}}"), q("date", "{{start_date}}")],
+        desc="Everyone is present unless they marked themselves absent.",
+        examples=["Attendance of a trip (owner)", "Attendance of a trip you do not run (refused)"]),
+
+    req("Trips", "GET", "/api/v1/shift/occurrences", "owner_session",
+        query=[q("page", "1"), q("shift_id", "{{shift_id}}", True)],
+        desc="Trips already written, with present and absent counts. A driver who is not an owner sees the trips they drove.",
+        examples=["Trips of a shift", "Trips of the service"]),
+
+    req("Shift History", "GET", "/api/v1/shift/history", "owner_session", query=[q("page", "1")],
+        desc="Every shift the service ran, deleted ones included with deletedAt.", examples=["Shift history"]),
+
+    req("Passenger History", "GET", "/api/v1/shift/passengers/history", "owner_session",
+        query=[q("page", "1"), q("passenger_id", "{{passenger2_id}}", True)],
+        desc="Each stint of a passenger on a shift: when they joined the service, when they were added and removed, how often they travelled.",
+        examples=["Passenger history (owner)"]),
+
+    req("Search Shift Requests", "GET", "/api/v1/shift/requests", "owner_session",
+        query=[q("page", "1"), q("search", "", True), q("day_of_week", "", True),
+               q("start_time", "", True), q("end_time", "", True)],
+        desc=("Passengers' requirements, open ones and the ones addressed to this service. search matches any "
+              "requested place, start_time and end_time work like the ride search."),
+        examples=["Search shift requests (owner)", "Search shift requests by place", "Search shift requests in a time window"]),
+
+    req("Delete Shift", "DELETE", "/api/v1/shift", "owner_session",
+        query=[q("shift_id", "{{shift_c_id}}")],
+        desc="Archived to del_shifts, deleted, and the driver and passengers are told. Its trips stay as travel history.",
+        examples=["Delete the touching shift", "Delete shift", "Delete today's shift",
+                  "Delete the shift on the member's van", "Delete the shift on the member's car"]),
+]}
+
+# ------------------------------------------------------- 6 shifts driver ----
+shifts_driver = {"name": "6 · Shifts · Driver", "item": [
+    req("My Shifts", "GET", "/api/v1/shift/mine", "driver2_session",
+        query=[q("page", "1"), q("status", "", True), q("day_of_week", "", True), q("search", "", True),
+               q("start_time", "", True), q("end_time", "", True)],
+        desc="The shifts the caller drives and the shifts their vehicles are on, with the same filters as the service's shifts.",
+        examples=["My shifts (member driver)", "My shifts (owner driving)", "My shifts (vehicles only member)"]),
+
+    req("Shift I Drive", "GET", "/api/v1/shift/detail", "driver2_session",
+        query=[q("shift_id", "{{shift_c_id}}")],
+        desc="Readable by the owner, the shift's driver and the owner of its vehicle.",
+        examples=["Driver reads the shift they drive", "Vehicle owner reads a shift their vehicle is on",
+                  "Driver reads a shift they do not drive (refused)"]),
+
+    req("Send Location Update", "POST", "/api/v1/shift/location", "driver2_session",
+        body={"shiftId": "{{shift_today_id}}", "message": "Running five minutes late",
+              "location": "Gulberg Greens main gate", "lat": 33.6180, "lng": 73.1560},
+        desc="Only the driver of the shift, only on a day it runs, and only its passengers travelling that day are told.",
+        examples=["Driver sends a location update", "Update from a driver who is not driving (refused)",
+                  "Update on a shift with no trip today (refused)"]),
+]}
+
+# ---------------------------------------------------- 7 shifts passenger ----
+shifts_passenger = {"name": "7 · Shifts · Passenger", "item": [
+    req("My Shifts", "GET", "/api/v1/passenger/shifts", "passenger_session",
+        query=[q("page", "1"), q("status", "", True), q("day_of_week", "", True), q("search", "", True),
+               q("start_time", "", True), q("end_time", "", True)],
+        examples=["My shifts (passenger)"]),
+
+    req("Shift Detail", "GET", "/api/v1/passenger/shift/detail", "passenger_session",
         query=[q("shift_id", "{{shift_id}}")],
-        desc="A passenger can open a shift they are seated on, and gets the driver and manager contacts with it."),
+        desc="myStop is the caller's own stop, other passengers are shown without their numbers.",
+        examples=["Passenger reads shift detail", "Passenger reads a shift they are not on (refused)"]),
 
-    req("Swap Male Rider For Female (one call)", "PUT", "/api/v1/shift/seats", "owner_session",
-        body={"shiftId": "{{shift_id}}", "seats": [
-            {"seatNumber": 2, "gender": "female", "passengerId": "{{passenger1_id}}", "stopSequence": 1},
-            {"seatNumber": 1, "gender": "male", "passengerId": "{{passenger2_id}}", "stopSequence": 2},
-        ]},
-        desc=("The swap you asked for. Seat 2 held a male rider and now holds a female one, and seat 1 "
-              "goes the other way, in a single request.\n\n"
-              "The rule that still holds: a seat's declared gender and the person sitting in it must "
-              "always agree, so nobody ever lands in a seat kept for the other gender. Try changing "
-              "one gender field and leaving the passenger, it will be refused.\n\n"
-              "stopSequence points at the stop that passenger now waits at, counting from 1.\n\n"
-              "Send passengerId as \"\" to free a seat. Everybody whose place actually changed is "
-              "notified, people who kept their seat are left alone.")),
+    req("Mark Absent", "PATCH", "/api/v1/passenger/shift/attendance", "passenger_session",
+        body={"shiftId": "{{shift_id}}", "date": "{{start_date}}", "status": "absent"},
+        desc=("status absent or present, for a date the shift runs that has not started. The driver of that trip "
+              "and the owner are told, the other passengers can see it."),
+        examples=["Mark absent", "Mark absent again", "Mark absent on a day the shift does not run (refused)",
+                  "Mark absent on a shift you are not on (refused)", "Mark absent after the trip started (refused)"]),
 
-    req("Free A Seat", "PUT", "/api/v1/shift/seats", "owner_session",
-        body={"shiftId": "{{shift_id}}", "seats": [
-            {"seatNumber": 2, "gender": "", "passengerId": "", "stopSequence": 0},
-        ]},
-        desc="An empty passengerId frees the seat and clears the gender it was kept for. seatsTaken is recomputed."),
+    req("Trip Attendance", "GET", "/api/v1/passenger/shift/attendance", "passenger2_session",
+        query=[q("shift_id", "{{shift_id}}"), q("date", "{{start_date}}")],
+        examples=["Attendance of a trip (other passenger)"]),
 
-    req("Sub Manager Builds A Shift", "POST", "/api/v1/shift", "driver2_session",
-        body={
-            "groupId": "{{group_id}}",
-            "vehicleId": "{{driver2_vehicle_id}}",
-            "driverId": "{{driver2_id}}",
-            "direction": "pickup",
-            "startDatetime": "2026-09-15 07:00:00",
-            "estimatedEndDatetime": "2026-09-15 08:30:00",
-            "startLocation": "Gulberg Greens",
-            "endLocation": "Roots School F-8",
-            "routeDetails": "Via Islamabad Highway",
-            "makeTemplate": False,
-            "daysOfWeek": [2],
-            "stops": [
-                {"location": "Gulberg Greens", "lat": 33.6180, "lng": 73.1560,
-                 "scheduledTime": "07:20:00",
-                 "seats": [{"seatNumber": 1, "gender": "female", "passengerId": "{{passenger1_id}}"}]},
-                {"location": "Roots School F-8", "lat": 33.7101, "lng": 73.0441,
-                 "scheduledTime": "08:20:00", "seats": []},
-            ],
-        },
-        tests=save("submanager_shift_id", "r.data.shiftId"),
-        desc=("Requirement 16 end to end: the sub manager takes the shift building load off the owner. "
-              "Same endpoint, different token.\n\n"
-              "Try the group membership calls on this token and they will come back "
-              "'Operation is not permitted', because a sub manager holds the shift permissions and "
-              "none of the membership ones.")),
+    req("Travel History", "GET", "/api/v1/passenger/shift/history", "passenger_session",
+        query=[q("page", "1")],
+        desc="Every trip that started, with the driver, vehicle and route of that day. It outlives leaving and deleted shifts.",
+        examples=["Travel history", "Travel history after the shift was deleted"]),
 
-    req("Owner Drives A Lent Vehicle", "POST", "/api/v1/shift", "owner_session",
-        body={
-            "groupId": "{{group_id}}", "vehicleId": "{{driver2_vehicle_id}}", "driverId": "{{owner_driver_id}}",
-            "direction": "pickup",
-            "startDatetime": "2026-09-15 14:00:00", "estimatedEndDatetime": "2026-09-15 15:30:00",
-            "startLocation": "Gulberg Greens", "endLocation": "Roots School F-8",
-            "routeDetails": "Owner driving a lent vehicle", "makeTemplate": False, "daysOfWeek": [2],
-            "stops": [
-                {"location": "Gulberg Greens", "lat": 33.6180, "lng": 73.1560, "scheduledTime": "14:20:00", "seats": []},
-                {"location": "Roots School F-8", "lat": 33.7101, "lng": 73.0441, "scheduledTime": "15:20:00", "seats": []},
-            ],
-        },
-        desc=("A driver joining with joinType both lends a vehicle AND drives. Those are separate "
-              "commitments: here the vehicle belongs to the second driver but the owner is behind "
-              "the wheel.\n\n"
-              "It matters at teardown. That driver cannot leave the fleet while their vehicle is "
-              "carrying a shift, even one they have nothing to do with, because their vehicles go "
-              "out of the fleet with them. Both refusals are saved on the leave request.")),
+    req("Create Shift Request", "POST", "/api/v1/passenger/shift/request", "passenger3_session",
+        body={"serviceId": "", "daysOfWeek": [1, 2, 3, 4, 5], "contactNumber": "+923001234567",
+              "note": "A seat for my daughter", "locations": [at(*G11, "07:30"), at(*BLUE, "08:15")]},
+        tests=save("shift_request_id", "r.data.requestId"),
+        desc="serviceId is optional, a request addressed to one service is shown only to its owner.",
+        examples=["Create shift request", "Create shift request for one service", "Shift request with one place (refused)"]),
 
-    req("Clash Check · Same Vehicle, Overlapping Time", "POST", "/api/v1/shift", "owner_session",
-        body={
-            "groupId": "{{group_id}}",
-            "vehicleId": "{{owner_vehicle_id}}",
-            "driverId": "{{owner_driver_id}}",
-            "direction": "pickup",
-            "startDatetime": "2026-09-14 07:30:00",
-            "estimatedEndDatetime": "2026-09-14 09:00:00",
-            "startLocation": "Somewhere else",
-            "endLocation": "Another school",
-            "routeDetails": "Overlaps the morning shift on purpose",
-            "makeTemplate": False,
-            "daysOfWeek": [1],
-            "stops": [{"location": "Somewhere else", "lat": 33.6, "lng": 73.1,
-                       "scheduledTime": "07:40:00", "seats": []}],
-        },
-        desc=("EXPECTED TO FAIL with 'Vehicle already has a ride or a shift scheduled for this "
-              "duration'. This proves requirements 19 and 20.\n\n"
-              "Create a carpool ride on this same vehicle at this time and the shift is refused too, "
-              "and the mirror holds: creating a carpool ride while a shift is on gets refused as well "
-              "(requirements 21 and 22).")),
+    req("My Shift Requests", "GET", "/api/v1/passenger/shift/requests", "passenger3_session",
+        query=[q("page", "1"), q("search", "", True), q("day_of_week", "", True),
+               q("start_time", "07:00", True), q("end_time", "09:00", True)],
+        examples=["My shift requests", "My shift requests in a time window"]),
 
-    req("Reschedule Shift (move the time)", "PATCH", "/api/v1/shift", "owner_session",
-        body={
-            "shiftId": "{{shift_id}}",
-            "startDatetime": "2026-09-14 07:20:00",
-            "estimatedEndDatetime": "2026-09-14 08:50:00",
-            "routeDetails": "Via Expressway, delayed for roadworks",
-            "stopTimes": [
-                {"sequenceNumber": 1, "scheduledTime": "07:35:00"},
-                {"sequenceNumber": 2, "scheduledTime": "07:55:00"},
-                {"sequenceNumber": 3, "scheduledTime": "08:40:00"},
-            ],
-        },
-        desc=("Pushes the whole trip back twenty minutes WITHOUT losing the seat plan. Cancelling "
-              "and rebuilding would throw the seats away, and is refused outright inside the two "
-              "hour window.\n\n"
-              "Every field except shiftId is optional, but the time window has to be sent whole or "
-              "not at all. stopTimes matches stops by their sequence number, so stop ids and the "
-              "seats hanging off them survive.\n\n"
-              "Moving the window re-runs the full clash check, ignoring this shift's own row. "
-              "Everybody aboard is notified.\n\n"
-              "The vehicle and driver are deliberately NOT changeable here, swapping either can "
-              "invalidate every seat, so that stays a cancel and rebuild.")),
+    req("Delete Shift Request", "DELETE", "/api/v1/passenger/shift/request", "passenger3_session",
+        query=[q("request_id", "{{shift_request_id}}")], examples=["Delete shift request"]),
 
-    req("Cancel Shift", "DELETE", "/api/v1/shift", "owner_session",
-        query=[q("shift_id", "{{submanager_shift_id}}")],
-        desc=("Soft cancel. Refused when the shift starts within 2 hours, mirroring the carpool ride "
-              "guard, so use a shift comfortably in the future.\n\n"
-              "The driver and every seated passenger are told, with the manager's contact in the message.")),
+    req("Notifications", "GET", "/api/v1/passenger/notifications", "passenger_session",
+        examples=["Passenger notifications"]),
 ]}
 
-# --------------------------------------------------- 5 templates -------------
-templates = {"name": "5 · Templates", "item": [
-    req("Get Shift Templates", "GET", "/api/v1/shift/templates", "owner_session",
-        query=[q("group_id", "{{group_id}}")],
-        tests=[
-            "const r = pm.response.json();",
-            "if (r.data && r.data.templates && r.data.templates.length) {",
-            '    pm.environment.set("template_id", r.data.templates[0].id);',
-            '    console.log("templates:", r.data.templates.length);',
-            "}",
-        ],
-        desc=("A template comes back with its stops, its seat plan and its vehicle.\n\n"
-              "This is how a shift is rebuilt: the app fetches a template, prefills the create form "
-              "with it, changes the date, and posts it to POST /api/v1/shift. Exactly the pattern your "
-              "ride templates already use, which is why there is no build from template endpoint.\n\n"
-              "Template seats point at their stop by sequence rather than by id, so a template stays "
-              "valid for a brand new shift.")),
+# ---------------------------------------------------------- 8 ride share ----
+ride_body = {
+    "startDatetime": "{{ride_date}} 12:00:00", "estimatedEndDatetime": "{{ride_date}} 13:00:00",
+    "numberOfSeats": 3, "startLocation": "Location A", "endLocation": "Location B",
+    "routePoints": ["LocationA1", "LocationA2"], "fare": 20.5, "routeDetails": "Via Highway 1",
+    "vehicleId": "{{vehicle_id}}", "makeTemplate": True, "isRecurring": False,
+    "frequency": 1, "period": 1, "daysOfWeek": [1],
+}
 
-    req("Delete Shift Template", "DELETE", "/api/v1/shift/template", "owner_session",
-        query=[q("shift_template_id", "{{template_id}}")],
-        desc="Deletes the template with its stops and seats. Needs shift.manage_templates."),
-]}
-
-
-# ----------------------------------------------------- 6 rideshare ----------
-# The existing carpool feature. Only one line of it changed for the fleet work,
-# the clash check, but its saved responses had drifted from what the server
-# actually returns, so they are recaptured here.
-rideshare = {"name": "6 · Rideshare (existing carpool)", "item": [
-    req("Create Ride", "POST", "/api/v1/ride/create", "owner_session",
-        body={
-            "startDatetime": "2026-09-15 15:30:00", "estimatedEndDatetime": "2026-09-15 17:00:00",
-            "numberOfSeats": 3, "startLocation": "Location A", "endLocation": "Location B",
-            "routePoints": ["LocationA1", "LocationA2"], "fare": 20.5,
-            "routeDetails": "Via Highway 1", "vehicleId": "{{owner_vehicle_id}}",
-            "makeTemplate": True, "isRecurring": False, "frequency": 1, "period": 1,
-            "daysOfWeek": [1],
-        },
+rideshare = {"name": "8 · Ride Share", "item": [
+    req("Create Ride", "POST", "/api/v1/ride/create", "owner_session", body=ride_body,
         tests=save("ride_id", "r.data.id"),
-        desc=("Unchanged except for one added guard: the vehicle and the driver are now also "
-              "checked against the fleet shifts, so a carpool ride cannot be created on top of a "
-              "shift. The second saved response shows that refusal.")),
-
-    req("Driver Rides", "GET", "/api/v1/driver/rides", "owner_session",
-        query=[q("page", "1"), q("status", "all")]),
-
-    req("Get One Ride", "GET", "/api/v1/ride", "open_token",
-        query=[q("ride_id", "{{ride_id}}")]),
-
-    req("Filtered Rides", "GET", "/api/v1/ride/filtered", "open_token",
-        query=[q("page", "1"), q("search", "LocationA1")]),
-
-    req("Ride Templates", "GET", "/api/v1/ride/templates", "owner_session"),
+        desc=("A ride goes on the driver's own vehicle and never offers more seats than it has. A vehicle whose "
+              "seats were never recorded keeps working as before until they are. The driver cannot be on "
+              "another ride at the same time on any vehicle, the vehicle cannot carry another ride, and "
+              "neither can be on a shift trip. A recurring series is checked date by date, against "
+              "everything already booked and against its own rides, before anything is written, and one "
+              "clashing date refuses the whole series and names that date. Touching times do not overlap."),
+        examples=["Create carpool ride", "Ride with more seats than the vehicle (refused)",
+                  "Ride on another driver's vehicle (refused)", "Ride on top of a shift trip (refused)",
+                  "Overlapping ride on the same vehicle (refused)",
+                  "Same driver on another vehicle at the same time (refused)", "Ride right after another ride",
+                  "Recurring series landing on a ride (refused)", "The refused series left nothing behind",
+                  "Recurring series landing on a shift trip (refused)",
+                  "Recurring series that runs into itself (refused)", "Create a recurring ride series",
+                  "Vehicle owner's ride on top of their vehicle's shift (refused)"]),
 
     req("Update Ride", "PATCH", "/api/v1/driver/ride/update", "owner_session",
-        query=[q("ride_id", "{{ride_id}}")],
-        body={"numberOfSeats": 2}),
+        query=[q("ride_id", "{{ride_id}}")], body={"numberOfSeats": 2},
+        desc=("Only the driver of the ride. Seats stay between the seats already booked and the vehicle's seats. "
+              "status inactive cancels the ride through the cancellation guards and archives it. status active "
+              "only matters for a ride the worker closed: one that has ended stays closed, and one still ahead "
+              "must not clash with anything the driver or vehicle took on meanwhile. An empty status changes nothing."),
+        examples=["Update ride seats", "Update ride above the vehicle (refused)", "Update somebody else's ride (refused)",
+                  "Empty status leaves the ride alone", "Cancel a ride"]),
 
+    req("Driver Rides", "GET", "/api/v1/driver/rides", "owner_session",
+        query=[q("page", "1"), q("status", "all")], examples=["Driver rides"]),
+    req("Get One Ride", "GET", "/api/v1/ride", "open_token", query=[q("ride_id", "{{ride_id}}")],
+        tests=save("ride_code", "r.data.ride.code"),
+        examples=["Get one ride", "Get a ride series", "The ride is still active"]),
+    req("Filtered Rides", "GET", "/api/v1/ride/filtered", "open_token",
+        query=[q("page", "1"), q("search", "LocationA1"),
+               q("start_time", "{{ride_date}} 00:00:00"), q("estimated_end_time", "{{ride_date}} 23:59:59")],
+        desc="Without start_time and estimated_end_time the search covers the next seven days only.",
+        examples=["Filtered rides"]),
+    req("Ride Templates", "GET", "/api/v1/ride/templates", "owner_session",
+        tests=save_from_list("ride_template_id", "r.data", "rideId", "ride_id", "id"),
+        examples=["Ride templates"]),
+    req("Delete Ride Template", "DELETE", "/api/v1/ride/template", "owner_session",
+        query=[q("ride_template_id", "{{ride_template_id}}")], examples=["Delete ride template"]),
     req("Passenger Ride Request", "POST", "/api/v1/passenger/ride/request", "open_token",
-        body={
-            "startDatetime": "2026-09-15 15:30:00", "estimatedEndDatetime": "2026-09-15 17:00:00",
-            "numberOfSeats": 2, "startLocation": "Location A", "endLocation": "Location B",
-            "routeDetails": "via gt road", "contactNumber": "+923301221121",
-        }),
-
+        body={"startDatetime": "{{ride_date}} 15:30:00", "estimatedEndDatetime": "{{ride_date}} 17:00:00",
+              "numberOfSeats": 2, "startLocation": "Location A", "endLocation": "Location B",
+              "routeDetails": "via gt road", "contactNumber": "+923301221121"},
+        tests=save("ride_request_id", "r.data.requestId"), examples=["Passenger ride request"]),
+    req("Get A Posted Ride Request", "GET", "/api/v1/ride/request", "open_token",
+        query=[q("request_id", "{{ride_request_id}}")],
+        desc="request_id accepts the id or the short code from the openUrl above.",
+        examples=["Get a posted ride request"]),
     req("Get Ride Requests", "GET", "/api/v1/driver/ride/requests", "owner_session",
-        query=[q("page", "1")]),
+        query=[q("page", "1")], examples=["Get ride requests"]),
+    req("Get Announcements", "GET", "/api/v1/announcements", "open_token", examples=["Get announcements"]),
+    req("Driver Notifications", "GET", "/api/v1/user/notifications", "owner_session",
+        examples=["Driver notifications"]),
 
-    req("Get Announcements", "GET", "/api/v1/announcements", "open_token"),
+    req("Driver Books A Seat For A Phone Caller", "POST", "/api/v1/driver/seat/book", "owner_session",
+        body={"rideId": "{{ride_id}}", "name": "Phone Caller", "mobileNumber": "+923001112233",
+              "code": "{{ride_code}}", "seats": 1, "isBook": True},
+        desc=("The older way to fill a ride board post: someone calls the driver directly, and the driver enters "
+              "the booking on their behalf. code is the ride's own code, read off Get One Ride. Send isBook "
+              "false with the same body to release the seat again."),
+        tests=save("driver_booking_id", "r.data.bookingId"),
+        examples=["Driver books a seat for a phone caller"]),
+    req("Driver's Bookings On A Ride", "GET", "/api/v1/driver/bookings", "owner_session",
+        query=[q("ride_id", "{{ride_id}}")], examples=["Driver's bookings on the ride"]),
+    req("Reserve (Confirm) A Booking", "GET", "/api/v1/driver/booking/reserve", "owner_session",
+        query=[q("booking_id", "{{driver_booking_id}}")], examples=["Reserve (confirm) a booking"]),
+    req("Passenger Books A Seat Directly", "POST", "/api/v1/passenger/seat/book", "open_token",
+        body={"rideId": "{{ride_id}}", "name": "Direct Rider", "mobileNumber": "+923001112244",
+              "seats": 1, "code": "{{ride_code}}"},
+        desc="The open-board equivalent: a rider with the ride's code books straight from the app, no phone call needed.",
+        examples=["Passenger books a seat directly"]),
+    req("Rate The Driver", "POST", "/api/v1/driver/rate", "open_token",
+        body={"driverId": "{{owner_id}}", "rideId": "{{ride_id}}", "mobileNumber": "+923001112244", "rating": 5},
+        desc="Left after a ride. Public because the rider who is rating may not hold a driver session.",
+        examples=["Rate the driver"]),
 
-    req("Driver Notifications", "GET", "/api/v1/user/notifications", "owner_session"),
+    req("Cancel Ride Series", "DELETE", "/api/v1/ride/series", "owner_session",
+        query=[q("ride_id", "{{ride_id}}")],
+        desc=("Cancels every ride of the series the given ride belongs to, the parent and all its repeats. Rides "
+              "with bookings or starting within the cancellation window are skipped with the reason. Kept last "
+              "in this folder because it cancels the ride the requests above use."),
+        examples=["Cancel the ride series"]),
+]}
 
-    req("Admin · List Rides", "GET", "/api/v1/admin/rides", "admin_session",
-        query=[q("page", "1")]),
+# ------------------------------------------------ 9 account lifecycle ----
+# a throwaway driver and passenger, kept separate from the accounts every other
+# folder depends on, so deleting them here never breaks a request that runs later
+lifecycle = {"name": "9 · Account Lifecycle & Support", "item": [
+    req("Lifecycle Driver · Register", "POST", "/api/v1/driver/register", "open_token",
+        body={"deviceId": "lc", "mobile": "+923400000008", "name": "Lifecycle Driver",
+              "password": "Golang@12122", "gender": "male"},
+        desc="A disposable account used only to demonstrate the self-service calls below.",
+        examples=["Lifecycle driver · Register"]),
+    req("Resend OTP", "POST", "/api/v1/otp/resend", "open_token",
+        query=[q("mobile_number", "+923400000008"), q("otp_operation", "ACTIVATE_DRIVER")],
+        desc="Issues a fresh code for the same operation; the one from registration no longer verifies.",
+        tests=save("lifecycle_otp", "r.data.tempOTP"), examples=["Resend OTP"]),
+    req("Lifecycle Driver · Verify OTP", "POST", "/api/v1/otp/verify", "open_token",
+        body={"mobile": "+923400000008", "otp": "{{lifecycle_otp}}", "operation": "ACTIVATE_DRIVER"},
+        examples=["Lifecycle driver · Verify OTP"]),
+    req("Lifecycle Driver · Login", "POST", "/api/v1/driver/login", "open_token",
+        body={"deviceId": "lc", "mobile": "+923400000008", "password": "Golang@12122"},
+        tests=save("lifecycle_driver_session", "r.data.sessionId"), examples=["Lifecycle driver · Login"]),
+    req("Lifecycle Driver · Set Pin", "POST", "/api/v1/driver/pin", "lifecycle_driver_session",
+        query=[q("pin", "151515")], examples=["Lifecycle driver · Set pin"]),
 
-    req("Admin · List Drivers", "GET", "/api/v1/admin/drivers", "admin_session",
-        query=[q("page", "1")]),
+    req("Driver · Forgot Password", "GET", "/api/v1/driver/password/forgot", "open_token",
+        query=[q("mobile_number", "+923400000008")],
+        desc=("Always 200 whether or not the number is registered, so a caller can't probe for accounts by it. "
+              "Sends a confirmation OTP — nothing changes yet."),
+        tests=save("lifecycle_reset_otp", "r.data.tempOTP"), examples=["Driver · Forgot password"]),
+    req("Driver · Confirm The New Password", "POST", "/api/v1/otp/verify", "open_token",
+        body={"mobile": "+923400000008", "otp": "{{lifecycle_reset_otp}}",
+              "operation": "FORGOT_PASSWORD", "password": "Golang@12123"},
+        desc="The new password travels with this call — nothing was cached by Forgot Password above.",
+        examples=["Driver · Confirm the new password"]),
 
-    req("Admin · List Vehicles", "GET", "/api/v1/admin/vehicles", "admin_session",
-        query=[q("page", "1")],
-        desc="Now carries numberOfSeats, hasAC and hasHeating, and its totalPages is correct (it used to count a query that already had the page limit applied)."),
+    req("Driver · Change Password, Wrong Current One", "POST", "/api/v1/driver/password/reset",
+        "lifecycle_driver_session",
+        body={"oldPassword": "not the real password", "newPassword": "Golang@12124"},
+        desc="Authenticated, needs the current password. This one is wrong, so no OTP is even sent.",
+        examples=["Driver · Change password, wrong current one (refused)"]),
+    req("Driver · Change Password", "POST", "/api/v1/driver/password/reset", "lifecycle_driver_session",
+        body={"oldPassword": "Golang@12123", "newPassword": "Golang@12124"},
+        desc="Correct current password: sends a confirmation OTP. The password is still the old one until it's verified.",
+        tests=save("lifecycle_reset_otp", "r.data.tempOTP"), examples=["Driver · Change password"]),
+    req("Driver · Confirm The Password Change", "POST", "/api/v1/otp/verify", "open_token",
+        body={"mobile": "+923400000008", "otp": "{{lifecycle_reset_otp}}", "operation": "UPDATE_PASSWORD"},
+        desc="No password in the body this time — the new one was already cached by Change Password above.",
+        examples=["Driver · Confirm the password change"]),
+
+    req("Driver · Forgot Pin", "GET", "/api/v1/driver/pin/forgot", "open_token",
+        query=[q("mobile_number", "+923400000008")],
+        tests=save("lifecycle_reset_otp", "r.data.tempOTP"), examples=["Driver · Forgot pin"]),
+    req("Driver · Confirm The New Pin", "POST", "/api/v1/otp/verify", "open_token",
+        body={"mobile": "+923400000008", "otp": "{{lifecycle_reset_otp}}", "operation": "FORGOT_PIN", "pin": "161616"},
+        examples=["Driver · Confirm the new pin"]),
+    req("Driver · Change Pin", "POST", "/api/v1/driver/pin/reset", "lifecycle_driver_session",
+        body={"oldPin": "161616", "newPin": "171717"},
+        tests=save("lifecycle_reset_otp", "r.data.tempOTP"), examples=["Driver · Change pin"]),
+    req("Driver · Confirm The Pin Change", "POST", "/api/v1/otp/verify", "open_token",
+        body={"mobile": "+923400000008", "otp": "{{lifecycle_reset_otp}}", "operation": "UPDATE_PIN"},
+        examples=["Driver · Confirm the pin change"]),
+
+    req("Driver · Deactivate/Reactivate Own Profile", "PATCH", "/api/v1/driver/status", "lifecycle_driver_session",
+        query=[q("status", "inactive"), q("pin", "171717")],
+        desc="Self-service, distinct from an admin suspension — send status active to switch back on.",
+        examples=["Driver · Deactivate own profile", "Driver · Reactivate own profile"]),
+
+    req("Lifecycle Passenger · Register", "POST", "/api/v1/passenger/register", "open_token",
+        body={"deviceId": "lcp", "mobile": "+923400000009", "name": "Lifecycle Passenger",
+              "gender": "female", "password": "Golang@12122"},
+        tests=save("lifecycle_passenger_otp", "r.data.tempOTP"), examples=["Lifecycle passenger · Register"]),
+    req("Lifecycle Passenger · Verify OTP", "POST", "/api/v1/otp/verify", "open_token",
+        body={"mobile": "+923400000009", "otp": "{{lifecycle_passenger_otp}}", "operation": "ACTIVATE_PASSENGER"},
+        examples=["Lifecycle passenger · Verify OTP"]),
+    req("Lifecycle Passenger · Login", "POST", "/api/v1/passenger/login", "open_token",
+        body={"deviceId": "lcp", "mobile": "+923400000009", "password": "Golang@12122"},
+        tests=save("lifecycle_passenger_session", "r.data.sessionId"), examples=["Lifecycle passenger · Login"]),
+    req("Passenger · Change Password", "POST", "/api/v1/passenger/password/reset", "lifecycle_passenger_session",
+        body={"oldPassword": "Golang@12122", "newPassword": "Golang@12123"},
+        desc="Two-step like the driver's: a confirmation OTP first, nothing changes until it's verified.",
+        tests=save("lifecycle_passenger_reset_otp", "r.data.tempOTP"), examples=["Passenger · Change password"]),
+    req("Passenger · Confirm The Password Change", "POST", "/api/v1/otp/verify", "open_token",
+        body={"mobile": "+923400000009", "otp": "{{lifecycle_passenger_reset_otp}}",
+              "operation": "PASSENGER_UPDATE_PASSWORD"},
+        examples=["Passenger · Confirm the password change"]),
+    req("Passenger · Delete Own Profile", "DELETE", "/api/v1/passenger/delete", "lifecycle_passenger_session",
+        examples=["Passenger · Delete own profile"]),
+    req("Driver · Delete Own Profile", "DELETE", "/api/v1/driver/delete", "lifecycle_driver_session",
+        query=[q("pin", "171717")], examples=["Driver · Delete own profile"]),
+
+    req("Get In Touch", "POST", "/api/v1/approach", "open_token",
+        body={"name": "Interested Fleet Owner", "number": "+923001234599", "email": "owner@example.com",
+              "message": "We run 12 vans in Lahore, interested in Pick & Drop", "type": "contact"},
+        desc="Public contact form, unrelated to any account — type is contact or complain.",
+        examples=["Get in touch"]),
 ]}
 
 collection = {
     "info": {
         "_postman_id": "b7c41f02-5e6a-4d38-9c11-3a7f0e2b4d91",
-        "name": "SathSawari · Shift Management",
+        "name": "SathSawari · Pick & Drop and Shifts",
         "description": (
-            "Every endpoint added by the group / fleet shift management feature, in the order you "
-            "would actually exercise them.\n\n"
+            "Pick & Drop services, their recurring shifts, and the ride share rules they share, in the order "
+            "you would actually exercise them.\n\n"
+            "Pick & Drop and shifts are two different things: a driver enables a Pick & Drop service and "
+            "becomes its only owner, and the owner builds shifts, the recurring trips of that service.\n\n"
             "SETUP\n"
-            "1. Use the same environment as your existing Rideshare collection, it needs base-url and "
-            "open_token.\n"
-            "2. Run the folders top to bottom. Almost every id is captured into an environment "
-            "variable by a test script, so the flow chains on its own.\n"
-            "3. The OTPs come back in the response as tempOTP while you are not on production, so the "
-            "verify steps chain automatically too.\n\n"
+            "1. Use the same environment as your existing Rideshare collection, it needs base-url and open_token.\n"
+            "2. Run the folders top to bottom. Ids are captured into environment variables by test scripts.\n"
+            "3. OTPs come back as tempOTP while you are not on production, so verification chains too.\n"
+            "4. The dates come from the collection variables start_date, end_date and ride_date, change them "
+            "if they have passed. Dates are YYYY-MM-DD, times HH:MM, days of week 1 (Monday) to 7 (Sunday), "
+            "all in Pakistan time.\n\n"
             "TOKENS USED\n"
             "  open_token          public endpoints\n"
-            "  admin_session       admin, roles and permissions\n"
-            "  owner_session       the driver who owns the fleet, ie the manager\n"
-            "  driver2_session     a second driver, later a sub manager\n"
-            "  passenger_session   a female passenger\n"
-            "  passenger2_session  a male passenger\n\n"
-            "Folder 4 contains two requests that are MEANT to fail, they are the proof of the clash "
-            "and gender rules. Each one says so in its description."
+            "  admin_session       admin console\n"
+            "  owner_session       the driver who owns the Pick & Drop service\n"
+            "  driver2_session     a driver who joins the service\n"
+            "  driver3_session     a driver who joins with vehicles only\n"
+            "  passenger_session   Ayesha, a passenger\n"
+            "  passenger2_session  Bilal, a passenger\n"
+            "  passenger3_session  Sana, a passenger who is turned away\n\n"
+            "Every request carries the real responses recorded by tools/flow_test.py, the success and every "
+            "refusal that proves one of its rules. Requests whose description starts MEANT TO FAIL are there "
+            "to show a rule refusing."
         ),
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     },
-    "item": [admin, accounts, form, group, shifts, templates, rideshare],
+    "item": [admin, accounts, owner, member, passenger, shifts_owner, shifts_driver, shifts_passenger, rideshare,
+             lifecycle],
     "variable": [
         {"key": "base-url", "value": "http://localhost:8080", "type": "string"},
+        {"key": "start_date", "value": START_DATE, "type": "string"},
+        {"key": "end_date", "value": END_DATE, "type": "string"},
+        {"key": "ride_date", "value": RIDE_DATE, "type": "string"},
     ],
 }
 

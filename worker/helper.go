@@ -285,15 +285,10 @@ func sendDriverBroadcast(ginCtx *gin.Context, sessionId string, req postgress.Br
 	}
 }
 
-// closeCompletedShifts retires shifts whose window has passed. Rides have always
-// been closed this way and shifts were left running for ever, which left finished
-// trips sitting in every "upcoming" list.
-//
-// Unlike the ride sweep this is a single statement rather than a row at a time,
-// since a busy fleet produces far more shifts than one driver produces rides.
-func closeCompletedShifts() {
-	sessionId := constants.WROKER_SESSION
-	logger.LogInfo("Request received in closeCompletedShifts", sessionId)
+// runShiftSchedule is one tick of the shift scheduler. Every step is a set based
+// statement, however many shifts there are, and every step is safe to run twice.
+func runShiftSchedule(ginCtx *gin.Context, sessionId string) {
+	logger.LogInfo("Request received in runShiftSchedule", sessionId)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -301,23 +296,149 @@ func closeCompletedShifts() {
 		}
 	}()
 
-	pkt := time.FixedZone("PKT", 5*60*60)
-	now := time.Now().In(pkt).Format(constants.DateTimeLayout)
+	db := database.DatabaseConn.Postgres
+	today := database.BusinessToday()
 
-	result := database.DatabaseConn.Postgres.
-		Model(&postgress.Shift{}).
-		Where("is_active = ?", true).
-		Where("estimated_end_datetime <= ?", now).
-		Update("is_active", false)
-
-	if result.Error != nil {
-		logger.LogError(sessionId, result.Error)
-		return
+	// trips are written before finished shifts are retired, and a day back as well as
+	// a day ahead, so the last trip of a shift is still recorded even if the worker
+	// was down when it ran
+	if err := database.MaterializeOccurrences(db,
+		database.AddDays(today, -constants.Occurrence_Backfill_Days),
+		database.AddDays(today, constants.Occurrence_Horizon_Days), ""); err != nil {
+		logger.LogError(sessionId, "failed to write the upcoming trips error: "+err.Error())
 	}
 
-	if result.RowsAffected > 0 {
-		logger.LogDebug2("closed shifts", sessionId, result.RowsAffected)
+	if err := db.Model(&postgress.Shift{}).
+		Where("status = ?", constants.Shift_Status_Active).
+		Where("end_date <> ''").
+		Where("end_date < ?", today).
+		Update("status", constants.Shift_Status_Completed).Error; err != nil {
+		logger.LogError(sessionId, "failed to retire the finished shifts error: "+err.Error())
 	}
 
-	logger.LogInfo("Response returned from closeCompletedShifts", sessionId)
+	if err := db.Model(&postgress.ShiftOccurrence{}).
+		Where("status = ?", constants.Occurrence_Status_Scheduled).
+		Where("ends_at <= ?", database.BusinessNowMinute()).
+		Update("status", constants.Occurrence_Status_Completed).Error; err != nil {
+		logger.LogError(sessionId, "failed to complete the finished trips error: "+err.Error())
+	}
+
+	sendShiftReminders(ginCtx, sessionId)
+
+	logger.LogInfo("Response returned from runShiftSchedule", sessionId)
+}
+
+// sendShiftReminders tells the driver and every passenger travelling that a trip
+// starts within fifteen minutes. Each reminder is claimed by an atomic update of its
+// own row before it is sent, the driver's on the occurrence and each passenger's on
+// their attendance, so a retried tick or a second worker finds nothing left to claim
+// and nobody is ever reminded twice for one trip. An absent passenger is not reminded.
+func sendShiftReminders(ginCtx *gin.Context, sessionId string) {
+	now := database.BusinessNow()
+	nowMinute := now.Format(constants.Minute_Datetime_Layout)
+	soon := now.Add(time.Duration(constants.Shift_Reminder_Minutes) * time.Minute).Format(constants.Minute_Datetime_Layout)
+
+	type driverReminder struct {
+		ID             string
+		ShiftID        string
+		ServiceID      string
+		DriverID       string
+		ShiftName      string
+		ServiceName    string
+		OccurrenceDate string
+		StartTime      string
+		VehicleNumber  string
+		Route          string
+	}
+
+	var drivers []driverReminder
+	if err := database.DatabaseConn.Postgres.Raw(`
+		UPDATE shift_occurrences
+		SET driver_reminder_at = now()
+		WHERE status = ?
+		  AND starts_at > ?
+		  AND starts_at <= ?
+		  AND driver_reminder_at IS NULL
+		RETURNING id, shift_id, service_id, driver_id, shift_name, service_name, occurrence_date, start_time, vehicle_number, route
+	`, constants.Occurrence_Status_Scheduled, nowMinute, soon).Scan(&drivers).Error; err != nil {
+		logger.LogError(sessionId, "failed to claim the driver reminders error: "+err.Error())
+	}
+
+	type passengerReminder struct {
+		PassengerID    string
+		Location       string
+		LocationTime   string
+		ShiftID        string
+		ServiceID      string
+		ShiftName      string
+		ServiceName    string
+		OccurrenceDate string
+		StartTime      string
+		DriverName     string
+		VehicleNumber  string
+	}
+
+	var passengers []passengerReminder
+	if err := database.DatabaseConn.Postgres.Raw(`
+		UPDATE shift_attendances
+		SET reminder_at = now()
+		FROM shift_occurrences
+		WHERE shift_occurrences.id = shift_attendances.occurrence_id
+		  AND shift_occurrences.status = ?
+		  AND shift_occurrences.starts_at > ?
+		  AND shift_occurrences.starts_at <= ?
+		  AND shift_attendances.status = ?
+		  AND shift_attendances.reminder_at IS NULL
+		RETURNING shift_attendances.passenger_id, shift_attendances.location, shift_attendances.location_time,
+			shift_occurrences.shift_id, shift_occurrences.service_id, shift_occurrences.shift_name,
+			shift_occurrences.service_name, shift_occurrences.occurrence_date, shift_occurrences.start_time,
+			shift_occurrences.driver_name, shift_occurrences.vehicle_number
+	`, constants.Occurrence_Status_Scheduled, nowMinute, soon, constants.Attendance_Present).Scan(&passengers).Error; err != nil {
+		logger.LogError(sessionId, "failed to claim the passenger reminders error: "+err.Error())
+	}
+
+	shiftName := func(name string) string {
+		if strings.TrimSpace(name) == "" {
+			return "unnamed shift"
+		}
+		return name
+	}
+
+	reminderData := func(shiftId, serviceId, date string) map[string]string {
+		return map[string]string{
+			constants.NOTIFICATION_KEY_SHIFT_ID:        shiftId,
+			constants.NOTIFICATION_KEY_SERVICE_ID:      serviceId,
+			constants.NOTIFICATION_KEY_OCCURRENCE_DATE: date,
+		}
+	}
+
+	for _, reminder := range drivers {
+		var stops []struct {
+			Location string `json:"location"`
+		}
+
+		firstStop := ""
+		if err := json.Unmarshal([]byte(reminder.Route), &stops); err == nil && len(stops) > 0 {
+			firstStop = stops[0].Location
+		}
+
+		message := fmt.Sprintf(constants.NOTIFICATION_MESSAGE_SHIFT_REMINDER_DRIVER,
+			shiftName(reminder.ShiftName), reminder.ServiceName, reminder.StartTime, firstStop, reminder.VehicleNumber)
+
+		utils.SendUserNotification(ginCtx, sessionId, constants.NOTIFICATION_TYPE_SHIFT_REMINDER, reminder.DriverID, constants.User_Driver,
+			constants.NOTIFICATION_TITLE_SHIFT_REMINDER, message, reminderData(reminder.ShiftID, reminder.ServiceID, reminder.OccurrenceDate))
+	}
+
+	for _, reminder := range passengers {
+		message := fmt.Sprintf(constants.NOTIFICATION_MESSAGE_SHIFT_REMINDER_RIDER,
+			shiftName(reminder.ShiftName), reminder.ServiceName, reminder.StartTime,
+			reminder.Location, reminder.LocationTime, reminder.DriverName, reminder.VehicleNumber)
+
+		utils.SendUserNotification(ginCtx, sessionId, constants.NOTIFICATION_TYPE_SHIFT_REMINDER, reminder.PassengerID, constants.User_Passenger,
+			constants.NOTIFICATION_TITLE_SHIFT_REMINDER, message, reminderData(reminder.ShiftID, reminder.ServiceID, reminder.OccurrenceDate))
+	}
+
+	if len(drivers)+len(passengers) > 0 {
+		logger.LogDebug2("sent shift reminders", sessionId, fmt.Sprintf("drivers: %d, passengers: %d", len(drivers), len(passengers)))
+	}
 }

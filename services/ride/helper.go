@@ -84,28 +84,123 @@ func mapRideToRideTemplateData(request RideCreationRequest, rideId, driverId, ve
 	}
 }
 
-func VehicleHasRideDuringTime(
-	vehicleID string,
-	startTime string,
-	endTime string,
-) (bool, error) {
-
-	var count int64
-
-	err := database.DatabaseConn.Postgres.Model(&postgress.Ride{}).
-		Where("vehicle_id = ?", vehicleID).
-		Where("is_active = ?", true).
-		Where(`
-			start_datetime < ?
-			AND estimated_end_datetime > ?
-		`, endTime, startTime).
-		Count(&count).Error
-
+// rideSlots lays out every ride a request puts on the calendar: the ride itself first,
+// then for a recurring request each repeat in date order, exactly as the series is
+// written.
+func rideSlots(request RideCreationRequest) (slots []database.RideSlot, err error) {
+	start, err := time.ParseInLocation(constants.DateTimeLayout, request.StartDatetime, constants.Business_Location)
 	if err != nil {
-		return false, err
+		return
 	}
 
-	return count > 0, nil
+	end, err := time.ParseInLocation(constants.DateTimeLayout, request.EstimatedEndDatetime, constants.Business_Location)
+	if err != nil {
+		return
+	}
+
+	slots = append(slots, database.RideSlot{Start: start, End: end})
+
+	if !request.IsRecurring {
+		return
+	}
+
+	frequency := findFrequency(request.Frequency, request.Period)
+
+	if request.Period == WEEKLY {
+		// the i-th day after the start, numbered 1 (Monday) to 7 (Sunday), gets a ride
+		// only when it is one of the requested days
+		dayOfWeek := int(start.Weekday()) + 1
+		for i := 1; i <= frequency; i++ {
+			day := ((dayOfWeek - 1) % 7) + 1
+			dayOfWeek++
+
+			if !utils.InSlice(request.DaysOfWeek, day) {
+				continue
+			}
+
+			childStart, childEnd := shiftDailyDates(start, end, i)
+			slots = append(slots, database.RideSlot{Start: childStart, End: childEnd})
+		}
+
+		return
+	}
+
+	for i := 1; i <= frequency; i++ {
+		childStart, childEnd := shiftDailyDates(start, end, i)
+		if request.Period == MONTHLY {
+			childStart, childEnd = shiftMonthlyDates(start, end, i)
+		}
+
+		slots = append(slots, database.RideSlot{Start: childStart, End: childEnd})
+	}
+
+	return
+}
+
+// seriesOverlap finds the first date a series runs into itself. A ride lasting longer
+// than the gap to its next repeat would need the driver and the vehicle twice at once.
+func seriesOverlap(slots []database.RideSlot) (string, bool) {
+	for i := 1; i < len(slots); i++ {
+		if slots[i].Start.Before(slots[i-1].End) {
+			return slots[i].Start.Format(constants.Date_Layout), true
+		}
+	}
+
+	return "", false
+}
+
+// createRides writes a ride and its whole series in one transaction. The driver and
+// the vehicle are locked under the same keys shifts use, then every date is checked
+// against the driver's rides on any vehicle, the vehicle's rides and the shift trips
+// of either, so nothing can take the time between the check and the write, and a
+// series is created whole or not at all.
+func createRides(orgCtx *gin.Context, sessionId string, request RideCreationRequest, vehicleId string, slots []database.RideSlot) (rideId string, err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	err = database.DatabaseConn.Postgres.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if e := database.LockShiftResources(tx, []string{request.EXTDriverId}, []string{vehicleId}, nil); e != nil {
+			return e
+		}
+
+		clash, e := database.FindRideScheduleClash(tx, request.EXTDriverId, vehicleId, slots, "")
+		if e != nil {
+			return e
+		}
+
+		if clash != nil {
+			return utils.Refuse(clash.RideMessage())
+		}
+
+		rides := make([]postgress.Ride, 0, len(slots))
+		for _, slot := range slots {
+			rideRequest := request
+			rideRequest.StartDatetime = slot.Start.Format(constants.DateTimeLayout)
+			rideRequest.EstimatedEndDatetime = slot.End.Format(constants.DateTimeLayout)
+
+			parentId := ""
+			if len(rides) > 0 {
+				parentId = rides[0].ID
+			}
+
+			rides = append(rides, mapRideData(rideRequest, parentId, request.EXTDriverId, vehicleId))
+		}
+
+		if e = tx.Create(&rides).Error; e != nil {
+			return e
+		}
+
+		rideId = rides[0].ID
+
+		return nil
+	})
+
+	if err != nil {
+		err = utils.ClientError(sessionId, err, fmt.Sprintf(constants.Creation_Failed, "ride"))
+	}
+
+	return
 }
 
 func getVehicleById(orgCtx *gin.Context, vehicleId string) (driver postgress.Vehicle, err error) {
@@ -601,7 +696,7 @@ func checkRideDeletionGuards(ride postgress.Ride, now time.Time) (blocked bool, 
 			fmt.Sprintf(Ride_Cancel_Skip_Message_Booked, ride.SeatsTaken)
 	}
 
-	startDate, err := time.ParseInLocation(constants.DateTimeLayout, ride.StartDatetime, time.Local)
+	startDate, err := time.ParseInLocation(constants.DateTimeLayout, ride.StartDatetime, constants.Business_Location)
 	if err != nil {
 		// fail closed: never delete a ride whose start time we can't verify
 		return true, Ride_Cancel_Skip_Reason_Invalid, Ride_Cancel_Skip_Message_Invalid
@@ -614,33 +709,4 @@ func checkRideDeletionGuards(ride postgress.Ride, now time.Time) (blocked bool, 
 	}
 
 	return false, "", ""
-}
-
-// skipRecurringForShift keeps a recurring series off the fleet shifts. The first
-// ride of a series is refused outright when it clashes, but a series lays down many
-// more dates and one of those landing on a shift would put the same vehicle or the
-// same driver in two places at once. A clashing date is skipped rather than failing
-// the whole series, so the rest of the run is still created.
-func skipRecurringForShift(ctx *gin.Context, sessionId, vehicleId, driverId, startDatetime, endDatetime string) bool {
-	hasVehicleShift, err := database.VehicleHasShiftDuringTime(ctx, vehicleId, startDatetime, endDatetime, "")
-	if err != nil {
-		logger.LogError(sessionId, err)
-		return false
-	}
-	if hasVehicleShift {
-		logger.LogWarning(sessionId, "skipping a recurring ride, the vehicle is on a shift at "+startDatetime)
-		return true
-	}
-
-	hasDriverShift, err := database.DriverHasShiftDuringTime(ctx, driverId, startDatetime, endDatetime, "")
-	if err != nil {
-		logger.LogError(sessionId, err)
-		return false
-	}
-	if hasDriverShift {
-		logger.LogWarning(sessionId, "skipping a recurring ride, the driver is on a shift at "+startDatetime)
-		return true
-	}
-
-	return false
 }

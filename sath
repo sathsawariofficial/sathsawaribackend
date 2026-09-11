@@ -2,7 +2,7 @@
 #
 # sath — one command line tool for this backend.
 #
-#   ./sath "add an endpoint that lets a manager swap two shifts"
+#   ./sath "add an endpoint that lets an owner copy a shift to next month"
 #
 # Anything that is not a known subcommand is treated as a prompt and handed to
 # Claude together with this project's standing rules, so the conventions and the
@@ -73,11 +73,35 @@ HOUSE STYLE:
 DELETION — the owner is explicit about this:
 - Anything that matters is copied into its own DEL* archive table before the row
   is deleted. Follow del_drivers, del_vehicles, del_rides, del_passengers,
-  del_passenger_location_preferences and del_roles.
+  del_shifts (+ del_shift_locations), del_pick_drop_advertisements (+ locations),
+  del_shift_requests (+ locations) and del_passenger_availabilities (+ locations).
 - A deletion must never leave a dangling reference. Free the seats, end the
   memberships, or refuse the deletion and say what has to be sorted out first.
-- Prefer a status change over a delete where the history is worth keeping. Shifts
-  and memberships are never hard deleted.
+- Shifts, advertisements and shift requests are archived and then hard deleted.
+  Memberships (pick_drop_drivers, pick_drop_vehicles, pick_drop_passengers) and
+  shift_passengers rows are never deleted, they end with a status, and
+  shift_occurrences and shift_attendances are kept as travel history.
+
+PICK & DROP AND SHIFTS — two different things, never name one after the other:
+- Pick & Drop (services/pickdrop, /api/v1/pickdrop, pick_drop_* tables) is the
+  service a driver enables. It has exactly one owner, no managers, no admin control.
+- A shift (services/shift, /api/v1/shift, shift_* tables) is one recurring trip
+  of a service. Only the owner creates, edits or deletes one.
+- A driver belongs to at most one service, as owner or member; so does a passenger.
+- A member driver joins with joinType driver (can drive shifts, may bring vehicles)
+  or vehicles (belongs only through their vehicles, at least one, is never a shift
+  driver, their vehicles are driven by others and may sit on different shifts).
+- A shift is named after its vehicle number; renaming the vehicle renames it.
+- Shift and shift request searches filter time like the ride search: start_time
+  keeps trips starting at or after it, end_time trips over by then.
+- A driver, vehicle or passenger is never on two shifts whose occurrences overlap,
+  in any service, a driver or vehicle is never on a ride during a shift trip, and a
+  driver (on any vehicle) or a vehicle is never on two rides at once. A recurring
+  ride series is checked whole, against itself too, and one clashing date refuses
+  all of it. Shifts and rides take the same pg_advisory_xact_lock keys per resource,
+  in sorted order, before checking, and only trips still to come count.
+- Times are PKT (database.BusinessNow). Dates YYYY-MM-DD, clock times HH:MM,
+  days of week ISO 1 (Monday) to 7 (Sunday).
 
 PERFORMANCE:
 - No N+1 queries. One joined query or one IN (...) query, never one per item.
@@ -260,8 +284,11 @@ cmd_db() {
         SELECT 'drivers', count(*) FROM drivers
         UNION ALL SELECT 'passengers', count(*) FROM passengers
         UNION ALL SELECT 'vehicles', count(*) FROM vehicles
-        UNION ALL SELECT 'groups', count(*) FROM groups
+        UNION ALL SELECT 'pick_drop_services', count(*) FROM pick_drop_services
         UNION ALL SELECT 'shifts', count(*) FROM shifts
+        UNION ALL SELECT 'shift_occurrences', count(*) FROM shift_occurrences
+        UNION ALL SELECT 'pick_drop_advertisements', count(*) FROM pick_drop_advertisements
+        UNION ALL SELECT 'shift_requests', count(*) FROM shift_requests
         UNION ALL SELECT 'rides', count(*) FROM rides;" | sed 's/|/: /' | sed 's/^/  /'
       ;;
     archives)
@@ -271,27 +298,37 @@ cmd_db() {
         UNION ALL SELECT 'del_vehicles', count(*) FROM del_vehicles
         UNION ALL SELECT 'del_rides', count(*) FROM del_rides
         UNION ALL SELECT 'del_passengers', count(*) FROM del_passengers
-        UNION ALL SELECT 'del_passenger_location_preferences', count(*) FROM del_passenger_location_preferences
-        UNION ALL SELECT 'del_roles', count(*) FROM del_roles;" | sed 's/|/: /' | sed 's/^/  /'
+        UNION ALL SELECT 'del_shifts', count(*) FROM del_shifts
+        UNION ALL SELECT 'del_pick_drop_advertisements', count(*) FROM del_pick_drop_advertisements
+        UNION ALL SELECT 'del_shift_requests', count(*) FROM del_shift_requests
+        UNION ALL SELECT 'del_passenger_availabilities', count(*) FROM del_passenger_availabilities;" | sed 's/|/: /' | sed 's/^/  /'
       ;;
     dangling)
       say "references left pointing at something deleted"
       PGPASSWORD="$pw" psql -h "$dsn_host" -U "$dsn_user" -d "$dsn_db" -tAc "
-        SELECT 'live seats holding a missing passenger', count(*) FROM shift_seats s
-          JOIN shifts sh ON sh.id = s.shift_id AND sh.is_active = true
-          WHERE s.passenger_id <> '' AND NOT EXISTS (SELECT 1 FROM passengers p WHERE p.id = s.passenger_id)
+        SELECT 'active shift passengers who no longer exist', count(*) FROM shift_passengers sp
+          JOIN shifts sh ON sh.id = sp.shift_id AND sh.status = 'active'
+          WHERE sp.status = 'active' AND NOT EXISTS (SELECT 1 FROM passengers p WHERE p.id = sp.passenger_id)
         UNION ALL
-        -- a seat on a finished or cancelled shift naming somebody since deleted is
-        -- history, not a dangling pointer: del_passengers is where the name lives
-        SELECT 'historical seats (expected, resolve via del_passengers)', count(*) FROM shift_seats s
-          JOIN shifts sh ON sh.id = s.shift_id AND sh.is_active = false
-          WHERE s.passenger_id <> '' AND NOT EXISTS (SELECT 1 FROM passengers p WHERE p.id = s.passenger_id)
+        SELECT 'active shifts on a missing vehicle', count(*) FROM shifts sh
+          WHERE sh.status = 'active' AND NOT EXISTS (SELECT 1 FROM vehicles v WHERE v.id = sh.vehicle_id)
         UNION ALL
-        SELECT 'shifts on a missing vehicle', count(*) FROM shifts sh
-          WHERE NOT EXISTS (SELECT 1 FROM vehicles v WHERE v.id = sh.vehicle_id)
+        SELECT 'active shifts with a missing driver', count(*) FROM shifts sh
+          WHERE sh.status = 'active' AND NOT EXISTS (SELECT 1 FROM drivers d WHERE d.id = sh.driver_id)
         UNION ALL
-        SELECT 'groups with a missing owner', count(*) FROM groups g
-          WHERE NOT EXISTS (SELECT 1 FROM drivers d WHERE d.id = g.owner_driver_id);" | sed 's/|/: /' | sed 's/^/  /'
+        SELECT 'occupied seats out of step', count(*) FROM shifts sh
+          WHERE sh.occupied_seats <> (SELECT count(*) FROM shift_passengers sp WHERE sp.shift_id = sh.id AND sp.status = 'active')
+        UNION ALL
+        SELECT 'services with a missing owner', count(*) FROM pick_drop_services s
+          WHERE NOT EXISTS (SELECT 1 FROM drivers d WHERE d.id = s.owner_driver_id)
+        UNION ALL
+        SELECT 'open driver memberships of a missing driver', count(*) FROM pick_drop_drivers m
+          WHERE m.status IN ('pending', 'approved') AND NOT EXISTS (SELECT 1 FROM drivers d WHERE d.id = m.driver_id)
+        UNION ALL
+        -- a trip naming somebody since deleted is history, not a dangling pointer:
+        -- the names were frozen onto the occurrence and del_passengers keeps the rest
+        SELECT 'historical attendance of deleted passengers (expected)', count(*) FROM shift_attendances a
+          WHERE NOT EXISTS (SELECT 1 FROM passengers p WHERE p.id = a.passenger_id);" | sed 's/|/: /' | sed 's/^/  /'
       ;;
     *)
       PGPASSWORD="$pw" psql -h "$dsn_host" -U "$dsn_user" -d "$dsn_db" -c "$q"
@@ -317,9 +354,9 @@ cmd_help() {
 ${B}sath${N} — one tool for the SathSawari backend
 
 ${B}ask it to do something${N}
-  ./sath "add an endpoint that cancels every shift of a group"
-  ./sath "the seat swap should notify the old passenger too"
-  ./sath "update the diagrams for the new admin endpoints"
+  ./sath "add an endpoint that lets an owner pause a shift for a week"
+  ./sath "moving a passenger to another stop should notify them too"
+  ./sath "update the diagrams for the new attendance rules"
 
   Anything that is not a subcommand below is sent to Claude with this project's
   standing rules attached, so it already knows the file layout, the archive rule,

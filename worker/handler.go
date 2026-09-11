@@ -33,14 +33,42 @@ func CloseActiveRidesScheduler() {
 
 	// run once immediately on start
 	closeActiveRides()
-	closeCompletedShifts()
 
 	for {
 		select {
 		case <-ticker.C:
 			closeActiveRides()
-			// a finished shift is retired on the same cadence as a finished ride
-			closeCompletedShifts()
+		}
+	}
+}
+
+// ShiftScheduler keeps shifts moving on the ride closer's cadence: it writes the trips
+// shifts make ahead of the day, retires finished trips and finished shifts, and sends
+// the reminder before each trip starts.
+func ShiftScheduler() {
+	sessionId := constants.WROKER_SESSION
+	logger.LogInfo("Starting ShiftScheduler", sessionId)
+
+	defer func() {
+		if r := recover(); r != nil {
+			logger.LogError(sessionId, fmt.Errorf("panic recovered in scheduler: %v", r))
+		}
+	}()
+
+	ticker := time.NewTicker(
+		time.Duration(configuration.ConfigurationData.General.Tickers.RideCloseScheduler) * time.Second,
+	)
+	defer ticker.Stop()
+
+	ginCtx := utils.GetWorkerGinContext()
+
+	// run once immediately on start
+	runShiftSchedule(ginCtx, sessionId)
+
+	for {
+		select {
+		case <-ticker.C:
+			runShiftSchedule(ginCtx, sessionId)
 		}
 	}
 }

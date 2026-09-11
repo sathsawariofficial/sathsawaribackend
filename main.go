@@ -15,8 +15,8 @@ import (
 	general "rideshare/services/general/rest"
 	general_rest "rideshare/services/general/rest"
 	"rideshare/services/general/socket"
-	"rideshare/services/group"
 	"rideshare/services/passenger"
+	"rideshare/services/pickdrop"
 	"rideshare/services/ride"
 	"rideshare/services/shift"
 	"rideshare/worker"
@@ -95,6 +95,12 @@ func main() {
 				passengerPublic.POST("/login", passenger.LoginPassengerHandler)
 				passengerPublic.GET("/password/forgot", passenger.ForgotPasswordHandler)
 			}
+
+			// Pick & Drop advertisements, searchable by anybody looking for a service
+			pickDropPublic := public.Group("/pickdrop")
+			{
+				pickDropPublic.GET("/advertisements/search", pickdrop.SearchAdvertisementsHandler)
+			}
 		}
 
 		protected := v1.Group("")
@@ -116,29 +122,19 @@ func main() {
 				// moderation: switch an account off rather than destroying it
 				adminProtected.PATCH("/driver/status", admin.UpdateDriverStatusHandler)
 
-				// passengers, invisible to the admin until the fleet feature gave
-				// them real accounts
+				// passenger accounts
 				adminProtected.GET("/passengers", admin.GetPassengersHandler)
 				adminProtected.GET("/passenger", admin.GetPassengerProfileHandler)
 				adminProtected.PATCH("/passenger/status", admin.UpdatePassengerStatusHandler)
 				adminProtected.DELETE("/passenger", admin.DeletePassengerHandler)
 
-				// oversight of the fleets and the shifts they run
-				adminProtected.GET("/groups", admin.GetGroupsHandler)
-				adminProtected.GET("/group", admin.GetGroupDetailsHandler)
-				adminProtected.PATCH("/group/status", admin.UpdateGroupStatusHandler)
+				// Pick & Drop is still run by each service's own owner, the admin
+				// console only ever looks
+				adminProtected.GET("/pickdrop/services", admin.GetPickDropServicesHandler)
+				adminProtected.GET("/pickdrop/service", admin.GetPickDropServiceDetailHandler)
+				adminProtected.GET("/pickdrop/advertisements", admin.GetAdvertisementsHandler)
 				adminProtected.GET("/shifts", admin.GetShiftsHandler)
-				adminProtected.GET("/shift", admin.GetShiftDetailsHandler)
-
-				// role and permission management, an admin can add a new role or
-				// remap what a role may do without a code change
-				adminProtected.POST("/role", admin.CreateRoleHandler)
-				adminProtected.GET("/roles", admin.GetRolesHandler)
-				adminProtected.PATCH("/role", admin.UpdateRoleHandler)
-				adminProtected.DELETE("/role", admin.DeleteRoleHandler)
-				adminProtected.POST("/permission", admin.CreatePermissionHandler)
-				adminProtected.GET("/permissions", admin.GetPermissionsHandler)
-				adminProtected.PUT("/role/permissions", admin.SetRolePermissionsHandler)
+				adminProtected.GET("/shift/requests", admin.GetShiftRequestsHandler)
 			}
 
 			driverProtected := protected.Group("/driver")
@@ -183,40 +179,57 @@ func main() {
 				rideProtected.DELETE("/series", ride.CancelRideSeriesHandler)
 			}
 
-			// the fleet a driver owns or belongs to
-			groupProtected := protected.Group("/group")
-			groupProtected.Use(middleware.Authentication(constants.DRIVER_TOKEN))
+			// the Pick & Drop service a driver owns, or joins as a driver
+			pickDropProtected := protected.Group("/pickdrop")
+			pickDropProtected.Use(middleware.Authentication(constants.DRIVER_TOKEN))
 			{
-				groupProtected.POST("", group.CreateGroupHandler)
-				groupProtected.GET("/mine", group.GetMyGroupsHandler)
-				groupProtected.GET("", group.GetGroupDetailsHandler)
+				pickDropProtected.POST("", pickdrop.EnableServiceHandler)
+				pickDropProtected.GET("", pickdrop.GetMyServiceHandler)
+				pickDropProtected.DELETE("", pickdrop.DisableServiceHandler)
+				pickDropProtected.GET("/search", pickdrop.SearchServicesHandler)
 
-				// how a fleet is found in the first place, and how somebody walks out
-				groupProtected.GET("/search", group.SearchGroupsHandler)
-				groupProtected.DELETE("/leave", group.LeaveGroupAsDriverHandler)
-				groupProtected.POST("/request/driver", group.RequestJoinGroupAsDriverHandler)
-				groupProtected.GET("/requests", group.GetGroupRequestsHandler)
-				groupProtected.PATCH("/requests", group.DecideGroupRequestsHandler)
-				groupProtected.PATCH("/submanagers", group.SetGroupSubManagersHandler)
-				groupProtected.DELETE("", group.DeleteGroupHandler)
+				// the owner's own vehicles, and the vehicles a joining driver offers
+				pickDropProtected.POST("/vehicles", pickdrop.AddServiceVehiclesHandler)
+				pickDropProtected.DELETE("/vehicle", pickdrop.RemoveServiceVehicleHandler)
+				pickDropProtected.POST("/vehicles/offer", pickdrop.OfferVehiclesHandler)
+				pickDropProtected.DELETE("/vehicle/offer", pickdrop.WithdrawVehicleHandler)
 
-				// the travel forms the manager reads while building a shift
-				groupProtected.GET("/passengers/schedules", group.GetGroupPassengerSchedulesHandler)
+				// joining and leaving, and the owner deciding who gets in
+				pickDropProtected.POST("/request", pickdrop.RequestJoinAsDriverHandler)
+				pickDropProtected.DELETE("/leave", pickdrop.LeaveServiceAsDriverHandler)
+				pickDropProtected.GET("/requests", pickdrop.GetJoinRequestsHandler)
+				pickDropProtected.GET("/request", pickdrop.GetJoinRequestHandler)
+				pickDropProtected.PATCH("/requests", pickdrop.DecideJoinRequestsHandler)
+
+				// what the owner builds shifts from
+				pickDropProtected.GET("/drivers/available", pickdrop.GetAvailableDriversHandler)
+				pickDropProtected.GET("/vehicles/available", pickdrop.GetAvailableVehiclesHandler)
+				pickDropProtected.GET("/passengers/available", pickdrop.GetAvailablePassengersHandler)
+
+				// the owner's advertisements
+				pickDropProtected.POST("/advertisement", pickdrop.CreateAdvertisementHandler)
+				pickDropProtected.GET("/advertisements", pickdrop.GetMyAdvertisementsHandler)
+				pickDropProtected.DELETE("/advertisement", pickdrop.DeleteAdvertisementHandler)
 			}
 
-			// building and running the shifts of a fleet
+			// the recurring shifts of a service, built by its owner and driven by
+			// the drivers assigned to them
 			shiftProtected := protected.Group("/shift")
 			shiftProtected.Use(middleware.Authentication(constants.DRIVER_TOKEN))
 			{
 				shiftProtected.POST("", shift.CreateShiftHandler)
-				shiftProtected.PATCH("", shift.RescheduleShiftHandler)
-				shiftProtected.PUT("/seats", shift.UpdateShiftSeatsHandler)
+				shiftProtected.PATCH("", shift.UpdateShiftHandler)
+				shiftProtected.DELETE("", shift.DeleteShiftHandler)
+				shiftProtected.PUT("/passengers", shift.UpdateShiftPassengersHandler)
+				shiftProtected.GET("", shift.GetServiceShiftsHandler)
 				shiftProtected.GET("/detail", shift.GetShiftHandler)
-				shiftProtected.GET("", shift.GetGroupShiftsHandler)
-				shiftProtected.GET("/mine", shift.GetMyShiftsHandler)
-				shiftProtected.DELETE("", shift.CancelShiftHandler)
-				shiftProtected.GET("/templates", shift.GetShiftTemplatesHandler)
-				shiftProtected.DELETE("/template", shift.DeleteShiftTemplateHandler)
+				shiftProtected.GET("/mine", shift.GetDriverShiftsHandler)
+				shiftProtected.GET("/history", shift.GetShiftHistoryHandler)
+				shiftProtected.GET("/passengers/history", shift.GetPassengerHistoryHandler)
+				shiftProtected.GET("/occurrences", shift.GetOccurrencesHandler)
+				shiftProtected.GET("/attendance", shift.GetAttendanceHandler)
+				shiftProtected.POST("/location", shift.SendDriverLocationHandler)
+				shiftProtected.GET("/requests", shift.SearchShiftRequestsHandler)
 			}
 
 			// everything a signed in passenger can reach
@@ -227,16 +240,25 @@ func main() {
 				passengerProtected.GET("/logout", passenger.LogoutPassengerHandler)
 				passengerProtected.POST("/password/reset", passenger.ChangePasswordHandler)
 				passengerProtected.DELETE("/delete", passenger.DeletePassengerProfileHandler)
-				passengerProtected.PUT("/schedule", passenger.SetPassengerScheduleHandler)
-				passengerProtected.GET("/schedule", passenger.GetPassengerScheduleHandler)
+				// a passenger joins one Pick & Drop service and tells it when they travel
+				passengerProtected.GET("/pickdrop/search", pickdrop.SearchServicesHandler)
+				passengerProtected.GET("/pickdrop", pickdrop.GetPassengerMembershipHandler)
+				passengerProtected.POST("/pickdrop/request", pickdrop.RequestJoinAsPassengerHandler)
+				passengerProtected.DELETE("/pickdrop/leave", pickdrop.LeaveServiceAsPassengerHandler)
+				passengerProtected.PUT("/availability", passenger.SetAvailabilityHandler)
+				passengerProtected.GET("/availability", passenger.GetAvailabilityHandler)
 
-				// a passenger asks to join a fleet and follows the shifts they are on
-				passengerProtected.GET("/groups/search", group.SearchGroupsHandler)
-				passengerProtected.GET("/groups", group.GetMyGroupsAsPassengerHandler)
-				passengerProtected.POST("/group/request", group.RequestJoinGroupAsPassengerHandler)
-				passengerProtected.DELETE("/group/leave", group.LeaveGroupAsPassengerHandler)
-				passengerProtected.GET("/shifts", shift.GetMyShiftsHandler)
-				passengerProtected.GET("/shift/detail", shift.GetShiftHandler)
+				// the shifts they are on, their attendance and their travel history
+				passengerProtected.GET("/shifts", shift.GetPassengerShiftsHandler)
+				passengerProtected.GET("/shift/detail", shift.GetPassengerShiftHandler)
+				passengerProtected.GET("/shift/attendance", shift.GetPassengerAttendanceHandler)
+				passengerProtected.PATCH("/shift/attendance", shift.MarkAttendanceHandler)
+				passengerProtected.GET("/shift/history", shift.GetTravelHistoryHandler)
+
+				// the requirements they put out for owners to find
+				passengerProtected.POST("/shift/request", shift.CreateShiftRequestHandler)
+				passengerProtected.GET("/shift/requests", shift.GetMyShiftRequestsHandler)
+				passengerProtected.DELETE("/shift/request", shift.DeleteShiftRequestHandler)
 				passengerProtected.GET("/notifications", general_rest.GetNotificationsHandler)
 			}
 

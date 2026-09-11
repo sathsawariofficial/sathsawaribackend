@@ -38,25 +38,54 @@ const (
 	General_Unknown         = "Unknown %s"
 	Not_Found               = "%s not found"
 
-	// group and shift errors
-	Passenger_Not_Found    = "Unknown passenger"
-	Group_Not_Found        = "Group not found"
-	Shift_Not_Found        = "Shift not found"
-	Role_Not_Found         = "Role not found"
-	Permission_Not_Found   = "Permission not found"
-	Not_Group_Member       = "You are not a member of this group"
-	Already_Group_Member   = "You are already a member of this group"
-	Request_Already_Exists = "A request has already been sent"
-	Seat_Gender_Mismatch   = "Seat %d is reserved for a %s passenger"
-	Seat_Already_Taken     = "Seat %d is already assigned"
-	Driver_Busy            = "Driver already has a ride or a shift scheduled for this duration"
-	Vehicle_Busy           = "Vehicle already has a ride or a shift scheduled for this duration"
-	Vehicle_Seats_Missing  = "Vehicle must have its number of seats set before it can join a group"
-	Not_System_Role        = "System roles cannot be deleted"
-	Owner_Cannot_Leave     = "The owner cannot leave their own group, delete it instead"
-	Passenger_Busy         = "%s is already on another shift starting %s"
-	Shift_In_The_Past      = "A shift cannot be scheduled in the past"
-	Shift_Too_Close        = "This shift starts within %d hour(s) and can no longer be changed"
+	// ride share capacity errors
+	Ride_Seats_Exceed_Vehicle = "Number of seats cannot be more than the vehicle's %d seat(s)"
+	Ride_Seats_Below_Booked   = "Number of seats cannot be less than the %d seat(s) already booked"
+	Ride_Clash                = "%s already has a ride from %s to %s"
+	Ride_Series_Overlap       = "The rides of this series would overlap each other on %s, each ride has to end before the next one starts"
+	Ride_Has_Ended            = "This ride has already ended and cannot be made active again"
+
+	// pick & drop errors
+	Passenger_Not_Found             = "Unknown passenger"
+	Service_Not_Found               = "Pick & Drop service not found"
+	Request_Not_Found               = "Request not found"
+	Advertisement_Not_Found         = "Advertisement not found"
+	Not_Service_Owner               = "Only the owner of a Pick & Drop service can do this"
+	Not_Service_Member              = "You are not a member of a Pick & Drop service"
+	Already_Owns_Service            = "You own a Pick & Drop service, so you cannot start or join another one"
+	Already_In_Service              = "You already belong to a Pick & Drop service, leave it first"
+	Pending_Service_Request         = "You already have a pending Pick & Drop request, withdraw it first"
+	Owner_Cannot_Leave              = "The owner cannot leave their own Pick & Drop service, disable it instead"
+	Vehicle_Already_In_Service      = "Vehicle %s is already offered to a Pick & Drop service"
+	Vehicle_Not_In_Service          = "This vehicle is not part of your Pick & Drop service"
+	Driver_Not_In_Service           = "This driver is not an approved driver of your Pick & Drop service"
+	Passenger_Not_In_Service        = "%s is not an approved passenger of your Pick & Drop service"
+	Advertisement_Limit             = "%d Pick & Drop vehicle(s) allow %d advertisement(s), delete one or add a vehicle first"
+	Service_Has_Active_Shifts       = "This Pick & Drop service still has %d active shift(s), delete them first"
+	On_Active_Shifts                = "%s still assigned to %d active shift(s), remove that assignment first"
+	Request_Already_Decided         = "This request is already %s"
+	Only_Approved_Removable         = "Only an approved member can be removed"
+	Vehicle_Driver_Not_Approved     = "Approve the driver of vehicle %s before the vehicle itself"
+	Vehicles_Join_Needs_Vehicle     = "Joining with vehicles only needs at least one vehicle on offer"
+	Last_Vehicle_Of_Vehicles_Member = "You joined with vehicles only, so your last vehicle cannot be taken out, leave the service instead"
+	Driver_Vehicles_Only            = "%s joined your Pick & Drop service with vehicles only and cannot drive a shift"
+
+	// shift errors
+	Shift_Not_Found           = "Shift not found"
+	Vehicle_Seats_Missing     = "Vehicle %s must have its number of seats set before it can be used for a shift"
+	Vehicle_Capacity_Exceeded = "Vehicle %s has %d seat(s), it cannot carry %d passenger(s)"
+	Resource_Shift_Clash      = "%s is already on the shift %q on %s from %s to %s"
+	Resource_Ride_Clash       = "%s already has a ride from %s to %s that overlaps this shift"
+	Not_Shift_Driver          = "You are not the driver of this shift"
+	Not_Shift_Passenger       = "You are not a passenger of this shift"
+	Not_An_Occurrence         = "This shift does not run on %s"
+	Occurrence_Started        = "This trip has already started"
+	Shift_In_The_Past         = "A shift cannot start in the past"
+	Passenger_Stop_Missing    = "%d passenger(s) are waiting at stop %d, move them before shortening the route"
+	Shift_Not_Active          = "This shift is %s and can no longer be changed"
+	Passenger_Not_On_Shift    = "Passenger %s is not on this shift"
+	Passenger_Already_On      = "%s is already on this shift"
+	End_Date_In_The_Past      = "The end date of a shift cannot be in the past"
 )
 
 // keys
@@ -81,14 +110,17 @@ const (
 	Ride_Template_Key      = "ride_template_id"
 	Language_Key           = "lang"
 	Type_Key               = "type"
-	Group_Key              = "group_id"
 	Shift_Key              = "shift_id"
-	Shift_Template_Key     = "shift_template_id"
-	Role_Key               = "role_id"
-	Permission_Key         = "permission_id"
-	Direction_Key          = "direction"
+	Service_Key            = "service_id"
+	Request_Key            = "request_id"
+	Advertisement_Key      = "advertisement_id"
 	Day_Of_Week_Key        = "day_of_week"
+	Days_Of_Week_Key       = "days_of_week"
 	Date_Key               = "date"
+	Start_Date_Key         = "start_date"
+	End_Date_Key           = "end_date"
+	End_Time_Key           = "end_time"
+	Exclude_Shift_Key      = "exclude_shift_id"
 	Driver_Key             = "driver_id"
 	Passenger_Key          = "passenger_id"
 )
@@ -108,15 +140,22 @@ const (
 
 // notification titles
 const (
-	NOTIFICATION_TITLE_RIDE_CREATION   = "Ride Created"
-	NOTIFICATION_TITLE_PIN_CREATION    = "Pin Created"
-	NOTIFICATION_TITLE_RIDE_BOOKED     = "Ride Booked"
-	NOTIFICATION_TITLE_SMS_TO_SERVICE  = "SathSawari sent an OTP"
-	NOTIFICATION_TITLE_SHIFT_CREATED   = "Shift Scheduled"
-	NOTIFICATION_TITLE_SHIFT_UPDATED   = "Shift Updated"
-	NOTIFICATION_TITLE_SHIFT_CANCELLED = "Shift Cancelled"
-	NOTIFICATION_TITLE_GROUP_REQUEST   = "New Group Request"
-	NOTIFICATION_TITLE_GROUP_DECISION  = "Group Request Update"
+	NOTIFICATION_TITLE_RIDE_CREATION  = "Ride Created"
+	NOTIFICATION_TITLE_PIN_CREATION   = "Pin Created"
+	NOTIFICATION_TITLE_RIDE_BOOKED    = "Ride Booked"
+	NOTIFICATION_TITLE_SMS_TO_SERVICE = "SathSawari sent an OTP"
+
+	NOTIFICATION_TITLE_PICKDROP_REQUEST  = "New Pick & Drop Request"
+	NOTIFICATION_TITLE_PICKDROP_DECISION = "Pick & Drop Request Update"
+	NOTIFICATION_TITLE_PICKDROP_UPDATE   = "Pick & Drop Update"
+	NOTIFICATION_TITLE_SHIFT_CREATED     = "Shift Scheduled"
+	NOTIFICATION_TITLE_SHIFT_UPDATED     = "Shift Updated"
+	NOTIFICATION_TITLE_SHIFT_DELETED     = "Shift Cancelled"
+	NOTIFICATION_TITLE_SHIFT_ASSIGNED    = "Shift Assigned"
+	NOTIFICATION_TITLE_SHIFT_PASSENGER   = "Shift Seat Update"
+	NOTIFICATION_TITLE_SHIFT_ABSENCE     = "Passenger Attendance"
+	NOTIFICATION_TITLE_SHIFT_DRIVER      = "Driver Update"
+	NOTIFICATION_TITLE_SHIFT_REMINDER    = "Shift Starting Soon"
 )
 
 // notification message
@@ -127,20 +166,36 @@ const (
 	NOTIFICATION_MESSAGE_PIN_UPDATED        = "Your pin has been updated, Please do not share it with anyone"
 	NOTIFICATION_MESSAGE_SMS_TO_SERVICE     = "<#> Sathsawari verification code: %s. Do not share this code with anyone.\n%s"
 
-	// shift notifications, they always carry the driver's number and the number of
-	// the manager or sub manager who built the shift so riders know who to contact
-	NOTIFICATION_MESSAGE_SHIFT_PASSENGER = "Your %s shift on %s. Vehicle %s, you are picked from %s at %s. Driver %s (%s). For any issue contact %s (%s)."
-	NOTIFICATION_MESSAGE_SHIFT_DRIVER    = "Your %s shift on %s. Vehicle %s with %d passenger(s), %d stop(s), starting %s. For any issue contact %s (%s)."
-	NOTIFICATION_MESSAGE_SHIFT_CANCELLED = "Your %s shift on %s with vehicle %s has been cancelled. For any issue contact %s (%s)."
+	// pick & drop membership notifications
+	NOTIFICATION_MESSAGE_PICKDROP_JOIN_REQUEST     = "%s has asked to join %s as a %s"
+	NOTIFICATION_MESSAGE_PICKDROP_VEHICLE_OFFER    = "%s has offered %d vehicle(s) to %s"
+	NOTIFICATION_MESSAGE_PICKDROP_APPROVED         = "Your request to join %s has been approved"
+	NOTIFICATION_MESSAGE_PICKDROP_REJECTED         = "Your request to join %s has been rejected"
+	NOTIFICATION_MESSAGE_PICKDROP_REMOVED          = "You have been removed from %s"
+	NOTIFICATION_MESSAGE_PICKDROP_VEHICLE_APPROVED = "Vehicle %s has been approved for %s"
+	NOTIFICATION_MESSAGE_PICKDROP_VEHICLE_REJECTED = "Vehicle %s has been rejected for %s"
+	NOTIFICATION_MESSAGE_PICKDROP_VEHICLE_REMOVED  = "Vehicle %s has been removed from %s"
+	NOTIFICATION_MESSAGE_PICKDROP_VEHICLE_LEFT     = "%s has taken vehicle %s out of %s"
+	NOTIFICATION_MESSAGE_PICKDROP_LEFT             = "%s has left %s"
+	NOTIFICATION_MESSAGE_PICKDROP_WITHDRAWN        = "%s has withdrawn their request to join %s"
+	NOTIFICATION_MESSAGE_PICKDROP_CLOSED           = "%s has been closed by its owner"
 
-	// group membership notifications
-	NOTIFICATION_MESSAGE_GROUP_JOIN_REQUEST = "%s has requested to join your group %s"
-	NOTIFICATION_MESSAGE_GROUP_APPROVED     = "Your request to join the group %s has been approved"
-	NOTIFICATION_MESSAGE_GROUP_REJECTED     = "Your request to join the group %s has been rejected"
-	NOTIFICATION_MESSAGE_GROUP_REMOVED      = "You have been removed from the group %s"
-	NOTIFICATION_MESSAGE_SUBMANAGER_ADDED   = "You are now a sub manager of the group %s"
-	NOTIFICATION_MESSAGE_SUBMANAGER_REMOVED = "You are no longer a sub manager of the group %s"
-	NOTIFICATION_MESSAGE_GROUP_LEFT         = "Someone has left your group %s"
+	// shift notifications
+	NOTIFICATION_MESSAGE_SHIFT_PASSENGER_ADDED    = "You have been added to the shift %s of %s (%s). You are picked from %s at %s. Driver %s, vehicle %s."
+	NOTIFICATION_MESSAGE_SHIFT_PASSENGER_REMOVED  = "You have been removed from the shift %s of %s."
+	NOTIFICATION_MESSAGE_SHIFT_PASSENGER_MOVED    = "Your stop on the shift %s of %s is now %s at %s."
+	NOTIFICATION_MESSAGE_SHIFT_DRIVER_ASSIGNED    = "You are driving the shift %s of %s (%s) from %s to %s with vehicle %s."
+	NOTIFICATION_MESSAGE_SHIFT_DRIVER_UNASSIGNED  = "You are no longer driving the shift %s of %s."
+	NOTIFICATION_MESSAGE_SHIFT_UPDATED            = "The shift %s of %s now runs %s from %s to %s. Driver %s, vehicle %s."
+	NOTIFICATION_MESSAGE_SHIFT_PASSENGERS_CHANGE  = "The passengers of the shift %s of %s have changed, %d of %d seat(s) are now taken."
+	NOTIFICATION_MESSAGE_SHIFT_DELETED            = "The shift %s of %s has been cancelled."
+	NOTIFICATION_MESSAGE_SHIFT_ABSENT             = "%s will be absent from the shift %s on %s (%s at %s)."
+	NOTIFICATION_MESSAGE_SHIFT_PRESENT            = "%s will travel on the shift %s on %s after all (%s at %s)."
+	NOTIFICATION_MESSAGE_SHIFT_DRIVER_UPDATE      = "%s, %s (vehicle %s, shift %s): %s. Sent at %s."
+	NOTIFICATION_MESSAGE_SHIFT_REMINDER_DRIVER    = "Your shift %s of %s starts at %s from %s with vehicle %s."
+	NOTIFICATION_MESSAGE_SHIFT_REMINDER_RIDER     = "Your shift %s of %s starts at %s. Be at %s by %s. Driver %s, vehicle %s."
+	NOTIFICATION_MESSAGE_SHIFT_VEHICLE_ASSIGNED   = "Your vehicle %s is on the shift %s of %s (%s) from %s to %s, driven by %s."
+	NOTIFICATION_MESSAGE_SHIFT_VEHICLE_UNASSIGNED = "Your vehicle %s is no longer on the shift %s of %s."
 )
 
 // genders
@@ -202,25 +257,38 @@ const (
 
 	Ride_Cancel_Min_Hours_Before_Start = 2
 
-	// group and shift limits
-	Group_Name_Min_Len                  = 3
-	Group_Name_Max_Len                  = 100
-	Description_Max_Len                 = 500
-	Role_Name_Min_Len                   = 3
-	Role_Name_Max_Len                   = 50
-	Permission_Code_Min_Len             = 3
-	Permission_Code_Max_Len             = 100
-	Location_Min_Len                    = 1
-	Location_Max_Len                    = 200
-	Shift_Stops_Max_Len                 = 60
-	Bulk_Request_Max_Len                = 100
-	Day_Of_Week_Min_Value               = 1
-	Day_Of_Week_Max_Value               = 7
-	Shift_Cancel_Min_Hours_Before_Start = 2
+	// pick & drop and shift limits
+	Service_Name_Min_Len            = 3
+	Service_Name_Max_Len            = 100
+	Title_Min_Len                   = 3
+	Title_Max_Len                   = 100
+	Description_Max_Len             = 500
+	Location_Min_Len                = 1
+	Location_Max_Len                = 200
+	Bulk_Request_Max_Len            = 100
+	Day_Of_Week_Min_Value           = 1
+	Day_Of_Week_Max_Value           = 7
+	Advertisement_Locations_Min_Len = 2
+	Advertisement_Locations_Max_Len = 10
+	Advertisements_Per_Vehicle      = 2
+	Shift_Request_Locations_Min_Len = 2
+	Shift_Request_Locations_Max_Len = 10
+	Availability_Locations_Max_Len  = 6
+	Shift_Locations_Min_Len         = 2
+	Shift_Locations_Max_Len         = 20
+	Shift_Reminder_Minutes          = 15
+	Occurrence_Backfill_Days        = 1
+	Occurrence_Horizon_Days         = 1
 )
 
 const (
 	DateTimeLayout = "2006-01-02 15:04:05"
+
+	// a pick & drop schedule is a calendar date plus a wall clock time in the
+	// business time zone, kept as sortable strings the same way rides keep theirs
+	Date_Layout            = "2006-01-02"
+	Clock_Layout           = "15:04"
+	Minute_Datetime_Layout = "2006-01-02 15:04"
 )
 
 const (
@@ -231,61 +299,64 @@ const (
 	NO_TOKEN_TYPE   = "no_token_type" // such token whose type dont matter
 )
 
-// shift direction, a pickup and a drop off are always two separate shifts
+// pick & drop membership status, shared by driver, vehicle and passenger rows. A row
+// is never reused, every request is its own row so the membership history survives
 const (
-	Shift_Direction_Pickup = "pickup"
-	Shift_Direction_Drop   = "drop"
+	Membership_Status_Pending   = "pending"
+	Membership_Status_Approved  = "approved"
+	Membership_Status_Rejected  = "rejected"
+	Membership_Status_Withdrawn = "withdrawn"
+	Membership_Status_Left      = "left"
+	Membership_Status_Removed   = "removed"
+	Membership_Status_Closed    = "closed"
+	Membership_Status_All       = "all"
 )
 
-// group membership status, shared by driver, vehicle and passenger membership
+// join request kinds and the decisions an owner can take on them
 const (
-	Membership_Status_Pending  = "pending"
-	Membership_Status_Approved = "approved"
-	Membership_Status_Rejected = "rejected"
-	Membership_Status_Left     = "left"
-	Membership_Status_Removed  = "removed"
+	Request_Type_Driver    = "driver"
+	Request_Type_Vehicle   = "vehicle"
+	Request_Type_Passenger = "passenger"
+
+	Request_Action_Approve = "approve"
+	Request_Action_Reject  = "reject"
+	Request_Action_Remove  = "remove"
+
+	// how a driver belongs to a service: able to drive its shifts, or only through the
+	// vehicles they brought, which other drivers then drive
+	Join_Type_Driver   = "driver"
+	Join_Type_Vehicles = "vehicles"
 )
 
-// how a driver joins a group
+// what the caller is to a pick & drop service
 const (
-	Join_Type_Driver_Only  = "driver_only"
-	Join_Type_Vehicle_Only = "vehicle_only"
-	Join_Type_Both         = "both"
+	Service_Role_Owner     = "owner"
+	Service_Role_Driver    = "driver"
+	Service_Role_Passenger = "passenger"
+	Service_Role_None      = "none"
 )
 
-// member kinds and actions used by the bulk membership decision api
+// shift, shift passenger, occurrence and attendance states
 const (
-	Member_Type_Driver    = "driver"
-	Member_Type_Vehicle   = "vehicle"
-	Member_Type_Passenger = "passenger"
+	Shift_Status_Active    = "active"
+	Shift_Status_Completed = "completed"
+	Shift_Status_Deleted   = "deleted"
+	Shift_Status_All       = "all"
 
-	Membership_Action_Approve = "approve"
-	Membership_Action_Reject  = "reject"
-	Membership_Action_Remove  = "remove"
-)
+	Shift_Passenger_Active  = "active"
+	Shift_Passenger_Removed = "removed"
 
-// shift seat status
-const (
-	Seat_Status_Empty    = "empty"
-	Seat_Status_Assigned = "assigned"
-)
+	Removal_Reason_Owner           = "removed_by_owner"
+	Removal_Reason_Left_Service    = "left_service"
+	Removal_Reason_Removed_Service = "removed_from_service"
+	Removal_Reason_Shift_Deleted   = "shift_deleted"
+	Removal_Reason_Account_Deleted = "account_deleted"
 
-// system roles seeded at boot, admin may add more
-const (
-	ROLE_GROUP_OWNER      = "group_owner"
-	ROLE_GROUP_SUBMANAGER = "group_submanager"
-)
+	Occurrence_Status_Scheduled = "scheduled"
+	Occurrence_Status_Completed = "completed"
 
-// system permissions seeded at boot, admin may add more and remap them to roles
-const (
-	PERMISSION_GROUP_MANAGE_MEMBERS     = "group.manage_members"
-	PERMISSION_GROUP_MANAGE_VEHICLES    = "group.manage_vehicles"
-	PERMISSION_GROUP_MANAGE_SUBMANAGERS = "group.manage_submanagers"
-	PERMISSION_GROUP_DELETE             = "group.delete"
-	PERMISSION_SHIFT_CREATE             = "shift.create"
-	PERMISSION_SHIFT_ASSIGN_SEATS       = "shift.assign_seats"
-	PERMISSION_SHIFT_CANCEL             = "shift.cancel"
-	PERMISSION_SHIFT_MANAGE_TEMPLATES   = "shift.manage_templates"
+	Attendance_Present = "present"
+	Attendance_Absent  = "absent"
 )
 
 // OTP Operations
@@ -314,9 +385,14 @@ const (
 
 // Notifications Key
 const (
-	NOTIFICATION_KEY_RIDE_ID  = "rideId"
-	NOTIFICATION_KEY_SHIFT_ID = "shiftId"
-	NOTIFICATION_KEY_GROUP_ID = "groupId"
+	NOTIFICATION_KEY_RIDE_ID         = "rideId"
+	NOTIFICATION_KEY_SHIFT_ID        = "shiftId"
+	NOTIFICATION_KEY_SERVICE_ID      = "serviceId"
+	NOTIFICATION_KEY_REQUEST_ID      = "requestId"
+	NOTIFICATION_KEY_OCCURRENCE_DATE = "occurrenceDate"
+	NOTIFICATION_KEY_LOCATION        = "location"
+	NOTIFICATION_KEY_LAT             = "lat"
+	NOTIFICATION_KEY_LNG             = "lng"
 )
 
 // deep linking url types

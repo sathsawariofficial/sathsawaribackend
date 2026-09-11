@@ -98,91 +98,18 @@ type AnnouncementRequest struct {
 	Link    string `json:"link"`
 }
 
-// AdminRoleRequest is the body of the admin create role api. A role created by an
-// admin is never a system role.
-type AdminRoleRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
-
-// AdminRoleUpdateRequest is the body of the admin update role api. Both fields are
-// pointers so that a caller can send only the one it wants changed.
-type AdminRoleUpdateRequest struct {
-	Name        *string `json:"name"`
-	Description *string `json:"description"`
-}
-
-// AdminPermissionRequest is the body of the admin create permission api.
-type AdminPermissionRequest struct {
-	Code        string `json:"code"`
-	Description string `json:"description"`
-}
-
-// AdminRolePermissionsRequest is the body of the admin bulk set permissions api, it
-// carries the complete permission set the role should hold after the call.
-type AdminRolePermissionsRequest struct {
-	RoleId        string   `json:"roleId"`
-	PermissionIds []string `json:"permissionIds"`
-}
-
-type AdminPermissionDetail struct {
-	ID          string    `json:"id"`
-	Code        string    `json:"code"`
-	Description string    `json:"description"`
-	IsSystem    bool      `json:"isSystem"`
-	CreatedAt   time.Time `json:"createdAt"`
-}
-
-type AdminRoleDetail struct {
-	ID          string                  `json:"id"`
-	Name        string                  `json:"name"`
-	Description string                  `json:"description"`
-	IsSystem    bool                    `json:"isSystem"`
-	CreatedAt   time.Time               `json:"createdAt"`
-	Permissions []AdminPermissionDetail `json:"permissions"`
-}
-
-type AdminRoleListResponse struct {
-	TotalPages int               `json:"totalPages"`
-	Roles      []AdminRoleDetail `json:"roles"`
-}
-
-type AdminPermissionListResponse struct {
-	TotalPages  int                     `json:"totalPages"`
-	Permissions []AdminPermissionDetail `json:"permissions"`
-}
-
-type AdminRoleCreatedResponse struct {
-	Id string `json:"id"`
-}
-
-type AdminPermissionCreatedResponse struct {
-	Id string `json:"id"`
-}
-
-// adminRolePermissionRow is the scan projection of the single joined query that
-// loads the permissions of a whole page of roles at once, the role id is carried
-// on every row so the rows can be stitched back onto their roles in memory.
-type adminRolePermissionRow struct {
-	RoleID      string    `json:"role_id"`
-	ID          string    `json:"id"`
-	Code        string    `json:"code"`
-	Description string    `json:"description"`
-	IsSystem    bool      `json:"is_system"`
-	CreatedAt   time.Time `json:"created_at"`
-}
-
 // AdminOverviewResponse is the platform at a glance, the first screen of an admin
 // console before drilling into anything.
 type AdminOverviewResponse struct {
-	Drivers    AdminCountPair `json:"drivers"`
-	Passengers AdminCountPair `json:"passengers"`
-	Vehicles   AdminCountPair `json:"vehicles"`
-	Groups     AdminCountPair `json:"groups"`
-	Shifts     AdminCountPair `json:"shifts"`
-	Rides      AdminCountPair `json:"rides"`
-	// requests still waiting on a fleet manager, across every group
-	PendingGroupRequests int64 `json:"pendingGroupRequests"`
+	Drivers             AdminCountPair `json:"drivers"`
+	Passengers          AdminCountPair `json:"passengers"`
+	Vehicles            AdminCountPair `json:"vehicles"`
+	Rides               AdminCountPair `json:"rides"`
+	Services            AdminCountPair `json:"services"`
+	Shifts              AdminCountPair `json:"shifts"`
+	Advertisements      int64          `json:"advertisements"`
+	OpenShiftRequests   int64          `json:"openShiftRequests"`
+	PendingJoinRequests int64          `json:"pendingJoinRequests"`
 }
 
 // AdminCountPair is a total with the slice of it that is currently live, so the
@@ -211,141 +138,128 @@ type AdminPassengerListResponse struct {
 	Passengers []AdminPassengerDetail `json:"passengers"`
 }
 
-type AdminPassengerGroup struct {
-	GroupId   string    `json:"groupId"`
-	GroupName string    `json:"groupName"`
-	Status    string    `json:"status"`
-	JoinedAt  time.Time `json:"joinedAt"`
-}
-
-type AdminSchedulePreference struct {
-	DayOfWeek     int     `json:"dayOfWeek"`
-	Direction     string  `json:"direction"`
-	IsEnabled     bool    `json:"isEnabled"`
-	Location      string  `json:"location"`
-	Lat           float64 `json:"lat"`
-	Lng           float64 `json:"lng"`
-	ScheduledTime string  `json:"scheduledTime"`
-}
-
-// AdminPassengerProfileResponse explains what one account is actually doing: who
-// they ride with and what they asked for.
 type AdminPassengerProfileResponse struct {
-	Passenger   AdminPassengerDetail      `json:"passenger"`
-	Groups      []AdminPassengerGroup     `json:"groups"`
-	TravelForm  []AdminSchedulePreference `json:"travelForm"`
-	TotalGroups int                       `json:"totalGroups"`
+	Passenger AdminPassengerDetail `json:"passenger"`
 }
 
-type AdminGroupDetail struct {
+////////////////////////////// PICK & DROP OVERSIGHT //////////////////////////////
+// Read only: Pick & Drop itself stays run by each service's owner, the admin console
+// only ever looks at it.
+
+// adminShiftFilter narrows a platform-wide shift or shift-request list the same way
+// the owner's own search does: a day of the week, a place or name, a clock window.
+type adminShiftFilter struct {
+	Status    string
+	DayOfWeek int
+	Search    string
+	StartTime string
+	EndTime   string
+}
+
+type AdminServiceSummary struct {
 	ID             string    `json:"id"`
 	Name           string    `json:"name"`
 	Description    string    `json:"description"`
-	Status         string    `json:"status"`
-	OwnerId        string    `json:"ownerDriverId"`
+	OwnerDriverId  string    `json:"ownerDriverId"`
 	OwnerName      string    `json:"ownerName"`
 	OwnerMobile    string    `json:"ownerMobile"`
-	MemberCount    int       `json:"memberCount"`
-	VehicleCount   int       `json:"vehicleCount"`
-	PassengerCount int       `json:"passengerCount"`
-	ShiftCount     int       `json:"shiftCount"`
+	Status         string    `json:"status"`
+	DriverCount    int64     `json:"driverCount"`
+	VehicleCount   int64     `json:"vehicleCount"`
+	PassengerCount int64     `json:"passengerCount"`
+	ShiftCount     int64     `json:"shiftCount"`
 	CreatedAt      time.Time `json:"createdAt"`
 }
 
-type AdminGroupListResponse struct {
-	TotalPages int                `json:"totalPages"`
-	Groups     []AdminGroupDetail `json:"groups"`
+type AdminServicesResponse struct {
+	TotalPages int                   `json:"totalPages"`
+	Services   []AdminServiceSummary `json:"services"`
 }
 
-type AdminGroupMember struct {
-	ID           string    `json:"id"`
-	DriverId     string    `json:"driverId"`
-	DriverName   string    `json:"driverName"`
-	DriverMobile string    `json:"driverMobile"`
-	RoleName     string    `json:"roleName"`
-	JoinType     string    `json:"joinType"`
-	Status       string    `json:"status"`
-	CreatedAt    time.Time `json:"createdAt"`
+// AdminServiceCounts is the same roster breakdown the owner's own dashboard sees:
+// approved members by kind, vehicles-only members counted apart from driving ones,
+// and everything still waiting on a decision.
+type AdminServiceCounts struct {
+	ApprovedDrivers       int64 `json:"approvedDrivers"`
+	ApprovedVehicleOwners int64 `json:"approvedVehicleOwners"`
+	ApprovedVehicles      int64 `json:"approvedVehicles"`
+	ApprovedPassengers    int64 `json:"approvedPassengers"`
+	PendingRequests       int64 `json:"pendingRequests"`
+	ActiveShifts          int64 `json:"activeShifts"`
 }
 
-type AdminGroupVehicle struct {
+type AdminServiceDetailResponse struct {
+	Service AdminServiceSummary `json:"service"`
+	Counts  AdminServiceCounts  `json:"counts"`
+	Shifts  []AdminShiftSummary `json:"shifts"`
+}
+
+type AdminShiftSummary struct {
+	ID               string    `json:"id"`
+	Name             string    `json:"name"`
+	ServiceId        string    `json:"serviceId"`
+	ServiceName      string    `json:"serviceName"`
+	ServiceOwnerId   string    `json:"serviceOwnerId"`
+	DriverId         string    `json:"driverId"`
+	DriverName       string    `json:"driverName"`
+	DriverMobile     string    `json:"driverMobile"`
+	VehicleId        string    `json:"vehicleId"`
+	VehicleNumber    string    `json:"vehicleNumber"`
+	VehicleOwnerId   string    `json:"vehicleOwnerId"`
+	VehicleOwnerName string    `json:"vehicleOwnerName"`
+	DaysOfWeek       []int     `json:"daysOfWeek"`
+	StartDate        string    `json:"startDate"`
+	EndDate          string    `json:"endDate"`
+	StartTime        string    `json:"startTime"`
+	EndTime          string    `json:"endTime"`
+	SeatCapacity     int       `json:"seatCapacity"`
+	OccupiedSeats    int       `json:"occupiedSeats"`
+	Status           string    `json:"status"`
+	CreatedAt        time.Time `json:"createdAt"`
+}
+
+type AdminShiftsResponse struct {
+	TotalPages int                 `json:"totalPages"`
+	Shifts     []AdminShiftSummary `json:"shifts"`
+}
+
+type AdminShiftRequestItem struct {
 	ID            string    `json:"id"`
-	VehicleId     string    `json:"vehicleId"`
-	VehicleNumber string    `json:"vehicleNumber"`
-	VehicleInfo   string    `json:"vehicleInfo"`
-	NumberOfSeats int       `json:"numberOfSeats"`
-	HasAC         bool      `json:"hasAC"`
-	HasHeating    bool      `json:"hasHeating"`
-	DriverName    string    `json:"driverName"`
-	Status        string    `json:"status"`
+	PassengerId   string    `json:"passengerId"`
+	PassengerName string    `json:"passengerName"`
+	ServiceId     string    `json:"serviceId"`
+	ServiceName   string    `json:"serviceName"`
+	ContactNumber string    `json:"contactNumber"`
+	Note          string    `json:"note"`
+	DaysOfWeek    []int     `json:"daysOfWeek"`
+	StartTime     string    `json:"startTime"`
+	EndTime       string    `json:"endTime"`
 	CreatedAt     time.Time `json:"createdAt"`
 }
 
-type AdminGroupPassenger struct {
-	ID              string    `json:"id"`
-	PassengerId     string    `json:"passengerId"`
-	PassengerName   string    `json:"passengerName"`
-	PassengerMobile string    `json:"passengerMobile"`
-	Gender          string    `json:"gender"`
-	Status          string    `json:"status"`
-	CreatedAt       time.Time `json:"createdAt"`
+type AdminShiftRequestsResponse struct {
+	TotalPages int                     `json:"totalPages"`
+	Requests   []AdminShiftRequestItem `json:"requests"`
 }
 
-type AdminGroupDetailsResponse struct {
-	Group      AdminGroupDetail      `json:"group"`
-	Members    []AdminGroupMember    `json:"members"`
-	Vehicles   []AdminGroupVehicle   `json:"vehicles"`
-	Passengers []AdminGroupPassenger `json:"passengers"`
+type AdminAdvertisementItem struct {
+	ID            string    `json:"id"`
+	ServiceId     string    `json:"serviceId"`
+	ServiceName   string    `json:"serviceName"`
+	OwnerDriverId string    `json:"ownerDriverId"`
+	OwnerName     string    `json:"ownerName"`
+	OwnerMobile   string    `json:"ownerMobile"`
+	Title         string    `json:"title"`
+	Description   string    `json:"description"`
+	Fare          float64   `json:"fare"`
+	DaysOfWeek    []int     `json:"daysOfWeek"`
+	StartTime     string    `json:"startTime"`
+	EndTime       string    `json:"endTime"`
+	VehicleCount  int64     `json:"vehicleCount"`
+	CreatedAt     time.Time `json:"createdAt"`
 }
 
-type AdminShiftDetail struct {
-	ID                   string    `json:"id"`
-	GroupId              string    `json:"groupId"`
-	GroupName            string    `json:"groupName"`
-	VehicleNumber        string    `json:"vehicleNumber"`
-	VehicleInfo          string    `json:"vehicleInfo"`
-	DriverId             string    `json:"driverId"`
-	DriverName           string    `json:"driverName"`
-	DriverMobile         string    `json:"driverMobile"`
-	Direction            string    `json:"direction"`
-	StartDatetime        string    `json:"startDatetime"`
-	EstimatedEndDatetime string    `json:"estimatedEndDatetime"`
-	StartLocation        string    `json:"startLocation"`
-	EndLocation          string    `json:"endLocation"`
-	NumberOfSeats        int       `json:"numberOfSeats"`
-	SeatsTaken           int       `json:"seatsTaken"`
-	CreatedByName        string    `json:"createdByName"`
-	CreatedByMobile      string    `json:"createdByMobile"`
-	IsActive             bool      `json:"isActive"`
-	CreatedAt            time.Time `json:"createdAt"`
-}
-
-type AdminShiftListResponse struct {
-	TotalPages int                `json:"totalPages"`
-	Shifts     []AdminShiftDetail `json:"shifts"`
-}
-
-type AdminShiftStop struct {
-	SequenceNumber int     `json:"sequenceNumber"`
-	Location       string  `json:"location"`
-	Lat            float64 `json:"lat"`
-	Lng            float64 `json:"lng"`
-	ScheduledTime  string  `json:"scheduledTime"`
-}
-
-type AdminShiftSeat struct {
-	SeatNumber      int    `json:"seatNumber"`
-	Gender          string `json:"gender"`
-	Status          string `json:"status"`
-	PassengerName   string `json:"passengerName,omitempty"`
-	PassengerMobile string `json:"passengerMobile,omitempty"`
-	StopSequence    int    `json:"stopSequence,omitempty"`
-	Location        string `json:"location,omitempty"`
-	ScheduledTime   string `json:"scheduledTime,omitempty"`
-}
-
-type AdminShiftDetailsResponse struct {
-	Shift AdminShiftDetail `json:"shift"`
-	Stops []AdminShiftStop `json:"stops"`
-	Seats []AdminShiftSeat `json:"seats"`
+type AdminAdvertisementsResponse struct {
+	TotalPages     int                      `json:"totalPages"`
+	Advertisements []AdminAdvertisementItem `json:"advertisements"`
 }

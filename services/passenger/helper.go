@@ -256,52 +256,81 @@ func updatePassengerFCM(orgCtx *gin.Context, id, fcm string) error {
 		Update("fcm", fcm).Error
 }
 
-// savePassengerSchedule writes the whole weekly form in one statement. The unique
-// index on (passenger_id, day_of_week, direction) turns a resend of the same leg
-// into an update instead of a duplicate row.
-func savePassengerSchedule(orgCtx *gin.Context, sessionId, passengerId string, preferences []SchedulePreference) (err error) {
-	logger.LogInfo("Request received in savePassengerSchedule", sessionId)
+// saveAvailability replaces the days it is given in one transaction: the day rows are
+// upserted in one statement on the unique (passenger, day) index, and the places of
+// those days are rewritten with one delete and one insert.
+func saveAvailability(orgCtx *gin.Context, sessionId, passengerId string, days []AvailabilityDay) (err error) {
+	logger.LogInfo("Request received in saveAvailability", sessionId)
 
 	var cancel context.CancelFunc
 	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
 	defer cancel()
 
-	rows := make([]postgress.PassengerLocationPreference, 0, len(preferences))
-	for _, preference := range preferences {
-		rows = append(rows, postgress.PassengerLocationPreference{
-			ID:            database.GenerateUUID(),
-			PassengerID:   passengerId,
-			DayOfWeek:     preference.DayOfWeek,
-			Direction:     preference.Direction,
-			IsEnabled:     preference.IsEnabled,
-			Location:      strings.TrimSpace(preference.Location),
-			Lat:           preference.Lat,
-			Lng:           preference.Lng,
-			ScheduledTime: preference.ScheduledTime,
+	rows := make([]postgress.PassengerAvailability, 0, len(days))
+	dayNumbers := make([]int, 0, len(days))
+	locations := []postgress.PassengerAvailabilityLocation{}
+
+	for _, day := range days {
+		rows = append(rows, postgress.PassengerAvailability{
+			ID:          database.GenerateUUID(),
+			PassengerID: passengerId,
+			DayOfWeek:   day.DayOfWeek,
+			IsRequired:  day.IsRequired,
 		})
+		dayNumbers = append(dayNumbers, day.DayOfWeek)
+
+		for index, location := range day.Locations {
+			locations = append(locations, postgress.PassengerAvailabilityLocation{
+				ID:          database.GenerateUUID(),
+				PassengerID: passengerId,
+				DayOfWeek:   day.DayOfWeek,
+				Sequence:    index + 1,
+				Location:    strings.TrimSpace(location.Location),
+				Lat:         location.Lat,
+				Lng:         location.Lng,
+				Time:        location.Time,
+			})
+		}
 	}
 
-	err = database.DatabaseConn.Postgres.WithContext(ctx).
-		Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "passenger_id"}, {Name: "day_of_week"}, {Name: "direction"}},
-			DoUpdates: clause.AssignmentColumns([]string{"is_enabled", "location", "lat", "lng", "scheduled_time", "updated_at"}),
-		}).
-		Create(&rows).Error
+	err = database.DatabaseConn.Postgres.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if e := tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "passenger_id"}, {Name: "day_of_week"}},
+			DoUpdates: clause.AssignmentColumns([]string{"is_required", "updated_at"}),
+		}).Create(&rows).Error; e != nil {
+			return e
+		}
 
-	logger.LogInfo("Response returned from savePassengerSchedule", sessionId)
+		if e := tx.Where("passenger_id = ?", passengerId).
+			Where("day_of_week IN ?", dayNumbers).
+			Delete(&postgress.PassengerAvailabilityLocation{}).Error; e != nil {
+			return e
+		}
+
+		if len(locations) == 0 {
+			return nil
+		}
+
+		return tx.Create(&locations).Error
+	})
+
+	logger.LogInfo("Response returned from saveAvailability", sessionId)
 
 	return
 }
 
-func getPassengerSchedule(orgCtx *gin.Context, passengerId string) (preferences []postgress.PassengerLocationPreference, err error) {
+func getAvailability(orgCtx *gin.Context, passengerId string) (days []postgress.PassengerAvailability, locations []postgress.PassengerAvailabilityLocation, err error) {
 	var cancel context.CancelFunc
 	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
 	defer cancel()
 
-	err = database.DatabaseConn.Postgres.WithContext(ctx).
-		Where("passenger_id = ?", passengerId).
-		Order("day_of_week ASC, direction ASC").
-		Find(&preferences).Error
+	db := database.DatabaseConn.Postgres.WithContext(ctx)
+
+	if err = db.Where("passenger_id = ?", passengerId).Order("day_of_week ASC").Find(&days).Error; err != nil {
+		return
+	}
+
+	err = db.Where("passenger_id = ?", passengerId).Order("day_of_week ASC, sequence ASC").Find(&locations).Error
 
 	return
 }

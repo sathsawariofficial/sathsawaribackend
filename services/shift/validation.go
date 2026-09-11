@@ -4,251 +4,342 @@ import (
 	"errors"
 	"fmt"
 	"rideshare/pkgs/constants"
-	"rideshare/pkgs/logger"
+	"rideshare/pkgs/database"
 	"rideshare/pkgs/utils"
-	"time"
+	"strings"
 )
 
-func ValidateShiftId(shiftId string) error {
-	if !utils.PKValidation(shiftId) {
-		return fmt.Errorf(constants.Invalid_Data, "shift id")
+func ValidateId(id, key string) error {
+	if !utils.PKValidation(id) {
+		return fmt.Errorf(constants.Invalid_Data, key)
 	}
 
 	return nil
 }
 
-func ValidateGroupId(groupId string) error {
-	if !utils.PKValidation(groupId) {
-		return fmt.Errorf(constants.Invalid_Data, "group id")
+func validateDate(value *string, key string) error {
+	*value = strings.TrimSpace(*value)
+
+	if utils.IsStringEmpty(*value) {
+		return fmt.Errorf(constants.Missing_Data, key)
 	}
 
-	return nil
+	_, err := utils.ParseBusinessDate(*value, strings.ToLower(key))
+	return err
 }
 
-func ValidateTemplateId(templateId string) error {
-	if !utils.PKValidation(templateId) {
-		return fmt.Errorf(constants.Invalid_Data, "shift template id")
-	}
+// validateEndDate allows no end date at all, a shift may run until it is changed.
+func validateEndDate(value *string, startDate string) error {
+	*value = strings.TrimSpace(*value)
 
-	return nil
-}
-
-// ValidateCreateShift checks the whole payload before a single row is written: the
-// route has to be in order, the seats have to be sane, and nobody may be seated
-// twice on the same trip.
-func ValidateCreateShift(sessionId string, request *CreateShiftRequest) error {
-	logger.LogInfo("Request received in ValidateCreateShift", sessionId)
-
-	if err := ValidateGroupId(request.GroupId); err != nil {
-		return err
-	}
-
-	if !utils.PKValidation(request.VehicleId) {
-		return fmt.Errorf(constants.Invalid_Data, "vehicle id")
-	}
-
-	if !utils.PKValidation(request.DriverId) {
-		return fmt.Errorf(constants.Invalid_Data, "driver id")
-	}
-
-	if request.Direction != constants.Shift_Direction_Pickup && request.Direction != constants.Shift_Direction_Drop {
-		return fmt.Errorf(constants.Invalid_Data, "direction")
-	}
-
-	var errMessage string
-	if utils.IsStringEmptyWithKey(request.StartDatetime, "Start date", &errMessage) ||
-		utils.IsStringEmptyWithKey(request.EstimatedEndDatetime, "Estimated end date", &errMessage) ||
-		utils.IsStringEmptyWithKey(request.StartLocation, "Start location", &errMessage) ||
-		utils.IsStringEmptyWithKey(request.EndLocation, "End location", &errMessage) {
-		return fmt.Errorf(constants.Missing_Data, errMessage)
-	}
-
-	if err := validateShiftWindow(request.StartDatetime, request.EstimatedEndDatetime); err != nil {
-		return err
-	}
-
-	if len(request.RouteDetails) > constants.RouteDetails_Max_Len {
-		return fmt.Errorf("length of the route details should not be more than %v characters", constants.RouteDetails_Max_Len)
-	}
-
-	if len(request.Stops) == 0 {
-		return fmt.Errorf(constants.Missing_Data, "At least one stop")
-	}
-
-	if len(request.Stops) > constants.Shift_Stops_Max_Len {
-		return fmt.Errorf("a shift cannot have more than %v stops", constants.Shift_Stops_Max_Len)
-	}
-
-	seenSeats := map[int]bool{}
-	seenPassengers := map[string]bool{}
-
-	for _, stop := range request.Stops {
-		if utils.IsStringEmpty(stop.Location) {
-			return fmt.Errorf(constants.Missing_Data, "Stop location")
-		}
-
-		locationLen := len(stop.Location)
-		if locationLen < constants.Location_Min_Len || locationLen > constants.Location_Max_Len {
-			return fmt.Errorf("length of a stop location should be between %v and %v characters", constants.Location_Min_Len, constants.Location_Max_Len)
-		}
-
-		for _, seat := range stop.Seats {
-			if err := validateSeat(seat.SeatNumber, seat.Gender, seat.PassengerId, seenSeats, seenPassengers); err != nil {
-				return err
-			}
-		}
-	}
-
-	for _, day := range request.DaysOfWeek {
-		if day < constants.Day_Of_Week_Min_Value || day > constants.Day_Of_Week_Max_Value {
-			return fmt.Errorf(constants.Invalid_Data, "day of week")
-		}
-	}
-
-	logger.LogInfo("Response returned from ValidateCreateShift", sessionId)
-
-	return nil
-}
-
-func ValidateUpdateShiftSeats(request *UpdateShiftSeatsRequest) error {
-	if err := ValidateShiftId(request.ShiftId); err != nil {
-		return err
-	}
-
-	if len(request.Seats) == 0 {
-		return fmt.Errorf(constants.Missing_Data, "Seats")
-	}
-
-	if len(request.Seats) > constants.Number_Of_Seats_Max_Value {
-		return fmt.Errorf("no more than %v seats can be changed in one call", constants.Number_Of_Seats_Max_Value)
-	}
-
-	seenSeats := map[int]bool{}
-	seenPassengers := map[string]bool{}
-
-	for _, seat := range request.Seats {
-		if err := validateSeat(seat.SeatNumber, seat.Gender, seat.PassengerId, seenSeats, seenPassengers); err != nil {
-			return err
-		}
-
-		if seat.StopSequence < 0 {
-			return fmt.Errorf(constants.Invalid_Data, "stop sequence")
-		}
-
-		// somebody has to be waiting somewhere, a seated passenger without a stop
-		// would never be picked up
-		if !utils.IsStringEmpty(seat.PassengerId) && seat.StopSequence == 0 {
-			return fmt.Errorf(constants.Missing_Data, "Stop sequence for the seated passenger")
-		}
-	}
-
-	return nil
-}
-
-// validateSeat applies the rules one seat has to satisfy no matter which api it
-// arrives through: a real seat number, a valid gender, and a passenger who is not
-// already sitting somewhere else on the same trip.
-func validateSeat(seatNumber int, gender, passengerId string, seenSeats map[int]bool, seenPassengers map[string]bool) error {
-	if seatNumber < constants.Number_Of_Seats_Min_Value || seatNumber > constants.Number_Of_Seats_Max_Value {
-		return fmt.Errorf(constants.Invalid_Data, "seat number")
-	}
-
-	if seenSeats[seatNumber] {
-		return fmt.Errorf("seat %d is listed more than once", seatNumber)
-	}
-	seenSeats[seatNumber] = true
-
-	seatGender := utils.Gender(gender)
-	if !utils.IsStringEmpty(gender) && !seatGender.IsValid() {
-		return fmt.Errorf(constants.Invalid_Data, "seat gender")
-	}
-
-	if utils.IsStringEmpty(passengerId) {
+	if utils.IsStringEmpty(*value) {
 		return nil
 	}
 
-	if !utils.PKValidation(passengerId) {
-		return fmt.Errorf(constants.Invalid_Data, "passenger id")
-	}
-
-	// a seat holding somebody must say which gender it is kept for, that is what
-	// stops the seat being handed to the other gender later
-	if utils.IsStringEmpty(gender) {
-		return fmt.Errorf(constants.Missing_Data, "Seat gender")
-	}
-
-	if seenPassengers[passengerId] {
-		return fmt.Errorf("a passenger cannot be seated twice on the same shift")
-	}
-	seenPassengers[passengerId] = true
-
-	return nil
-}
-
-func validateShiftWindow(startDatetime, estimatedEndDatetime string) error {
-	start, err := time.ParseInLocation(constants.DateTimeLayout, startDatetime, time.Local)
-	if err != nil {
-		return fmt.Errorf(constants.Invalid_Data, "start date")
-	}
-
-	end, err := time.ParseInLocation(constants.DateTimeLayout, estimatedEndDatetime, time.Local)
-	if err != nil {
-		return fmt.Errorf(constants.Invalid_Data, "estimated end date")
-	}
-
-	if !end.After(start) {
-		return fmt.Errorf(constants.Invalid_Data, "estimated end date, it has to be after the start")
-	}
-
-	// a shift in the past is nonsense: nobody can be picked up yesterday, and the
-	// worker would retire it the moment it was written
-	if start.Before(time.Now()) {
-		return errors.New(constants.Shift_In_The_Past)
-	}
-
-	return nil
-}
-
-// ValidateRescheduleShift checks a reschedule. Every field is optional except the
-// shift itself, but a time window has to be sent whole or not at all, half a window
-// cannot be judged against the clash rules.
-func ValidateRescheduleShift(request *RescheduleShiftRequest) error {
-	if err := ValidateShiftId(request.ShiftId); err != nil {
+	if _, err := utils.ParseBusinessDate(*value, "end date"); err != nil {
 		return err
 	}
 
-	startGiven := !utils.IsStringEmpty(request.StartDatetime)
-	endGiven := !utils.IsStringEmpty(request.EstimatedEndDatetime)
-
-	if startGiven != endGiven {
-		return fmt.Errorf(constants.Missing_Data, "Both the start and the estimated end date")
+	if *value < database.BusinessToday() {
+		return errors.New(constants.End_Date_In_The_Past)
 	}
 
-	if startGiven {
-		// validateShiftWindow also refuses a window that starts in the past, which is
-		// what stops a shift being reschedulued backwards out of sight
-		if err := validateShiftWindow(request.StartDatetime, request.EstimatedEndDatetime); err != nil {
+	if startDate != "" && *value < startDate {
+		return fmt.Errorf(constants.Invalid_Data, "end date, it cannot be before the start date")
+	}
+
+	return nil
+}
+
+// validatePassengerInputs checks passengers placed on stops. stops is the length of
+// the route when it is known, otherwise only the lower bound can be checked here.
+func validatePassengerInputs(passengers []ShiftPassengerInput, stops int, seen map[string]bool) error {
+	for _, passenger := range passengers {
+		if err := ValidateId(passenger.PassengerId, "passenger id"); err != nil {
 			return err
 		}
-	}
 
-	if len(request.RouteDetails) > constants.RouteDetails_Max_Len {
-		return fmt.Errorf("length of the route details should not be more than %v characters", constants.RouteDetails_Max_Len)
-	}
-
-	if len(request.StopTimes) > constants.Shift_Stops_Max_Len {
-		return fmt.Errorf("a shift cannot have more than %v stops", constants.Shift_Stops_Max_Len)
-	}
-
-	for _, stop := range request.StopTimes {
-		if stop.SequenceNumber < 1 {
-			return fmt.Errorf(constants.Invalid_Data, "stop sequence")
+		if seen[passenger.PassengerId] {
+			return fmt.Errorf(constants.Invalid_Data, "passengers, a passenger is listed twice")
 		}
+		seen[passenger.PassengerId] = true
 
-		if utils.IsStringEmpty(stop.ScheduledTime) {
-			return fmt.Errorf(constants.Missing_Data, "Scheduled time")
+		if passenger.LocationSequence < 1 || (stops > 0 && passenger.LocationSequence > stops) {
+			return fmt.Errorf(constants.Invalid_Data, fmt.Sprintf("location sequence of passenger %s", passenger.PassengerId))
 		}
 	}
 
 	return nil
+}
+
+func ValidateCreateShift(request *CreateShiftRequest) (err error) {
+	if err = ValidateId(request.DriverId, "driver id"); err != nil {
+		return
+	}
+
+	if err = ValidateId(request.VehicleId, "vehicle id"); err != nil {
+		return
+	}
+
+	if err = utils.ValidateDaysOfWeek(request.DaysOfWeek); err != nil {
+		return
+	}
+
+	if err = validateDate(&request.StartDate, "Start date"); err != nil {
+		return
+	}
+
+	if request.StartDate < database.BusinessToday() {
+		return errors.New(constants.Shift_In_The_Past)
+	}
+
+	if err = validateEndDate(&request.EndDate, request.StartDate); err != nil {
+		return
+	}
+
+	if request.Locations, err = utils.ValidateRouteLocations(request.Locations, constants.Shift_Locations_Min_Len, constants.Shift_Locations_Max_Len); err != nil {
+		return
+	}
+
+	if len(request.Passengers) > constants.Number_Of_Seats_Max_Value {
+		return fmt.Errorf("no more than %v passengers can be sent in one call", constants.Number_Of_Seats_Max_Value)
+	}
+
+	return validatePassengerInputs(request.Passengers, len(request.Locations), map[string]bool{})
+}
+
+// ValidateUpdateShift checks the shape of an edit. Whether a new start date is in
+// the past is judged by the service, which knows whether it changed at all.
+func ValidateUpdateShift(request *UpdateShiftRequest) (err error) {
+	if err = ValidateId(request.ShiftId, "shift id"); err != nil {
+		return
+	}
+
+	if request.DriverId == nil && request.VehicleId == nil && request.DaysOfWeek == nil &&
+		request.StartDate == nil && request.EndDate == nil && request.Locations == nil {
+		return fmt.Errorf(constants.Missing_Data, "At least one change")
+	}
+
+	if request.DriverId != nil {
+		if err = ValidateId(*request.DriverId, "driver id"); err != nil {
+			return
+		}
+	}
+
+	if request.VehicleId != nil {
+		if err = ValidateId(*request.VehicleId, "vehicle id"); err != nil {
+			return
+		}
+	}
+
+	if request.DaysOfWeek != nil {
+		if err = utils.ValidateDaysOfWeek(request.DaysOfWeek); err != nil {
+			return
+		}
+	}
+
+	startDate := ""
+	if request.StartDate != nil {
+		if err = validateDate(request.StartDate, "Start date"); err != nil {
+			return
+		}
+		startDate = *request.StartDate
+	}
+
+	if request.EndDate != nil {
+		if err = validateEndDate(request.EndDate, startDate); err != nil {
+			return
+		}
+	}
+
+	if request.Locations != nil {
+		if request.Locations, err = utils.ValidateRouteLocations(request.Locations, constants.Shift_Locations_Min_Len, constants.Shift_Locations_Max_Len); err != nil {
+			return
+		}
+	}
+
+	return nil
+}
+
+func ValidateUpdateShiftPassengers(request *UpdateShiftPassengersRequest) error {
+	if err := ValidateId(request.ShiftId, "shift id"); err != nil {
+		return err
+	}
+
+	total := len(request.Add) + len(request.Move) + len(request.Remove)
+	if total == 0 {
+		return fmt.Errorf(constants.Missing_Data, "Passengers to add, move or remove")
+	}
+
+	if total > constants.Number_Of_Seats_Max_Value {
+		return fmt.Errorf("no more than %v passengers can be changed in one call", constants.Number_Of_Seats_Max_Value)
+	}
+
+	seen := map[string]bool{}
+
+	if err := validatePassengerInputs(request.Add, 0, seen); err != nil {
+		return err
+	}
+
+	if err := validatePassengerInputs(request.Move, 0, seen); err != nil {
+		return err
+	}
+
+	for _, passengerId := range request.Remove {
+		if err := ValidateId(passengerId, "passenger id"); err != nil {
+			return err
+		}
+
+		if seen[passengerId] {
+			return fmt.Errorf(constants.Invalid_Data, "passengers, a passenger is listed twice")
+		}
+		seen[passengerId] = true
+	}
+
+	return nil
+}
+
+func ValidateAttendanceQuery(shiftId, date string) error {
+	if err := ValidateId(shiftId, "shift id"); err != nil {
+		return err
+	}
+
+	return validateDate(&date, "Date")
+}
+
+func ValidateMarkAttendance(request *MarkAttendanceRequest) error {
+	if err := ValidateId(request.ShiftId, "shift id"); err != nil {
+		return err
+	}
+
+	if err := validateDate(&request.Date, "Date"); err != nil {
+		return err
+	}
+
+	if request.Status != constants.Attendance_Absent && request.Status != constants.Attendance_Present {
+		return fmt.Errorf(constants.Invalid_Data, "status, use absent or present")
+	}
+
+	return nil
+}
+
+func ValidateDriverLocation(request *DriverLocationRequest) error {
+	if err := ValidateId(request.ShiftId, "shift id"); err != nil {
+		return err
+	}
+
+	request.Message = strings.TrimSpace(request.Message)
+	request.Location = strings.TrimSpace(request.Location)
+
+	if utils.IsStringEmpty(request.Message) && utils.IsStringEmpty(request.Location) {
+		return fmt.Errorf(constants.Missing_Data, "Message or location")
+	}
+
+	if len(request.Message) > constants.Message_Max_Len {
+		return fmt.Errorf("length of the message should not be more than %v characters", constants.Message_Max_Len)
+	}
+
+	if len(request.Location) > constants.Location_Max_Len {
+		return fmt.Errorf("length of the location should not be more than %v characters", constants.Location_Max_Len)
+	}
+
+	if request.Lat < -90 || request.Lat > 90 || request.Lng < -180 || request.Lng > 180 {
+		return fmt.Errorf(constants.Invalid_Data, "coordinates")
+	}
+
+	return nil
+}
+
+func ValidateShiftRequest(request *ShiftRequestInput) (err error) {
+	request.ServiceId = strings.TrimSpace(request.ServiceId)
+	request.Note = strings.TrimSpace(request.Note)
+
+	if !utils.IsStringEmpty(request.ServiceId) {
+		if err = ValidateId(request.ServiceId, "service id"); err != nil {
+			return
+		}
+	}
+
+	if err = utils.ValidateDaysOfWeek(request.DaysOfWeek); err != nil {
+		return
+	}
+
+	if err = utils.IsValidMobileNumber(request.ContactNumber); err != nil {
+		return
+	}
+
+	if len(request.Note) > constants.Description_Max_Len {
+		return fmt.Errorf("length of the note should not be more than %v characters", constants.Description_Max_Len)
+	}
+
+	request.Locations, err = utils.ValidateRouteLocations(request.Locations, constants.Shift_Request_Locations_Min_Len, constants.Shift_Request_Locations_Max_Len)
+
+	return
+}
+
+// ParseShiftListFilter reads the optional narrowing of a shift list, the active
+// shifts are listed when no status is asked for.
+func ParseShiftListFilter(status, dayOfWeek, search, startTime, endTime string) (filter shiftListFilter, err error) {
+	if !utils.IsStringEmpty(startTime) {
+		if filter.StartTime, err = utils.NormalizeClock(startTime); err != nil {
+			return filter, fmt.Errorf(constants.Invalid_Data, "start time, use HH:MM")
+		}
+	}
+
+	if !utils.IsStringEmpty(endTime) {
+		if filter.EndTime, err = utils.NormalizeClock(endTime); err != nil {
+			return filter, fmt.Errorf(constants.Invalid_Data, "end time, use HH:MM")
+		}
+	}
+
+	switch status {
+	case "":
+		filter.Status = constants.Shift_Status_Active
+	case constants.Shift_Status_Active, constants.Shift_Status_Completed, constants.Shift_Status_All:
+		filter.Status = status
+	default:
+		return filter, fmt.Errorf(constants.Invalid_Data, "status, use active, completed or all")
+	}
+
+	if !utils.IsStringEmpty(dayOfWeek) {
+		filter.DayOfWeek = utils.ToInt(dayOfWeek)
+		if filter.DayOfWeek < constants.Day_Of_Week_Min_Value || filter.DayOfWeek > constants.Day_Of_Week_Max_Value {
+			return filter, fmt.Errorf(constants.Invalid_Data, "day of week, use 1 for Monday to 7 for Sunday")
+		}
+	}
+
+	filter.Search = strings.TrimSpace(search)
+	if len(filter.Search) > constants.General_Max_Len {
+		return filter, fmt.Errorf("length of the search should not be more than %v characters", constants.General_Max_Len)
+	}
+
+	return filter, nil
+}
+
+func ParseShiftRequestSearch(search, dayOfWeek, startTime, endTime string) (filter shiftRequestSearch, err error) {
+	filter.Search = strings.TrimSpace(search)
+	if len(filter.Search) > constants.General_Max_Len {
+		return filter, fmt.Errorf("length of the search should not be more than %v characters", constants.General_Max_Len)
+	}
+
+	if !utils.IsStringEmpty(dayOfWeek) {
+		filter.DayOfWeek = utils.ToInt(dayOfWeek)
+		if filter.DayOfWeek < constants.Day_Of_Week_Min_Value || filter.DayOfWeek > constants.Day_Of_Week_Max_Value {
+			return filter, fmt.Errorf(constants.Invalid_Data, "day of week, use 1 for Monday to 7 for Sunday")
+		}
+	}
+
+	if !utils.IsStringEmpty(startTime) {
+		if filter.StartTime, err = utils.NormalizeClock(startTime); err != nil {
+			return filter, fmt.Errorf(constants.Invalid_Data, "start time, use HH:MM")
+		}
+	}
+
+	if !utils.IsStringEmpty(endTime) {
+		if filter.EndTime, err = utils.NormalizeClock(endTime); err != nil {
+			return filter, fmt.Errorf(constants.Invalid_Data, "end time, use HH:MM")
+		}
+	}
+
+	return filter, nil
 }

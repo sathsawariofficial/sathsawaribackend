@@ -202,51 +202,44 @@ func ValidatePassengerChangePassword(request *PassengerChangePasswordRequest) er
 	return nil
 }
 
-// ValidatePassengerSchedule checks the whole weekly form in one pass. A day and a
-// direction may only appear once, otherwise the caller is silently asking for two
-// different pickups on the same leg.
-func ValidatePassengerSchedule(request *PassengerScheduleRequest) error {
-	if len(request.Preferences) == 0 {
-		return fmt.Errorf(constants.Missing_Data, "Preferences")
+// ValidateAvailability checks the weekly requirement and cleans it in place. A day may
+// appear once, a day that is not required carries no places, and a required day
+// carries one to six places reached one after another.
+func ValidateAvailability(request *AvailabilityRequest) error {
+	if len(request.Days) == 0 {
+		return fmt.Errorf(constants.Missing_Data, "Days")
 	}
 
-	if len(request.Preferences) > constants.Bulk_Request_Max_Len {
-		return fmt.Errorf("no more than %v preferences can be sent in one call", constants.Bulk_Request_Max_Len)
+	if len(request.Days) > constants.Day_Of_Week_Max_Value {
+		return fmt.Errorf("no more than %v days can be sent", constants.Day_Of_Week_Max_Value)
 	}
 
-	seen := map[string]bool{}
+	seen := map[int]bool{}
 
-	for _, preference := range request.Preferences {
-		if preference.DayOfWeek < constants.Day_Of_Week_Min_Value || preference.DayOfWeek > constants.Day_Of_Week_Max_Value {
-			return fmt.Errorf(constants.Invalid_Data, "day of week")
+	for index := range request.Days {
+		day := &request.Days[index]
+
+		if day.DayOfWeek < constants.Day_Of_Week_Min_Value || day.DayOfWeek > constants.Day_Of_Week_Max_Value {
+			return fmt.Errorf(constants.Invalid_Data, "day of week, use 1 for Monday to 7 for Sunday")
 		}
 
-		if preference.Direction != constants.Shift_Direction_Pickup && preference.Direction != constants.Shift_Direction_Drop {
-			return fmt.Errorf(constants.Invalid_Data, "direction")
+		if seen[day.DayOfWeek] {
+			return fmt.Errorf(constants.Invalid_Data, "days, a day is repeated")
 		}
+		seen[day.DayOfWeek] = true
 
-		key := fmt.Sprintf("%d:%s", preference.DayOfWeek, preference.Direction)
-		if seen[key] {
-			return fmt.Errorf(constants.Invalid_Data, "preferences, a day and direction is repeated")
-		}
-		seen[key] = true
-
-		// a leg that is switched off carries no place and no time, the passenger is
-		// simply not travelling on that leg
-		if !preference.IsEnabled {
+		if !day.IsRequired {
+			if len(day.Locations) > 0 {
+				return fmt.Errorf("day %d is not required, it cannot carry locations", day.DayOfWeek)
+			}
 			continue
 		}
 
-		var errMessage string
-		if utils.IsStringEmptyWithKey(preference.Location, "Location", &errMessage) ||
-			utils.IsStringEmptyWithKey(preference.ScheduledTime, "Scheduled time", &errMessage) {
-			return fmt.Errorf(constants.Missing_Data, errMessage)
+		cleaned, err := utils.ValidateRouteLocations(day.Locations, 1, constants.Availability_Locations_Max_Len)
+		if err != nil {
+			return fmt.Errorf("day %d: %s", day.DayOfWeek, err.Error())
 		}
-
-		locationLen := len(preference.Location)
-		if locationLen < constants.Location_Min_Len || locationLen > constants.Location_Max_Len {
-			return fmt.Errorf("length of the location should be between %v and %v characters", constants.Location_Min_Len, constants.Location_Max_Len)
-		}
+		day.Locations = cleaned
 	}
 
 	return nil

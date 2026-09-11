@@ -101,26 +101,23 @@ type PassengerOTPResponse struct {
 	OTP string `json:"tempOTP"`
 }
 
-// SchedulePreference is one leg of the standing weekly travel form. A passenger
-// holds at most one of these per day per direction, which is what lets them travel
-// in the morning but not in the evening, or be picked from one address and dropped
-// at another.
-type SchedulePreference struct {
-	DayOfWeek     int     `json:"dayOfWeek"`
-	Direction     string  `json:"direction"`
-	IsEnabled     bool    `json:"isEnabled"`
-	Location      string  `json:"location"`
-	Lat           float64 `json:"lat"`
-	Lng           float64 `json:"lng"`
-	ScheduledTime string  `json:"scheduledTime"`
+// AvailabilityDay is one day of a Pick & Drop passenger's weekly requirement: whether
+// they need the service that day and, when they do, up to six places each with the
+// time they need to be there.
+type AvailabilityDay struct {
+	DayOfWeek  int                   `json:"dayOfWeek"`
+	IsRequired bool                  `json:"isRequired"`
+	Locations  []utils.RouteLocation `json:"locations"`
 }
 
-// PassengerScheduleRequest carries the whole weekly form in one call, the api
-// replaces every leg it is given rather than making the app send one call per day.
-type PassengerScheduleRequest struct {
-	Preferences []SchedulePreference `json:"preferences"`
+// AvailabilityRequest replaces the days it carries in one call, a day left out stays
+// as it was.
+type AvailabilityRequest struct {
+	Days []AvailabilityDay `json:"days"`
 }
 
-type PassengerScheduleResponse struct {
-	Preferences []SchedulePreference `json:"preferences"`
+// AvailabilityResponse always carries the whole week, Monday to Sunday.
+type AvailabilityResponse struct {
+	ServiceId string            `json:"serviceId"`
+	Days      []AvailabilityDay `json:"days"`
 }

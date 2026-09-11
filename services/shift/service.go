@@ -5,496 +5,484 @@ import (
 	"fmt"
 	"rideshare/pkgs/constants"
 	"rideshare/pkgs/database"
-	"rideshare/pkgs/database/postgress"
 	"rideshare/pkgs/logger"
 	"rideshare/pkgs/utils"
-	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
-// CreateShift builds one directional trip of one vehicle on one day. Everything is
-// checked before a single row is written: who is allowed to build it, whether the
-// vehicle and the driver belong to the fleet, whether the seats fit the vehicle and
-// the people in them, and whether either the vehicle or the driver is already
-// promised somewhere else at that hour, on another shift or on a carpool ride.
-func CreateShift(ctx *gin.Context, sessionId, createdByDriverId string, request CreateShiftRequest) (shiftId, templateId string, err error) {
+func ownerError(sessionId string, err error) error {
+	if isNotFound(err) {
+		err = errors.New(constants.Not_Service_Owner)
+	} else {
+		logger.LogError(sessionId, "failed to read the service error: "+err.Error())
+		err = errors.New(constants.Unknown_Error)
+	}
+	logger.LogError(sessionId, err)
+
+	return err
+}
+
+func shiftReadError(sessionId string, err error) error {
+	if isNotFound(err) {
+		err = errors.New(constants.Shift_Not_Found)
+	} else {
+		logger.LogError(sessionId, "failed to read the shift error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the shift")
+	}
+	logger.LogError(sessionId, err)
+
+	return err
+}
+
+// CreateShift builds a recurring shift for the owner's service. The driver has to be
+// the owner or an approved driver, the vehicle approved with a valid seat count, the
+// passengers approved members who fit in the vehicle, and none of them may already be
+// on an overlapping shift in any service or, for the driver and vehicle, on a ride.
+func CreateShift(ctx *gin.Context, sessionId, ownerId string, request CreateShiftRequest) (resp CreateShiftResponse, err error) {
 	logger.LogInfo("Request received in CreateShift", sessionId)
 
-	if _, err = database.GetGroupById(ctx, request.GroupId); err != nil {
-		logger.LogError(sessionId, "failed to get group error: "+err.Error())
-		err = errors.New(constants.Group_Not_Found)
-		return
-	}
-
-	if err = requirePermission(ctx, sessionId, request.GroupId, createdByDriverId, constants.PERMISSION_SHIFT_CREATE); err != nil {
-		return
-	}
-
-	vehicle, err := getApprovedGroupVehicle(ctx, request.GroupId, request.VehicleId)
+	result, err := createShift(ctx, sessionId, ownerId, request)
 	if err != nil {
-		logger.LogError(sessionId, "failed to get the group vehicle error: "+err.Error())
-		err = errors.New(constants.Vehicle_Not_Found)
+		err = utils.ClientError(sessionId, err, fmt.Sprintf(constants.Creation_Failed, "shift"))
 		return
 	}
 
-	if vehicle.NumberOfSeats <= 0 {
-		err = errors.New(constants.Vehicle_Seats_Missing)
+	notifyShiftCreated(ctx, sessionId, ownerId, result)
+
+	resp = CreateShiftResponse{
+		ShiftId: result.Shift.ID,
+		Seats:   seatInfo(result.Shift.SeatCapacity, result.Shift.OccupiedSeats),
+	}
+
+	logger.LogInfo("Response returned from CreateShift", sessionId)
+	logger.LogDebug2("Response returned from CreateShift", sessionId, resp)
+
+	return
+}
+
+// UpdateShift edits a shift and returns it as it now stands.
+func UpdateShift(ctx *gin.Context, sessionId, ownerId string, request UpdateShiftRequest) (resp ShiftDetailResponse, err error) {
+	logger.LogInfo("Request received in UpdateShift", sessionId)
+
+	before, after, err := updateShift(ctx, sessionId, ownerId, request)
+	if err != nil {
+		err = utils.ClientError(sessionId, err, fmt.Sprintf(constants.Update_Failed, "shift"))
+		return
+	}
+
+	notifyShiftUpdated(ctx, sessionId, ownerId, before, after)
+
+	resp, err = GetShift(ctx, sessionId, ownerId, after.Shift.ID)
+
+	logger.LogInfo("Response returned from UpdateShift", sessionId)
+
+	return
+}
+
+func UpdateShiftPassengers(ctx *gin.Context, sessionId, ownerId string, request UpdateShiftPassengersRequest) (resp UpdateShiftPassengersResponse, err error) {
+	logger.LogInfo("Request received in UpdateShiftPassengers", sessionId)
+
+	change, err := updateShiftPassengers(ctx, sessionId, ownerId, request)
+	if err != nil {
+		err = utils.ClientError(sessionId, err, fmt.Sprintf(constants.Update_Failed, "shift passengers"))
+		return
+	}
+
+	notifyPassengersChanged(ctx, sessionId, ownerId, change)
+
+	resp = passengerChangeResp(change)
+
+	logger.LogInfo("Response returned from UpdateShiftPassengers", sessionId)
+
+	return
+}
+
+// DeleteShift archives and deletes a shift and tells its driver and passengers.
+func DeleteShift(ctx *gin.Context, sessionId, ownerId, shiftId string) (err error) {
+	logger.LogInfo("Request received in DeleteShift", sessionId)
+
+	result, err := deleteShift(ctx, sessionId, ownerId, shiftId)
+	if err != nil {
+		err = utils.ClientError(sessionId, err, fmt.Sprintf(constants.DELETE_Failed, "shift"))
+		return
+	}
+
+	notifyShiftDeleted(ctx, sessionId, ownerId, result)
+
+	logger.LogInfo("Response returned from DeleteShift", sessionId)
+
+	return
+}
+
+// GetShift is a shift as its owner, its driver or the owner of its vehicle sees it,
+// passengers' numbers included.
+func GetShift(ctx *gin.Context, sessionId, userId, shiftId string) (resp ShiftDetailResponse, err error) {
+	logger.LogInfo("Request received in GetShift", sessionId)
+
+	details, locations, passengers, err := loadShiftView(ctx, shiftId)
+	if err != nil {
+		err = shiftReadError(sessionId, err)
+		return
+	}
+
+	if details.OwnerDriverID != userId && details.DriverID != userId && details.VehicleOwnerID != userId {
+		err = errors.New(constants.Operation_Not_Permitted)
 		logger.LogError(sessionId, err)
 		return
 	}
 
-	isMember, err := database.IsApprovedGroupMember(ctx, request.GroupId, request.DriverId)
-	if err != nil {
-		logger.LogError(sessionId, "failed to check the driver membership error: "+err.Error())
-		err = errors.New(constants.Unknown_Error)
-		return
-	}
-	if !isMember {
-		err = errors.New(constants.Not_Group_Member)
-		logger.LogError(sessionId, "the assigned driver is not in the group error: "+err.Error())
-		return
-	}
-
-	plan := flattenSeatPlan(request.Stops)
-
-	passengers, err := getEligiblePassengers(ctx, request.GroupId, passengerIdsFromPlan(plan))
-	if err != nil {
-		logger.LogError(sessionId, "failed to load the passengers error: "+err.Error())
-		err = errors.New(constants.Unknown_Error)
-		return
-	}
-
-	if err = checkSeatsAgainstVehicle(plan, vehicle, passengers); err != nil {
-		logger.LogError(sessionId, "seat check error: "+err.Error())
-		return
-	}
-
-	if err = checkClashes(ctx, sessionId, request.VehicleId, request.DriverId, request.StartDatetime, request.EstimatedEndDatetime, ""); err != nil {
-		return
-	}
-
-	if err = checkPassengersFree(ctx, sessionId, passengerIdsFromPlan(plan),
-		request.StartDatetime, request.EstimatedEndDatetime, "", passengers); err != nil {
-		return
-	}
-
-	shiftId, templateId, err = createShiftWithStopsAndSeats(ctx, sessionId, createdByDriverId, vehicle, plan, request)
-	if err != nil {
-		logger.LogError(sessionId, "failed to create shift error: "+err.Error())
-		err = fmt.Errorf(constants.Creation_Failed, "shift")
-		return
-	}
-
-	notifyShift(ctx, sessionId, shiftId, constants.NOTIFICATION_TYPE_SHIFT_CREATED, constants.NOTIFICATION_TITLE_SHIFT_CREATED)
-
-	logger.LogInfo("Response returned from CreateShift", sessionId)
-	logger.LogDebug2("Response returned from CreateShift", sessionId, shiftId)
-
-	return
-}
-
-// UpdateShiftSeats re-seats an existing trip in one call. The same rules as at
-// creation apply, a seat kept for one gender never takes the other and nobody is
-// seated twice.
-func UpdateShiftSeats(ctx *gin.Context, sessionId, driverId string, request UpdateShiftSeatsRequest) (err error) {
-	logger.LogInfo("Request received in UpdateShiftSeats", sessionId)
-
-	shift, err := getShiftById(ctx, request.ShiftId)
-	if err != nil {
-		logger.LogError(sessionId, "failed to get shift error: "+err.Error())
-		err = errors.New(constants.Shift_Not_Found)
-		return
-	}
-
-	if err = requirePermission(ctx, sessionId, shift.GroupID, driverId, constants.PERMISSION_SHIFT_ASSIGN_SEATS); err != nil {
-		return
-	}
-
-	stops, err := getShiftStops(ctx, shift.ID)
-	if err != nil {
-		logger.LogError(sessionId, "failed to get the stops error: "+err.Error())
-		err = errors.New(constants.Unknown_Error)
-		return
-	}
-
-	stopsBySequence := map[int]string{}
-	for _, stop := range stops {
-		stopsBySequence[stop.SequenceNumber] = stop.ID
-	}
-
-	existingSeats, err := getShiftSeats(ctx, shift.ID)
-	if err != nil {
-		logger.LogError(sessionId, "failed to get the seats error: "+err.Error())
-		err = errors.New(constants.Unknown_Error)
-		return
-	}
-
-	passengerIds := []string{}
-	for _, seat := range request.Seats {
-		if !utils.IsStringEmpty(seat.PassengerId) {
-			passengerIds = append(passengerIds, seat.PassengerId)
-		}
-
-		if seat.SeatNumber > shift.NumberOfSeats {
-			err = fmt.Errorf("seat %d does not exist on this shift, it has %d seat(s)", seat.SeatNumber, shift.NumberOfSeats)
-			logger.LogError(sessionId, err)
-			return
-		}
-
-		if !utils.IsStringEmpty(seat.PassengerId) {
-			if _, ok := stopsBySequence[seat.StopSequence]; !ok {
-				err = fmt.Errorf(constants.Invalid_Data, "stop sequence")
-				logger.LogError(sessionId, err)
-				return
-			}
-		}
-	}
-
-	passengers, err := getEligiblePassengers(ctx, shift.GroupID, passengerIds)
-	if err != nil {
-		logger.LogError(sessionId, "failed to load the passengers error: "+err.Error())
-		err = errors.New(constants.Unknown_Error)
-		return
-	}
-
-	// judge the whole shift as it will look after the change, not just the seats in
-	// the payload, otherwise somebody could be seated twice across two calls
-	finalSeats, err := mergeSeatState(existingSeats, request.Seats)
-	if err != nil {
-		logger.LogError(sessionId, "seat merge error: "+err.Error())
-		return
-	}
-
-	for _, seat := range request.Seats {
-		if utils.IsStringEmpty(seat.PassengerId) {
-			continue
-		}
-
-		passenger, ok := passengers[seat.PassengerId]
-		if !ok {
-			err = errors.New(constants.Not_Group_Member)
-			logger.LogError(sessionId, "a passenger is not in the group error: "+err.Error())
-			return
-		}
-
-		// the seat's gender and the person sitting in it always have to agree. The
-		// manager may re-declare that gender in the same call, which is how a male
-		// rider is swapped for a female one in one go, what can never happen is a
-		// passenger ending up in a seat kept for the other gender.
-		if !strings.EqualFold(passenger.Gender, seat.Gender) {
-			err = fmt.Errorf(constants.Seat_Gender_Mismatch, seat.SeatNumber, seat.Gender)
-			logger.LogError(sessionId, err)
-			return
-		}
-	}
-
-	// judged against this shift's own window, ignoring this shift, so somebody
-	// already aboard it is not reported as clashing with themselves
-	if err = checkPassengersFree(ctx, sessionId, passengerIds,
-		shift.StartDatetime, shift.EstimatedEndDatetime, shift.ID, passengers); err != nil {
-		return
-	}
-
-	seatsTaken := 0
-	for _, passengerId := range finalSeats {
-		if !utils.IsStringEmpty(passengerId) {
-			seatsTaken++
-		}
-	}
-
-	if err = applySeatUpdates(ctx, sessionId, shift.ID, request.Seats, stopsBySequence, seatsTaken); err != nil {
-		logger.LogError(sessionId, "failed to update the seats error: "+err.Error())
-		err = fmt.Errorf(constants.Update_Failed, "seats")
-		return
-	}
-
-	// everybody who was on this trip before and everybody on it now needs to be told
-	notifyShiftSeatChange(ctx, sessionId, shift.ID, existingSeats)
-
-	logger.LogInfo("Response returned from UpdateShiftSeats", sessionId)
-
-	return
-}
-
-// GetShift returns one trip with its route in order and its seats. Anybody inside
-// the fleet may look, and so may a passenger who holds a seat on it.
-func GetShift(ctx *gin.Context, sessionId, userId, shiftId string) (
-	shift postgress.ShiftDetails,
-	stops []postgress.ShiftStop,
-	seats []postgress.ShiftSeatDetails,
-	err error,
-) {
-	logger.LogInfo("Request received in GetShift", sessionId)
-
-	shift, err = getShiftDetails(ctx, shiftId)
-	if err != nil {
-		logger.LogError(sessionId, "failed to get shift error: "+err.Error())
-		err = errors.New(constants.Shift_Not_Found)
-		return
-	}
-
-	isMember, err := database.IsApprovedGroupMember(ctx, shift.GroupID, userId)
-	if err != nil {
-		logger.LogError(sessionId, "failed to check the membership error: "+err.Error())
-		err = errors.New(constants.Unknown_Error)
-		return
-	}
-
-	if !isMember {
-		var isSeated bool
-		isSeated, err = isSeatedOnShift(ctx, shiftId, userId)
-		if err != nil {
-			logger.LogError(sessionId, "failed to check the seat error: "+err.Error())
-			err = errors.New(constants.Unknown_Error)
-			return
-		}
-
-		if !isSeated {
-			err = errors.New(constants.Operation_Not_Permitted)
-			logger.LogError(sessionId, err)
-			return
-		}
-	}
-
-	if stops, err = getShiftStops(ctx, shiftId); err != nil {
-		logger.LogError(sessionId, "failed to get the stops error: "+err.Error())
-		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the shift")
-		return
-	}
-
-	if seats, err = getShiftSeats(ctx, shiftId); err != nil {
-		logger.LogError(sessionId, "failed to get the seats error: "+err.Error())
-		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the shift")
-		return
-	}
+	resp = shiftDetailResp(details, locations, passengers, "", database.BusinessNow())
 
 	logger.LogInfo("Response returned from GetShift", sessionId)
 
 	return
 }
 
-// GetGroupShifts is the roster a manager works from.
-func GetGroupShifts(ctx *gin.Context, sessionId, driverId, groupId, filterDriverId, direction, startTime, endTime, status string, page int) (
-	shifts []postgress.ShiftDetails,
-	totalRows int64,
-	err error,
-) {
-	logger.LogInfo("Request received in GetGroupShifts", sessionId)
+// GetPassengerShift is a shift as one of its passengers sees it.
+func GetPassengerShift(ctx *gin.Context, sessionId, passengerId, shiftId string) (resp ShiftDetailResponse, err error) {
+	logger.LogInfo("Request received in GetPassengerShift", sessionId)
 
-	isMember, err := database.IsApprovedGroupMember(ctx, groupId, driverId)
+	details, locations, passengers, err := loadShiftView(ctx, shiftId)
 	if err != nil {
-		logger.LogError(sessionId, "failed to check the membership error: "+err.Error())
-		err = errors.New(constants.Unknown_Error)
-		return
-	}
-	if !isMember {
-		err = errors.New(constants.Not_Group_Member)
-		logger.LogError(sessionId, err)
+		err = shiftReadError(sessionId, err)
 		return
 	}
 
-	shifts, totalRows, err = getShiftsByGroup(ctx, groupId, filterDriverId, direction, startTime, endTime, status, page)
-	if err != nil {
-		logger.LogError(sessionId, "failed to get the shifts error: "+err.Error())
-		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the shifts")
-		return
-	}
-
-	logger.LogInfo("Response returned from GetGroupShifts", sessionId)
-
-	return
-}
-
-// GetMyShifts answers "what am I on" for whoever is asking, the driver behind the
-// wheel or the passenger holding a seat.
-func GetMyShifts(ctx *gin.Context, sessionId, userId, direction, startTime, endTime string, page int) (
-	shifts []postgress.ShiftDetails,
-	totalRows int64,
-	err error,
-) {
-	logger.LogInfo("Request received in GetMyShifts", sessionId)
-
-	shifts, totalRows, err = getShiftsForUser(ctx, userId, direction, startTime, endTime, page)
-	if err != nil {
-		logger.LogError(sessionId, "failed to get the shifts error: "+err.Error())
-		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the shifts")
-		return
-	}
-
-	logger.LogInfo("Response returned from GetMyShifts", sessionId)
-
-	return
-}
-
-// CancelShift calls a trip off and tells everybody who was counting on it. It
-// refuses this close to departure, the same way a carpool ride does.
-func CancelShift(ctx *gin.Context, sessionId, driverId, shiftId string) (err error) {
-	logger.LogInfo("Request received in CancelShift", sessionId)
-
-	shift, err := getShiftById(ctx, shiftId)
-	if err != nil {
-		logger.LogError(sessionId, "failed to get shift error: "+err.Error())
-		err = errors.New(constants.Shift_Not_Found)
-		return
-	}
-
-	if err = requirePermission(ctx, sessionId, shift.GroupID, driverId, constants.PERMISSION_SHIFT_CANCEL); err != nil {
-		return
-	}
-
-	if blocked, message := checkShiftCancellationGuard(shift, time.Now()); blocked {
-		err = errors.New(message)
-		logger.LogError(sessionId, "shift cancellation blocked: "+message)
-		return
-	}
-
-	// the seats have to be read before the shift goes inactive, they are who we owe
-	// the message to
-	seats, err := getShiftSeats(ctx, shiftId)
-	if err != nil {
-		logger.LogError(sessionId, "failed to get the seats error: "+err.Error())
-		err = errors.New(constants.Unknown_Error)
-		return
-	}
-
-	if err = cancelShift(ctx, sessionId, shiftId); err != nil {
-		logger.LogError(sessionId, "failed to cancel shift error: "+err.Error())
-		err = fmt.Errorf(constants.Failed_To_Do_Job, "cancel the shift")
-		return
-	}
-
-	notifyShiftCancelled(ctx, sessionId, shiftId, seats)
-
-	logger.LogInfo("Response returned from CancelShift", sessionId)
-
-	return
-}
-
-// GetShiftTemplates hands back the saved shapes of past shifts. The app prefills the
-// create form with one of these and posts it back through CreateShift, which is how
-// the ride templates already work, so there is no separate build from template api.
-func GetShiftTemplates(ctx *gin.Context, sessionId, driverId, groupId string) (templates []postgress.ShiftTemplate, err error) {
-	logger.LogInfo("Request received in GetShiftTemplates", sessionId)
-
-	isMember, err := database.IsApprovedGroupMember(ctx, groupId, driverId)
-	if err != nil {
-		logger.LogError(sessionId, "failed to check the membership error: "+err.Error())
-		err = errors.New(constants.Unknown_Error)
-		return
-	}
-	if !isMember {
-		err = errors.New(constants.Not_Group_Member)
-		logger.LogError(sessionId, err)
-		return
-	}
-
-	templates, err = getShiftTemplates(ctx, groupId)
-	if err != nil {
-		logger.LogError(sessionId, "failed to get the templates error: "+err.Error())
-		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the templates")
-		return
-	}
-
-	logger.LogInfo("Response returned from GetShiftTemplates", sessionId)
-
-	return
-}
-
-func DeleteShiftTemplate(ctx *gin.Context, sessionId, driverId, templateId string) (err error) {
-	logger.LogInfo("Request received in DeleteShiftTemplate", sessionId)
-
-	template, err := getShiftTemplateById(ctx, templateId)
-	if err != nil {
-		logger.LogError(sessionId, "failed to get the template error: "+err.Error())
-		err = fmt.Errorf(constants.Not_Found, "shift template")
-		return
-	}
-
-	if err = requirePermission(ctx, sessionId, template.GroupID, driverId, constants.PERMISSION_SHIFT_MANAGE_TEMPLATES); err != nil {
-		return
-	}
-
-	if err = deleteShiftTemplate(ctx, sessionId, templateId); err != nil {
-		logger.LogError(sessionId, "failed to delete the template error: "+err.Error())
-		err = fmt.Errorf(constants.DELETE_Failed, "shift template")
-		return
-	}
-
-	logger.LogInfo("Response returned from DeleteShiftTemplate", sessionId)
-
-	return
-}
-
-// RescheduleShift moves a shift that is already built. Without it, pushing a
-// departure back fifteen minutes would mean cancelling and rebuilding, which throws
-// away the seat plan and is refused outright inside the two hour window.
-//
-// The vehicle and the driver stay put on purpose: swapping either can invalidate
-// every seat, so that remains a cancel and rebuild. Moving the window re-runs the
-// full clash check, ignoring this shift's own row, and everybody aboard is told.
-func RescheduleShift(ctx *gin.Context, sessionId, driverId string, request RescheduleShiftRequest) (err error) {
-	logger.LogInfo("Request received in RescheduleShift", sessionId)
-
-	shift, err := getShiftById(ctx, request.ShiftId)
-	if err != nil {
-		logger.LogError(sessionId, "failed to get shift error: "+err.Error())
-		err = errors.New(constants.Shift_Not_Found)
-		return
-	}
-
-	if err = requirePermission(ctx, sessionId, shift.GroupID, driverId, constants.PERMISSION_SHIFT_CREATE); err != nil {
-		return
-	}
-
-	// the same guard cancelling uses: this close to departure people are already on
-	// their way to the stop, the time cannot be moved under them
-	if blocked, _ := checkShiftCancellationGuard(shift, time.Now()); blocked {
-		err = fmt.Errorf(constants.Shift_Too_Close, constants.Shift_Cancel_Min_Hours_Before_Start)
-		logger.LogError(sessionId, err)
-		return
-	}
-
-	updates := map[string]interface{}{}
-
-	if !utils.IsStringEmpty(request.StartDatetime) {
-		// the shift's own row is excluded, otherwise it would always clash with itself
-		if err = checkClashes(ctx, sessionId, shift.VehicleID, shift.DriverID,
-			request.StartDatetime, request.EstimatedEndDatetime, shift.ID); err != nil {
-			return
+	onShift := false
+	for _, passenger := range passengers {
+		if passenger.PassengerID == passengerId {
+			onShift = true
 		}
-
-		updates["start_datetime"] = request.StartDatetime
-		updates["estimated_end_datetime"] = request.EstimatedEndDatetime
 	}
 
-	if !utils.IsStringEmpty(request.StartLocation) {
-		updates["start_location"] = strings.TrimSpace(request.StartLocation)
-	}
-
-	if !utils.IsStringEmpty(request.EndLocation) {
-		updates["end_location"] = strings.TrimSpace(request.EndLocation)
-	}
-
-	if !utils.IsStringEmpty(request.RouteDetails) {
-		updates["route_details"] = request.RouteDetails
-	}
-
-	if len(updates) == 0 && len(request.StopTimes) == 0 {
-		logger.LogInfo("Response returned from RescheduleShift", sessionId)
+	if !onShift {
+		err = errors.New(constants.Not_Shift_Passenger)
+		logger.LogError(sessionId, err)
 		return
 	}
 
-	if err = applyShiftReschedule(ctx, sessionId, shift.ID, updates, request.StopTimes); err != nil {
-		logger.LogError(sessionId, "failed to reschedule the shift error: "+err.Error())
-		err = fmt.Errorf(constants.Update_Failed, "shift")
+	resp = shiftDetailResp(details, locations, passengers, passengerId, database.BusinessNow())
+
+	logger.LogInfo("Response returned from GetPassengerShift", sessionId)
+
+	return
+}
+
+func GetServiceShifts(ctx *gin.Context, sessionId, ownerId string, filter shiftListFilter, page int) (resp ShiftsResponse, err error) {
+	logger.LogInfo("Request received in GetServiceShifts", sessionId)
+
+	service, err := database.GetActiveServiceByOwner(ctx, ownerId)
+	if err != nil {
+		err = ownerError(sessionId, err)
 		return
 	}
 
-	notifyShift(ctx, sessionId, shift.ID, constants.NOTIFICATION_TYPE_SHIFT_UPDATED, constants.NOTIFICATION_TITLE_SHIFT_UPDATED)
+	rows, totalRows, err := listShifts(ctx, func(query *gorm.DB) *gorm.DB {
+		return query.Where("shifts.service_id = ?", service.ID)
+	}, filter, page)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get the shifts error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the shifts")
+		return
+	}
 
-	logger.LogInfo("Response returned from RescheduleShift", sessionId)
+	resp = shiftsPage(rows, totalRows, database.BusinessNow())
+
+	logger.LogInfo("Response returned from GetServiceShifts", sessionId)
+
+	return
+}
+
+// GetDriverShifts lists the shifts a driver drives and the shifts their vehicles are
+// on, in any service. A member who joined with vehicles only sees their vehicles' shifts.
+func GetDriverShifts(ctx *gin.Context, sessionId, driverId string, filter shiftListFilter, page int) (resp ShiftsResponse, err error) {
+	logger.LogInfo("Request received in GetDriverShifts", sessionId)
+
+	rows, totalRows, err := listShifts(ctx, func(query *gorm.DB) *gorm.DB {
+		return query.Where("(shifts.driver_id = ? OR vehicles.driver_id = ?)", driverId, driverId)
+	}, filter, page)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get the shifts error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the shifts")
+		return
+	}
+
+	resp = shiftsPage(rows, totalRows, database.BusinessNow())
+
+	logger.LogInfo("Response returned from GetDriverShifts", sessionId)
+
+	return
+}
+
+func GetPassengerShifts(ctx *gin.Context, sessionId, passengerId string, filter shiftListFilter, page int) (resp ShiftsResponse, err error) {
+	logger.LogInfo("Request received in GetPassengerShifts", sessionId)
+
+	rows, totalRows, err := listShifts(ctx, func(query *gorm.DB) *gorm.DB {
+		return query.Where(`EXISTS (
+			SELECT 1 FROM shift_passengers
+			WHERE shift_passengers.shift_id = shifts.id
+			  AND shift_passengers.passenger_id = ?
+			  AND shift_passengers.status = ?
+		)`, passengerId, constants.Shift_Passenger_Active)
+	}, filter, page)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get the shifts error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the shifts")
+		return
+	}
+
+	resp = shiftsPage(rows, totalRows, database.BusinessNow())
+
+	logger.LogInfo("Response returned from GetPassengerShifts", sessionId)
+
+	return
+}
+
+// GetShiftHistory lists every shift the owner's service ever ran, deleted ones included.
+func GetShiftHistory(ctx *gin.Context, sessionId, ownerId string, page int) (resp ShiftHistoryResponse, err error) {
+	logger.LogInfo("Request received in GetShiftHistory", sessionId)
+
+	service, err := database.GetActiveServiceByOwner(ctx, ownerId)
+	if err != nil {
+		err = ownerError(sessionId, err)
+		return
+	}
+
+	rows, totalRows, err := getShiftHistory(ctx, service.ID, page)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get the shift history error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the shift history")
+		return
+	}
+
+	resp = shiftHistoryPage(rows, totalRows)
+
+	logger.LogInfo("Response returned from GetShiftHistory", sessionId)
+
+	return
+}
+
+// GetPassengerHistory lists who travelled on the owner's shifts, when they joined the
+// service, when they were put on and taken off each shift and how often they travelled.
+func GetPassengerHistory(ctx *gin.Context, sessionId, ownerId, passengerId string, page int) (resp PassengerHistoryResponse, err error) {
+	logger.LogInfo("Request received in GetPassengerHistory", sessionId)
+
+	service, err := database.GetActiveServiceByOwner(ctx, ownerId)
+	if err != nil {
+		err = ownerError(sessionId, err)
+		return
+	}
+
+	rows, totalRows, err := getPassengerHistory(ctx, service.ID, passengerId, page)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get the passenger history error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the passenger history")
+		return
+	}
+
+	resp = passengerHistoryPage(rows, totalRows)
+
+	logger.LogInfo("Response returned from GetPassengerHistory", sessionId)
+
+	return
+}
+
+// GetOccurrences lists trips with their attendance counted. An owner sees every trip
+// of their service, a driver the trips they drove.
+func GetOccurrences(ctx *gin.Context, sessionId, userId, shiftId string, page int) (resp OccurrencesResponse, err error) {
+	logger.LogInfo("Request received in GetOccurrences", sessionId)
+
+	scopeColumn, scopeValue := "driver_id", userId
+
+	service, e := database.GetActiveServiceByOwner(ctx, userId)
+	if e == nil {
+		scopeColumn, scopeValue = "service_id", service.ID
+	} else if !isNotFound(e) {
+		logger.LogError(sessionId, "failed to read the service error: "+e.Error())
+		err = errors.New(constants.Unknown_Error)
+		return
+	}
+
+	rows, totalRows, err := getOccurrences(ctx, scopeColumn, scopeValue, shiftId, page)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get the trips error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the trips")
+		return
+	}
+
+	resp = occurrencesPage(rows, totalRows)
+
+	logger.LogInfo("Response returned from GetOccurrences", sessionId)
+
+	return
+}
+
+func GetAttendance(ctx *gin.Context, sessionId, userId, shiftId, date string) (resp AttendanceResponse, err error) {
+	logger.LogInfo("Request received in GetAttendance", sessionId)
+
+	if resp, err = attendanceView(ctx, userId, shiftId, date, false); err != nil {
+		err = utils.ClientError(sessionId, err, fmt.Sprintf(constants.Failed_To_Do_Job, "get the attendance"))
+		return
+	}
+
+	logger.LogInfo("Response returned from GetAttendance", sessionId)
+
+	return
+}
+
+// GetPassengerAttendance lets the passengers of a trip see who else travels on it and
+// who will be absent.
+func GetPassengerAttendance(ctx *gin.Context, sessionId, passengerId, shiftId, date string) (resp AttendanceResponse, err error) {
+	logger.LogInfo("Request received in GetPassengerAttendance", sessionId)
+
+	if resp, err = attendanceView(ctx, passengerId, shiftId, date, true); err != nil {
+		err = utils.ClientError(sessionId, err, fmt.Sprintf(constants.Failed_To_Do_Job, "get the attendance"))
+		return
+	}
+
+	logger.LogInfo("Response returned from GetPassengerAttendance", sessionId)
+
+	return
+}
+
+// MarkAttendance marks the passenger absent, or present again, for one trip and tells
+// the driver of that trip and the owner.
+func MarkAttendance(ctx *gin.Context, sessionId, passengerId string, request MarkAttendanceRequest) (resp MarkAttendanceResponse, err error) {
+	logger.LogInfo("Request received in MarkAttendance", sessionId)
+
+	change, err := markAttendance(ctx, sessionId, passengerId, request)
+	if err != nil {
+		err = utils.ClientError(sessionId, err, fmt.Sprintf(constants.Update_Failed, "attendance"))
+		return
+	}
+
+	notifyAttendance(ctx, sessionId, change)
+
+	resp = MarkAttendanceResponse{
+		ShiftId: request.ShiftId,
+		Date:    request.Date,
+		Status:  request.Status,
+		Changed: change.Changed,
+	}
+
+	logger.LogInfo("Response returned from MarkAttendance", sessionId)
+
+	return
+}
+
+// SendDriverLocation lets the driver of a shift tell today's passengers where they are.
+func SendDriverLocation(ctx *gin.Context, sessionId, driverId string, request DriverLocationRequest) (resp DriverLocationResponse, err error) {
+	logger.LogInfo("Request received in SendDriverLocation", sessionId)
+
+	result, err := sendDriverUpdate(ctx, sessionId, driverId, request)
+	if err != nil {
+		err = utils.ClientError(sessionId, err, fmt.Sprintf(constants.Failed_To_Do_Job, "send the update"))
+		return
+	}
+
+	notifyDriverUpdate(ctx, sessionId, request, result)
+
+	resp = DriverLocationResponse{
+		UpdateId:   result.Update.ID,
+		Date:       result.Occurrence.OccurrenceDate,
+		Recipients: len(result.Recipients),
+	}
+
+	logger.LogInfo("Response returned from SendDriverLocation", sessionId)
+
+	return
+}
+
+func AddShiftRequest(ctx *gin.Context, sessionId, passengerId string, request ShiftRequestInput) (requestId string, err error) {
+	logger.LogInfo("Request received in AddShiftRequest", sessionId)
+
+	if requestId, err = createShiftRequest(ctx, sessionId, passengerId, request); err != nil {
+		err = utils.ClientError(sessionId, err, fmt.Sprintf(constants.Creation_Failed, "shift request"))
+		return
+	}
+
+	logger.LogInfo("Response returned from AddShiftRequest", sessionId)
+	logger.LogDebug2("Response returned from AddShiftRequest", sessionId, requestId)
+
+	return
+}
+
+func GetMyShiftRequests(ctx *gin.Context, sessionId, passengerId string, filter shiftRequestSearch, page int) (resp ShiftRequestsResponse, err error) {
+	logger.LogInfo("Request received in GetMyShiftRequests", sessionId)
+
+	rows, locations, totalRows, err := getShiftRequests(ctx, func(query *gorm.DB) *gorm.DB {
+		return query.Where("shift_requests.passenger_id = ?", passengerId)
+	}, filter, page)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get the shift requests error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the shift requests")
+		return
+	}
+
+	resp = shiftRequestsPage(rows, locations, totalRows)
+
+	logger.LogInfo("Response returned from GetMyShiftRequests", sessionId)
+
+	return
+}
+
+func DeleteShiftRequest(ctx *gin.Context, sessionId, passengerId, requestId string) (err error) {
+	logger.LogInfo("Request received in DeleteShiftRequest", sessionId)
+
+	if err = deleteShiftRequest(ctx, sessionId, passengerId, requestId); err != nil {
+		err = utils.ClientError(sessionId, err, fmt.Sprintf(constants.DELETE_Failed, "shift request"))
+		return
+	}
+
+	logger.LogInfo("Response returned from DeleteShiftRequest", sessionId)
+
+	return
+}
+
+// SearchShiftRequests lets an owner find passengers' requirements. A request addressed
+// to another service is never shown to them.
+func SearchShiftRequests(ctx *gin.Context, sessionId, ownerId string, filter shiftRequestSearch, page int) (resp ShiftRequestsResponse, err error) {
+	logger.LogInfo("Request received in SearchShiftRequests", sessionId)
+
+	service, err := database.GetActiveServiceByOwner(ctx, ownerId)
+	if err != nil {
+		err = ownerError(sessionId, err)
+		return
+	}
+
+	rows, locations, totalRows, err := getShiftRequests(ctx, func(query *gorm.DB) *gorm.DB {
+		return query.Where("(COALESCE(shift_requests.service_id, '') = '' OR shift_requests.service_id = ?)", service.ID)
+	}, filter, page)
+	if err != nil {
+		logger.LogError(sessionId, "failed to search the shift requests error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "search the shift requests")
+		return
+	}
+
+	resp = shiftRequestsPage(rows, locations, totalRows)
+
+	logger.LogInfo("Response returned from SearchShiftRequests", sessionId)
+
+	return
+}
+
+// GetTravelHistory lists the trips a passenger was on, with the driver, vehicle and
+// route of that day and whether they travelled.
+func GetTravelHistory(ctx *gin.Context, sessionId, passengerId string, page int) (resp TravelHistoryResponse, err error) {
+	logger.LogInfo("Request received in GetTravelHistory", sessionId)
+
+	rows, totalRows, err := getTravelHistory(ctx, passengerId, page)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get the travel history error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the travel history")
+		return
+	}
+
+	resp = travelHistoryPage(rows, totalRows)
+
+	logger.LogInfo("Response returned from GetTravelHistory", sessionId)
 
 	return
 }

@@ -159,6 +159,7 @@ func getRideResp(sessionId string, ride postgress.RideDetails, childRides []post
 		EndLocation:          ride.EndLocation,
 		RoutePoints:          ride.RoutePoints,
 		Fare:                 ride.Fare,
+		Code:                 ride.Code,
 		OpenURL:              openUrl,
 	}
 
@@ -184,6 +185,7 @@ func getRideResp(sessionId string, ride postgress.RideDetails, childRides []post
 			EndLocation:          ride.EndLocation,
 			RoutePoints:          ride.RoutePoints,
 			Fare:                 ride.Fare,
+			Code:                 ride.Code,
 			OpenURL:              openUrl,
 		})
 	}

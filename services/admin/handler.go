@@ -394,269 +394,6 @@ func GetApprochRequestsHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, resp)
 }
 
-// creates a role an admin can hand out inside a group
-func CreateRoleHandler(ctx *gin.Context) {
-	sessionId := xid.New().String()
-	logger.LogInfo("Request received in CreateRoleHandler", sessionId)
-
-	var request AdminRoleRequest
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		logger.LogError(sessionId, "binding error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: fmt.Sprintf(constants.Creation_Failed, "role"),
-		})
-		return
-	}
-
-	logger.LogDebug2("Request received in CreateRoleHandler", sessionId, request)
-
-	if err := ValidateRoleRequest(&request); err != nil {
-		logger.LogError(sessionId, "validation error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
-		return
-	}
-
-	roleId, err := CreateRole(ctx, sessionId, request)
-	if err != nil {
-		logger.LogError(sessionId, "create role error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
-		return
-	}
-
-	roleResp := createdRoleResp(roleId)
-
-	logger.LogInfo("Response returned from CreateRoleHandler", sessionId)
-
-	ctx.JSON(http.StatusOK, roleResp)
-}
-
-// lists every role with the permissions it currently holds
-func GetRolesHandler(ctx *gin.Context) {
-	sessionId := xid.New().String()
-	logger.LogInfo("Request received in GetRolesHandler", sessionId)
-
-	page, err := utils.GetPageNumber(ctx)
-	if err != nil {
-		logger.LogError(sessionId, "failed to get page number error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: fmt.Sprintf(constants.Invalid_Data, "page"),
-		})
-		return
-	}
-
-	roles, permissions, totalRows, err := GetRoles(ctx, sessionId, page)
-	if err != nil {
-		logger.LogError(sessionId, "get roles error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
-		return
-	}
-
-	rolesResp := rolesResp(roles, permissions, totalRows)
-
-	logger.LogInfo("Response returned from GetRolesHandler", sessionId)
-
-	ctx.JSON(http.StatusOK, rolesResp)
-}
-
-// updates the name or the description of a role
-func UpdateRoleHandler(ctx *gin.Context) {
-	sessionId := xid.New().String()
-	logger.LogInfo("Request received in UpdateRoleHandler", sessionId)
-
-	roleId := ctx.Query(constants.Role_Key)
-
-	var request AdminRoleUpdateRequest
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		logger.LogError(sessionId, "binding error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: fmt.Sprintf(constants.Update_Failed, "role"),
-		})
-		return
-	}
-
-	logger.LogDebug2("Request received in UpdateRoleHandler", sessionId, request)
-
-	if err := ValidateRoleUpdateRequest(roleId, &request); err != nil {
-		logger.LogError(sessionId, "validation error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
-		return
-	}
-
-	if err := UpdateRole(ctx, sessionId, roleId, request); err != nil {
-		logger.LogError(sessionId, "update role error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
-		return
-	}
-
-	logger.LogInfo("Response returned from UpdateRoleHandler", sessionId)
-
-	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(fmt.Sprintf(constants.Updated_Successfully, "Role")))
-}
-
-// deletes a role that is neither a system role nor still held by a member
-func DeleteRoleHandler(ctx *gin.Context) {
-	sessionId := xid.New().String()
-	logger.LogInfo("Request received in DeleteRoleHandler", sessionId)
-
-	adminId := ctx.GetString(constants.User_KEY)
-	roleId := ctx.Query(constants.Role_Key)
-
-	if err := utils.ValidateId(roleId); err != nil {
-		logger.LogError(sessionId, "validation error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: fmt.Sprintf(constants.Invalid_Data, "role id"),
-		})
-		return
-	}
-
-	if err := DeleteRole(ctx, sessionId, adminId, roleId); err != nil {
-		logger.LogError(sessionId, "delete role error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
-		return
-	}
-
-	logger.LogInfo("Response returned from DeleteRoleHandler", sessionId)
-
-	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(fmt.Sprintf(constants.Deleted_Successfully, "Role")))
-}
-
-// creates a permission that can then be mapped onto any role
-func CreatePermissionHandler(ctx *gin.Context) {
-	sessionId := xid.New().String()
-	logger.LogInfo("Request received in CreatePermissionHandler", sessionId)
-
-	var request AdminPermissionRequest
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		logger.LogError(sessionId, "binding error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: fmt.Sprintf(constants.Creation_Failed, "permission"),
-		})
-		return
-	}
-
-	logger.LogDebug2("Request received in CreatePermissionHandler", sessionId, request)
-
-	if err := ValidatePermissionRequest(&request); err != nil {
-		logger.LogError(sessionId, "validation error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
-		return
-	}
-
-	permissionId, err := CreatePermission(ctx, sessionId, request)
-	if err != nil {
-		logger.LogError(sessionId, "create permission error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
-		return
-	}
-
-	permissionResp := createdPermissionResp(permissionId)
-
-	logger.LogInfo("Response returned from CreatePermissionHandler", sessionId)
-
-	ctx.JSON(http.StatusOK, permissionResp)
-}
-
-// lists every permission the system knows about
-func GetPermissionsHandler(ctx *gin.Context) {
-	sessionId := xid.New().String()
-	logger.LogInfo("Request received in GetPermissionsHandler", sessionId)
-
-	page, err := utils.GetPageNumber(ctx)
-	if err != nil {
-		logger.LogError(sessionId, "failed to get page number error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: fmt.Sprintf(constants.Invalid_Data, "page"),
-		})
-		return
-	}
-
-	permissions, totalRows, err := GetPermissions(ctx, sessionId, page)
-	if err != nil {
-		logger.LogError(sessionId, "get permissions error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
-		return
-	}
-
-	permissionsResp := permissionsResp(permissions, totalRows)
-
-	logger.LogInfo("Response returned from GetPermissionsHandler", sessionId)
-
-	ctx.JSON(http.StatusOK, permissionsResp)
-}
-
-// replaces the whole permission set of a role in one call
-func SetRolePermissionsHandler(ctx *gin.Context) {
-	sessionId := xid.New().String()
-	logger.LogInfo("Request received in SetRolePermissionsHandler", sessionId)
-
-	var request AdminRolePermissionsRequest
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		logger.LogError(sessionId, "binding error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: fmt.Sprintf(constants.Update_Failed, "role permissions"),
-		})
-		return
-	}
-
-	logger.LogDebug2("Request received in SetRolePermissionsHandler", sessionId, request)
-
-	if err := ValidateRolePermissionsRequest(&request); err != nil {
-		logger.LogError(sessionId, "validation error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
-		return
-	}
-
-	if err := SetRolePermissions(ctx, sessionId, request); err != nil {
-		logger.LogError(sessionId, "set role permissions error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
-		return
-	}
-
-	logger.LogInfo("Response returned from SetRolePermissionsHandler", sessionId)
-
-	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(fmt.Sprintf(constants.Updated_Successfully, "Role permissions")))
-}
-
 // the whole platform counted in one call, the admin's first screen
 func GetOverviewHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
@@ -723,7 +460,7 @@ func GetPassengersHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, passengersResp)
 }
 
-// one passenger with the fleets they ride with and the travel form they filled in
+// one passenger account
 func GetPassengerProfileHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in GetPassengerProfileHandler", sessionId)
@@ -739,7 +476,7 @@ func GetPassengerProfileHandler(ctx *gin.Context) {
 		return
 	}
 
-	passenger, groups, preferences, err := GetPassengerProfile(ctx, sessionId, passengerId)
+	passenger, err := GetPassengerProfile(ctx, sessionId, passengerId)
 	if err != nil {
 		logger.LogError(sessionId, "get passenger error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
@@ -749,7 +486,7 @@ func GetPassengerProfileHandler(ctx *gin.Context) {
 		return
 	}
 
-	profileResp := passengerProfileResp(passenger, groups, preferences)
+	profileResp := passengerProfileResp(passenger)
 
 	logger.LogInfo("Response returned from GetPassengerProfileHandler", sessionId)
 
@@ -869,10 +606,14 @@ func UpdateDriverStatusHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(fmt.Sprintf(constants.Updated_Successfully, "Driver")))
 }
 
-// every fleet on the platform with the size of each
-func GetGroupsHandler(ctx *gin.Context) {
+////////////////////////////// PICK & DROP OVERSIGHT //////////////////////////////
+// Read only: Pick & Drop and its shifts stay run by each service's own owner, the
+// admin console only ever looks.
+
+// every Pick & Drop service on the platform, active or disabled, with its roster
+func GetPickDropServicesHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
-	logger.LogInfo("Request received in GetGroupsHandler", sessionId)
+	logger.LogInfo("Request received in GetPickDropServicesHandler", sessionId)
 
 	search := ctx.DefaultQuery(constants.Search_Loc_Key, "")
 	status := ctx.DefaultQuery(constants.Status_Key, "")
@@ -887,9 +628,9 @@ func GetGroupsHandler(ctx *gin.Context) {
 		return
 	}
 
-	groups, totalRows, err := GetGroups(ctx, sessionId, search, status, page)
+	services, totalRows, err := GetPickDropServices(ctx, sessionId, search, status, page)
 	if err != nil {
-		logger.LogError(sessionId, "get groups error: "+err.Error())
+		logger.LogError(sessionId, "get services error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
 			Message: err.Error(),
@@ -897,64 +638,18 @@ func GetGroupsHandler(ctx *gin.Context) {
 		return
 	}
 
-	groupsResp := adminGroupsResp(groups, totalRows)
+	logger.LogInfo("Response returned from GetPickDropServicesHandler", sessionId)
 
-	logger.LogInfo("Response returned from GetGroupsHandler", sessionId)
-
-	ctx.JSON(http.StatusOK, groupsResp)
+	ctx.JSON(http.StatusOK, servicesResp(services, totalRows))
 }
 
-// one fleet with its full rosters, including everybody who was turned away
-func GetGroupDetailsHandler(ctx *gin.Context) {
+// one service, its roster counts and every active shift it has
+func GetPickDropServiceDetailHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
-	logger.LogInfo("Request received in GetGroupDetailsHandler", sessionId)
+	logger.LogInfo("Request received in GetPickDropServiceDetailHandler", sessionId)
 
-	groupId := ctx.Query(constants.Group_Key)
-
-	if err := utils.ValidateId(groupId); err != nil {
-		logger.LogError(sessionId, "validation error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: fmt.Sprintf(constants.Invalid_Data, "group id"),
-		})
-		return
-	}
-
-	_, overview, members, vehicles, passengers, err := GetGroupDetails(ctx, sessionId, groupId)
-	if err != nil {
-		logger.LogError(sessionId, "get group error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
-		return
-	}
-
-	detailsResp := adminGroupDetailsResp(overview, members, vehicles, passengers)
-
-	logger.LogInfo("Response returned from GetGroupDetailsHandler", sessionId)
-
-	ctx.JSON(http.StatusOK, detailsResp)
-}
-
-// shuts a fleet down, or brings it back, without deleting its history
-func UpdateGroupStatusHandler(ctx *gin.Context) {
-	sessionId := xid.New().String()
-	logger.LogInfo("Request received in UpdateGroupStatusHandler", sessionId)
-
-	groupId := ctx.Query(constants.Group_Key)
-
-	var request AdminStatusRequest
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		logger.LogError(sessionId, "binding error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: fmt.Sprintf(constants.Update_Failed, "group"),
-		})
-		return
-	}
-
-	if err := ValidateAccountStatus(groupId, &request); err != nil {
+	serviceId := ctx.Query(constants.Service_Key)
+	if err := utils.ValidateId(serviceId); err != nil {
 		logger.LogError(sessionId, "validation error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
@@ -963,8 +658,9 @@ func UpdateGroupStatusHandler(ctx *gin.Context) {
 		return
 	}
 
-	if err := UpdateGroupStatus(ctx, sessionId, groupId, request.Status); err != nil {
-		logger.LogError(sessionId, "update group status error: "+err.Error())
+	service, counts, shifts, err := GetPickDropServiceDetail(ctx, sessionId, serviceId)
+	if err != nil {
+		logger.LogError(sessionId, "get service error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
 			Message: err.Error(),
@@ -972,22 +668,32 @@ func UpdateGroupStatusHandler(ctx *gin.Context) {
 		return
 	}
 
-	logger.LogInfo("Response returned from UpdateGroupStatusHandler", sessionId)
+	logger.LogInfo("Response returned from GetPickDropServiceDetailHandler", sessionId)
 
-	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(fmt.Sprintf(constants.Updated_Successfully, "Group")))
+	ctx.JSON(http.StatusOK, serviceDetailResp(service, counts, shifts))
 }
 
-// every shift on the platform, filterable
+// every shift on the platform, in any service, searched the same way an owner
+// searches their own
 func GetShiftsHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
 	logger.LogInfo("Request received in GetShiftsHandler", sessionId)
 
-	groupId := ctx.DefaultQuery(constants.Group_Key, "")
-	driverId := ctx.DefaultQuery(constants.Driver_Key, "")
-	direction := ctx.DefaultQuery(constants.Direction_Key, "")
-	startTime := ctx.DefaultQuery(constants.Start_Time_Key, "")
-	endTime := ctx.DefaultQuery(constants.Extimated_End_Time_Key, "")
-	status := ctx.DefaultQuery(constants.Status_Key, "")
+	filter, err := ParseAdminShiftFilter(
+		ctx.DefaultQuery(constants.Status_Key, ""),
+		ctx.DefaultQuery(constants.Day_Of_Week_Key, ""),
+		ctx.DefaultQuery(constants.Search_Loc_Key, ""),
+		ctx.DefaultQuery(constants.Start_Time_Key, ""),
+		ctx.DefaultQuery(constants.End_Time_Key, ""),
+	)
+	if err != nil {
+		logger.LogError(sessionId, "validation error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
 
 	page, err := utils.GetPageNumber(ctx)
 	if err != nil {
@@ -999,7 +705,7 @@ func GetShiftsHandler(ctx *gin.Context) {
 		return
 	}
 
-	shifts, totalRows, err := GetShifts(ctx, sessionId, groupId, driverId, direction, startTime, endTime, status, page)
+	shifts, totalRows, err := GetShifts(ctx, sessionId, filter, page)
 	if err != nil {
 		logger.LogError(sessionId, "get shifts error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
@@ -1009,32 +715,26 @@ func GetShiftsHandler(ctx *gin.Context) {
 		return
 	}
 
-	shiftsResp := adminShiftsResp(shifts, totalRows)
-
 	logger.LogInfo("Response returned from GetShiftsHandler", sessionId)
 
-	ctx.JSON(http.StatusOK, shiftsResp)
+	ctx.JSON(http.StatusOK, shiftsResp(shifts, totalRows))
 }
 
-// one shift with its route in order and everybody aboard
-func GetShiftDetailsHandler(ctx *gin.Context) {
+// every open shift request on the platform, addressed to a service or still open to
+// any of them
+func GetShiftRequestsHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
-	logger.LogInfo("Request received in GetShiftDetailsHandler", sessionId)
+	logger.LogInfo("Request received in GetShiftRequestsHandler", sessionId)
 
-	shiftId := ctx.Query(constants.Shift_Key)
-
-	if err := utils.ValidateId(shiftId); err != nil {
-		logger.LogError(sessionId, "validation error: "+err.Error())
-		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
-			Code:    http.StatusBadRequest,
-			Message: fmt.Sprintf(constants.Invalid_Data, "shift id"),
-		})
-		return
-	}
-
-	shift, stops, seats, err := GetShiftDetails(ctx, sessionId, shiftId)
+	filter, err := ParseAdminShiftFilter(
+		constants.Shift_Status_All,
+		ctx.DefaultQuery(constants.Day_Of_Week_Key, ""),
+		ctx.DefaultQuery(constants.Search_Loc_Key, ""),
+		ctx.DefaultQuery(constants.Start_Time_Key, ""),
+		ctx.DefaultQuery(constants.End_Time_Key, ""),
+	)
 	if err != nil {
-		logger.LogError(sessionId, "get shift error: "+err.Error())
+		logger.LogError(sessionId, "validation error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
 			Message: err.Error(),
@@ -1042,9 +742,60 @@ func GetShiftDetailsHandler(ctx *gin.Context) {
 		return
 	}
 
-	detailsResp := adminShiftDetailsResp(shift, stops, seats)
+	page, err := utils.GetPageNumber(ctx)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get page number error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Invalid_Data, "page"),
+		})
+		return
+	}
 
-	logger.LogInfo("Response returned from GetShiftDetailsHandler", sessionId)
+	requests, totalRows, err := GetShiftRequests(ctx, sessionId, filter, page)
+	if err != nil {
+		logger.LogError(sessionId, "get shift requests error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
 
-	ctx.JSON(http.StatusOK, detailsResp)
+	logger.LogInfo("Response returned from GetShiftRequestsHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, shiftRequestsResp(requests, totalRows))
+}
+
+// every advertisement on the platform, whatever the status of the service that
+// posted it
+func GetAdvertisementsHandler(ctx *gin.Context) {
+	sessionId := xid.New().String()
+	logger.LogInfo("Request received in GetAdvertisementsHandler", sessionId)
+
+	search := ctx.DefaultQuery(constants.Search_Loc_Key, "")
+
+	page, err := utils.GetPageNumber(ctx)
+	if err != nil {
+		logger.LogError(sessionId, "failed to get page number error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf(constants.Invalid_Data, "page"),
+		})
+		return
+	}
+
+	ads, totalRows, err := GetAdvertisements(ctx, sessionId, search, page)
+	if err != nil {
+		logger.LogError(sessionId, "get advertisements error: "+err.Error())
+		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	logger.LogInfo("Response returned from GetAdvertisementsHandler", sessionId)
+
+	ctx.JSON(http.StatusOK, advertisementsResp(ads, totalRows))
 }

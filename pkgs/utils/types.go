@@ -127,6 +127,27 @@ type Location struct {
 	Category string  `json:"category"`
 }
 
+// Refusal is a business rule turning a request down. Its message is written for the
+// caller and goes back as it stands, where a database failure is logged and replaced
+// by a generic message so nothing internal leaks out.
+type Refusal struct {
+	Message string
+}
+
+func (refusal Refusal) Error() string {
+	return refusal.Message
+}
+
+// RouteLocation is one place of an ordered route with the time it is reached. Every
+// api that takes a route shares it: advertisements, shift requests, shifts and a
+// passenger's weekly availability.
+type RouteLocation struct {
+	Location string  `json:"location"`
+	Lat      float64 `json:"lat"`
+	Lng      float64 `json:"lng"`
+	Time     string  `json:"time"`
+}
+
 type SMSResponse struct {
 	Response SMSResponseDetails `json:"response"`
 }

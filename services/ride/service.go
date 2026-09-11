@@ -32,60 +32,44 @@ func CreateRide(ctx *gin.Context, sessionId string, request RideCreationRequest)
 		return
 	}
 
-	hasRide, err := VehicleHasRideDuringTime(request.VehicleId, request.StartDatetime, request.EstimatedEndDatetime)
-	if err != nil {
-		logger.LogError(sessionId, "failed to determine if vehicle already has a ride error: "+err.Error())
-		err = errors.New("Vehicle might already have a ride scheduled for this duration")
+	// a driver can only put a ride on a vehicle of their own
+	if vehicle.DriverId != request.EXTDriverId {
+		logger.LogError(sessionId, "the vehicle does not belong to the driver")
+		err = errors.New(constants.Vehicle_Not_Found)
 		return
 	}
-	if hasRide {
-		err = errors.New("Vehicle already has a ride scheduled for this duration")
+
+	// a vehicle registered before seats were recorded holds 0, ride share keeps
+	// working on it exactly as before until its seats are set, and from then on no
+	// ride may offer more seats than the vehicle has
+	if vehicle.NumberOfSeats > 0 && request.NumberOfSeats > vehicle.NumberOfSeats {
+		err = fmt.Errorf(constants.Ride_Seats_Exceed_Vehicle, vehicle.NumberOfSeats)
 		logger.LogError(sessionId, err)
 		return
 	}
 
-	hasVehicleShift, err := database.VehicleHasShiftDuringTime(ctx, request.VehicleId, request.StartDatetime, request.EstimatedEndDatetime, "")
+	// every ride the request lays down, the first one and each repeat of a series
+	slots, err := rideSlots(request)
 	if err != nil {
-		logger.LogError(sessionId, "failed to determine if vehicle already has a shift error: "+err.Error())
-		err = errors.New(constants.Vehicle_Busy)
+		logger.LogError(sessionId, "failed to lay out the rides error: "+err.Error())
+		err = fmt.Errorf(constants.Invalid_Data, "ride dates")
 		return
 	}
-	if hasVehicleShift {
-		err = errors.New(constants.Vehicle_Busy)
+
+	logger.LogDebug("rides to create", sessionId, fmt.Sprintf("recurring: %v, frequency: %d, period: %d, rides: %d", request.IsRecurring, request.Frequency, request.Period, len(slots)))
+
+	// a series whose rides run into each other would need the vehicle twice at once
+	if date, overlaps := seriesOverlap(slots); overlaps {
+		err = fmt.Errorf(constants.Ride_Series_Overlap, date)
 		logger.LogError(sessionId, err)
 		return
 	}
 
-	hasDriverShift, err := database.DriverHasShiftDuringTime(ctx, request.EXTDriverId, request.StartDatetime, request.EstimatedEndDatetime, "")
-	if err != nil {
-		logger.LogError(sessionId, "failed to determine if driver already has a shift error: "+err.Error())
-		err = errors.New(constants.Driver_Busy)
+	// neither the driver, on whichever vehicle, nor the vehicle, whoever drives it, can
+	// be on another ride or a shift trip at the time of any ride of the request, and a
+	// clash on one date refuses the whole request
+	if rideId, err = createRides(ctx, sessionId, request, vehicle.ID, slots); err != nil {
 		return
-	}
-	if hasDriverShift {
-		err = errors.New(constants.Driver_Busy)
-		logger.LogError(sessionId, err)
-		return
-	}
-
-	// Save the ride in the database
-	ride := mapRideData(request, "", request.EXTDriverId, vehicle.ID)
-	if err = database.DatabaseConn.Postgres.Create(&ride).Error; err != nil {
-		logger.LogError(sessionId, "failed to create ride error: "+err.Error())
-		err = fmt.Errorf(constants.Creation_Failed, "ride")
-		return
-	}
-	rideId = ride.ID
-
-	if request.IsRecurring {
-		logger.LogDebug("recurring ride", sessionId, fmt.Sprintf("frequency: %d, period: %d", request.Frequency, request.Period))
-
-		err = handleRecurring(ctx, rideId, rideId, request.VehicleId, request)
-		if err != nil {
-			logger.LogError(sessionId, "failed to create recurring rides ride error: "+err.Error())
-			err = fmt.Errorf(constants.Creation_Failed, "recurring rides")
-			return
-		}
 	}
 
 	if request.MakeTemplate {
@@ -108,98 +92,6 @@ func CreateRide(ctx *gin.Context, sessionId string, request RideCreationRequest)
 
 	logger.LogInfo("Response returned from CreateRide", sessionId)
 	logger.LogDebug2("Response returned from CreateRide", sessionId, rideId)
-
-	return
-}
-
-func handleRecurring(ctx *gin.Context, sessionId, rideId, vehicleId string, request RideCreationRequest) (err error) {
-	logger.LogInfo("Request received in handleRecurring", sessionId)
-
-	startDatetime, err := utils.ConvertStrToTime(request.StartDatetime)
-	if err != nil {
-		logger.LogError(sessionId, err)
-		return err
-	}
-
-	endDatetime, err := utils.ConvertStrToTime(request.EstimatedEndDatetime)
-	if err != nil {
-		logger.LogError(sessionId, err)
-		return err
-	}
-
-	frequency := findFrequency(request.Frequency, request.Period)
-
-	logger.LogDebug("frequency iterations", sessionId, fmt.Sprintf("frequency: %d, period: %d, total iterations: %d", request.Frequency, request.Period, frequency))
-
-	if request.Period == WEEKLY {
-		// as we want to start adding recurring payments from day after startdate
-		dayOfWeek := int(startDatetime.Weekday()) + 1
-		shift := 1
-		for i := 1; i <= frequency; i++ {
-			rideRequest := request
-
-			// keep day between 1-7 [only create ride on days user has requested]
-			day := ((dayOfWeek - 1) % 7) + 1
-			// [day of the week based on start date]
-			dayOfWeek++
-			if !utils.InSlice(request.DaysOfWeek, day) {
-				// [number of days to be added since the start date]
-				shift++
-				continue
-			}
-
-			currentStart, currentEnd := shiftDailyDates(startDatetime, endDatetime, shift)
-
-			rideRequest.StartDatetime = currentStart.Format(constants.DateTimeLayout)
-			rideRequest.EstimatedEndDatetime = currentEnd.Format(constants.DateTimeLayout)
-			// [number of days to be added since the start date]
-			shift++
-
-			if skipRecurringForShift(ctx, sessionId, vehicleId, rideRequest.EXTDriverId, rideRequest.StartDatetime, rideRequest.EstimatedEndDatetime) {
-				continue
-			}
-
-			ride := mapRideData(rideRequest, rideId, rideRequest.EXTDriverId, vehicleId)
-
-			if err = database.DatabaseConn.Postgres.Create(&ride).Error; err != nil {
-				logger.LogError(sessionId, "failed to create ride error: "+err.Error())
-				return fmt.Errorf(constants.Creation_Failed, "ride")
-			}
-		}
-	} else {
-		for i := 1; i <= frequency; i++ {
-			rideRequest := request
-
-			step := i
-			// add i-th day from start date
-			currentStart, currentEnd := shiftDailyDates(startDatetime, endDatetime, step)
-
-			if request.Period == MONTHLY {
-				currentStart, currentEnd = shiftMonthlyDates(startDatetime, endDatetime, step)
-			}
-
-			rideRequest.StartDatetime = currentStart.Format(constants.DateTimeLayout)
-			rideRequest.EstimatedEndDatetime = currentEnd.Format(constants.DateTimeLayout)
-
-			if skipRecurringForShift(ctx, sessionId, vehicleId, rideRequest.EXTDriverId, rideRequest.StartDatetime, rideRequest.EstimatedEndDatetime) {
-				continue
-			}
-
-			ride := mapRideData(
-				rideRequest,
-				rideId,
-				rideRequest.EXTDriverId,
-				vehicleId,
-			)
-
-			if err = database.DatabaseConn.Postgres.Create(&ride).Error; err != nil {
-				logger.LogError(sessionId, "failed to create ride error: "+err.Error())
-				return fmt.Errorf(constants.Creation_Failed, "ride")
-			}
-		}
-	}
-
-	logger.LogInfo("Response returned from handleRecurring", sessionId)
 
 	return
 }
@@ -336,14 +228,86 @@ func UpdateRide(orgCtx *gin.Context, sessionId, rideId string, request UpdateRid
 		return nil
 	}
 
-	// Normal updates
+	// Normal updates, only ever by the driver who owns the ride
+	if ride.DriverID != orgCtx.GetString(constants.User_KEY) {
+		tx.Rollback()
+		err := errors.New(constants.Operation_Not_Permitted)
+		logger.LogError(sessionId, "driver is not the owner of this ride error: "+err.Error())
+		return err
+	}
+
 	updates := map[string]interface{}{}
 
-	if request.Status != nil {
-		updates["is_active"] = strings.EqualFold(*request.Status, constants.Ride_Status_Active)
+	// switching a ride off always goes through the guards and the archive above, so here
+	// a status can only switch a closed ride back on, and an empty or repeated status
+	// changes nothing
+	if request.Status != nil && strings.EqualFold(*request.Status, constants.Ride_Status_Active) && !ride.IsActive {
+		start, startErr := time.ParseInLocation(constants.DateTimeLayout, ride.StartDatetime, constants.Business_Location)
+		end, endErr := time.ParseInLocation(constants.DateTimeLayout, ride.EstimatedEndDatetime, constants.Business_Location)
+		if startErr != nil || endErr != nil {
+			tx.Rollback()
+			err := fmt.Errorf(constants.Invalid_Data, "ride dates")
+			logger.LogError(sessionId, err)
+			return err
+		}
+
+		// the worker closes a ride once it is over, and a ride that is over stays over
+		if !end.After(time.Now()) {
+			tx.Rollback()
+			err := errors.New(constants.Ride_Has_Ended)
+			logger.LogError(sessionId, err)
+			return err
+		}
+
+		// whatever the driver or the vehicle took on while the ride was off keeps its time
+		if err := database.LockShiftResources(tx, []string{ride.DriverID}, []string{ride.VehicleID}, nil); err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return errors.New(constants.General_Error)
+		}
+
+		clash, err := database.FindRideScheduleClash(tx, ride.DriverID, ride.VehicleID, []database.RideSlot{{Start: start, End: end}}, ride.ID)
+		if err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return errors.New(constants.General_Error)
+		}
+
+		if clash != nil {
+			tx.Rollback()
+			err = errors.New(clash.RideMessage())
+			logger.LogError(sessionId, err)
+			return err
+		}
+
+		updates["is_active"] = true
 	}
 
 	if request.NumberOfSeats > 0 {
+		// a ride cannot drop below the seats already booked on it
+		if request.NumberOfSeats < ride.SeatsTaken {
+			tx.Rollback()
+			err := fmt.Errorf(constants.Ride_Seats_Below_Booked, ride.SeatsTaken)
+			logger.LogError(sessionId, err)
+			return err
+		}
+
+		var vehicle postgress.Vehicle
+		if err := tx.Where("id = ?", ride.VehicleID).Find(&vehicle).Error; err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return errors.New(constants.General_Error)
+		}
+
+		// the same capacity rule as creating a ride, skipped only while the vehicle
+		// has no seat count recorded
+		if vehicle.NumberOfSeats > 0 && request.NumberOfSeats > vehicle.NumberOfSeats {
+			tx.Rollback()
+			err := fmt.Errorf(constants.Ride_Seats_Exceed_Vehicle, vehicle.NumberOfSeats)
+			logger.LogError(sessionId, err)
+			return err
+		}
+
 		updates["number_of_seats"] = request.NumberOfSeats
 	}
 

@@ -207,23 +207,25 @@ func SendUserNotification(orgCtx *gin.Context, sessionId, notificationType, user
 
 	var fcm string
 
+	lookupUserFCM := func() bool {
+		userFCM, err := database.GetDriverFCM(orgCtx, userId)
+		if err != nil {
+			logger.LogError(sessionId, err)
+			return false
+		}
+		fcm = userFCM.FCM
+		return true
+	}
+
 	switch notificationType {
 	case constants.NOTIFICATION_TYPE_RIDE_CREATED,
 		constants.NOTIFICATION_TYPE_PIN_CREATED,
 		constants.NOTIFICATION_TYPE_INFORMATION,
 		constants.NOTIFICATION_TYPE_MARKETING,
-		constants.NOTIFICATION_TYPE_SHIFT_CREATED,
-		constants.NOTIFICATION_TYPE_SHIFT_UPDATED,
-		constants.NOTIFICATION_TYPE_SHIFT_CANCELLED,
-		constants.NOTIFICATION_TYPE_GROUP_REQUEST,
-		constants.NOTIFICATION_TYPE_GROUP_DECISION,
 		constants.NOTIFICATION_TITLE_RIDE_BOOKED:
-		userFCM, err := database.GetDriverFCM(orgCtx, userId)
-		if err != nil {
-			logger.LogError(sessionId, err)
+		if !lookupUserFCM() {
 			return
 		}
-		fcm = userFCM.FCM
 	case constants.NOTIFICATION_TYPE_SMS_TO_SERVICE,
 		constants.NOTIFICATION_TYPE_BACKUP_SMS_TO_SERVICE:
 		if configuration.ConfigurationData.Integerations.SMS.LocalSMSService ||
@@ -245,8 +247,14 @@ func SendUserNotification(orgCtx *gin.Context, sessionId, notificationType, user
 			return
 		}
 	default:
-		logger.LogWarning(sessionId, fmt.Sprintf("unhandled notification type: %s", notificationType))
-		return
+		if !constants.IsPickDropNotificationType(notificationType) {
+			logger.LogWarning(sessionId, fmt.Sprintf("unhandled notification type: %s", notificationType))
+			return
+		}
+
+		if !lookupUserFCM() {
+			return
+		}
 	}
 
 	redis.SendNotification(database.DatabaseConn.RedisConn, redis.NotificationRequest{
@@ -494,4 +502,145 @@ func CreateOpenRideLink(urlType, shortCode string) string {
 func IsUUID(s string) bool {
 	_, err := uuid.Parse(s)
 	return err == nil
+}
+
+// NormalizeClock accepts a wall clock time as HH:MM or HH:MM:SS and hands it back as
+// HH:MM, the form every schedule is stored and compared in.
+func NormalizeClock(value string) (string, error) {
+	value = strings.TrimSpace(value)
+
+	for _, layout := range []string{constants.Clock_Layout, "15:04:05"} {
+		if clock, err := time.Parse(layout, value); err == nil {
+			return clock.Format(constants.Clock_Layout), nil
+		}
+	}
+
+	return "", fmt.Errorf(constants.Invalid_Data, "time, use HH:MM")
+}
+
+// ParseBusinessDate reads a YYYY-MM-DD date on the business wall clock.
+func ParseBusinessDate(value, key string) (time.Time, error) {
+	day, err := time.ParseInLocation(constants.Date_Layout, strings.TrimSpace(value), constants.Business_Location)
+	if err != nil {
+		return day, fmt.Errorf(constants.Invalid_Data, key+", use YYYY-MM-DD")
+	}
+
+	return day, nil
+}
+
+// ValidateDaysOfWeek checks a set of weekdays, Monday 1 to Sunday 7, each at most once.
+func ValidateDaysOfWeek(days []int) error {
+	if len(days) == 0 {
+		return fmt.Errorf(constants.Missing_Data, "Days of week")
+	}
+
+	seen := map[int]bool{}
+	for _, day := range days {
+		if day < constants.Day_Of_Week_Min_Value || day > constants.Day_Of_Week_Max_Value {
+			return fmt.Errorf(constants.Invalid_Data, "day of week, use 1 for Monday to 7 for Sunday")
+		}
+
+		if seen[day] {
+			return fmt.Errorf(constants.Invalid_Data, "days of week, a day is repeated")
+		}
+		seen[day] = true
+	}
+
+	return nil
+}
+
+// ParseDaysOfWeekQuery reads days of week sent as a comma separated query value.
+func ParseDaysOfWeekQuery(value string) (days []int, err error) {
+	if IsStringEmpty(strings.TrimSpace(value)) {
+		return
+	}
+
+	for _, part := range strings.Split(value, ",") {
+		day, e := strconv.Atoi(strings.TrimSpace(part))
+		if e != nil {
+			return nil, fmt.Errorf(constants.Invalid_Data, "days of week")
+		}
+		days = append(days, day)
+	}
+
+	return days, ValidateDaysOfWeek(days)
+}
+
+// ValidateRouteLocations checks an ordered route and hands it back cleaned: names
+// trimmed and every time as HH:MM. Each place has to be reached after the one before
+// it, a route is driven in order.
+func ValidateRouteLocations(locations []RouteLocation, minLen, maxLen int) ([]RouteLocation, error) {
+	if len(locations) < minLen {
+		return nil, fmt.Errorf("at least %d location(s) are required", minLen)
+	}
+
+	if len(locations) > maxLen {
+		return nil, fmt.Errorf("no more than %d locations can be sent", maxLen)
+	}
+
+	cleaned := make([]RouteLocation, 0, len(locations))
+	previous := ""
+
+	for index, location := range locations {
+		name := strings.TrimSpace(location.Location)
+		if IsStringEmpty(name) {
+			return nil, fmt.Errorf(constants.Missing_Data, fmt.Sprintf("Location %d", index+1))
+		}
+
+		if len(name) > constants.Location_Max_Len {
+			return nil, fmt.Errorf("length of location %d should not be more than %v characters", index+1, constants.Location_Max_Len)
+		}
+
+		if location.Lat < -90 || location.Lat > 90 || location.Lng < -180 || location.Lng > 180 {
+			return nil, fmt.Errorf(constants.Invalid_Data, fmt.Sprintf("coordinates of location %d", index+1))
+		}
+
+		clock, err := NormalizeClock(location.Time)
+		if err != nil {
+			return nil, fmt.Errorf(constants.Invalid_Data, fmt.Sprintf("time of location %d, use HH:MM", index+1))
+		}
+
+		if previous != "" && clock <= previous {
+			return nil, fmt.Errorf("location %d has to be reached after location %d", index+1, index)
+		}
+		previous = clock
+
+		cleaned = append(cleaned, RouteLocation{
+			Location: name,
+			Lat:      location.Lat,
+			Lng:      location.Lng,
+			Time:     clock,
+		})
+	}
+
+	return cleaned, nil
+}
+
+func Refuse(message string) error {
+	return Refusal{Message: message}
+}
+
+// ClientError turns whatever came out of a transaction into what the caller may see:
+// a refusal keeps its own message, anything else is logged and hidden behind the
+// fallback.
+func ClientError(sessionId string, err error, fallback string) error {
+	logger.LogError(sessionId, err)
+
+	var refusal Refusal
+	if errors.As(err, &refusal) {
+		return errors.New(refusal.Message)
+	}
+
+	return errors.New(fallback)
+}
+
+// RoutePoints lower cases every place of a route in order, the same normalisation
+// ride route points get, so the same array search finds them.
+func RoutePoints(locations []RouteLocation) []string {
+	points := make([]string, 0, len(locations))
+	for _, location := range locations {
+		points = append(points, strings.ToLower(strings.TrimSpace(location.Location)))
+	}
+
+	return points
 }

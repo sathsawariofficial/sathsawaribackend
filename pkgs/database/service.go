@@ -7,9 +7,13 @@ import (
 	"rideshare/pkgs/configuration"
 	"rideshare/pkgs/constants"
 	"rideshare/pkgs/database/postgress"
+	"sort"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lib/pq"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func GetActiveDriverById(orgCtx *gin.Context, driverId string) (driver postgress.Driver, err error) {
@@ -112,36 +116,41 @@ func SaveMissingLocation(orgCtx context.Context, request postgress.MissingLocati
 	return
 }
 
-// checkDriverFleetTies stops a driver being deleted out from under a fleet that
-// still depends on them. A fleet with a deleted owner would have nobody able to run
-// it, and a shift whose driver no longer exists would strand its passengers, so
-// both cases are refused and the caller is told what to sort out first.
-func checkDriverFleetTies(ctx context.Context, driverId string) error {
-	var ownedGroups int64
-	if err := DatabaseConn.Postgres.WithContext(ctx).
-		Model(&postgress.Group{}).
+// checkDriverPickDropTies stops a driver being deleted out from under Pick & Drop. A
+// service with a deleted owner would have nobody able to run it, and a shift whose
+// driver or vehicle no longer exists would strand its passengers, so both are
+// refused and the caller is told what to sort out first.
+func checkDriverPickDropTies(ctx context.Context, driverId string) error {
+	db := DatabaseConn.Postgres.WithContext(ctx)
+
+	var ownedServices int64
+	if err := db.Model(&postgress.PickDropService{}).
 		Where("owner_driver_id = ?", driverId).
 		Where("status = ?", constants.Status_Active).
-		Count(&ownedGroups).Error; err != nil {
+		Count(&ownedServices).Error; err != nil {
 		return err
 	}
 
-	if ownedGroups > 0 {
-		return fmt.Errorf("this driver owns %d active group(s), delete or hand those over first", ownedGroups)
+	if ownedServices > 0 {
+		return errors.New("this driver owns an active Pick & Drop service, disable it first")
 	}
 
-	var upcomingShifts int64
-	if err := DatabaseConn.Postgres.WithContext(ctx).
-		Model(&postgress.Shift{}).
-		Where("driver_id = ?", driverId).
-		Where("is_active = ?", true).
-		Where("start_datetime > ?", time.Now().Format(constants.DateTimeLayout)).
-		Count(&upcomingShifts).Error; err != nil {
+	var vehicleIds []string
+	if err := db.Model(&postgress.Vehicle{}).Where("driver_id = ?", driverId).Pluck("id", &vehicleIds).Error; err != nil {
 		return err
 	}
 
-	if upcomingShifts > 0 {
-		return fmt.Errorf("this driver is still driving %d upcoming shift(s), cancel or reassign those first", upcomingShifts)
+	driverShifts, vehicleShifts, err := CountActiveShiftAssignments(db, driverId, vehicleIds)
+	if err != nil {
+		return err
+	}
+
+	if driverShifts > 0 {
+		return fmt.Errorf(constants.On_Active_Shifts, "This driver is", driverShifts)
+	}
+
+	if vehicleShifts > 0 {
+		return fmt.Errorf(constants.On_Active_Shifts, "A vehicle of this driver is", vehicleShifts)
 	}
 
 	return nil
@@ -155,7 +164,7 @@ func DeleteDriver(orgCtx *gin.Context, driver postgress.Driver, updateById strin
 	)
 	defer cancel()
 
-	if err := checkDriverFleetTies(ctx, driver.ID); err != nil {
+	if err := checkDriverPickDropTies(ctx, driver.ID); err != nil {
 		return err
 	}
 
@@ -269,22 +278,15 @@ func DeleteDriver(orgCtx *gin.Context, driver postgress.Driver, updateById strin
 		}
 	}
 
-	////////// LEAVE EVERY FLEET //////////
+	////////// LEAVE PICK & DROP //////////
 	// the driver is on their way out, so their membership and the vehicles they
-	// lent stop counting towards any fleet they belonged to
-	if err := tx.Model(&postgress.GroupMember{}).
-		Where("driver_id = ?", driver.ID).
-		Updates(map[string]interface{}{
-			"status":  constants.Membership_Status_Left,
-			"role_id": "",
-		}).Error; err != nil {
+	// offered stop counting towards the service they belonged to
+	if err := EndOpenMemberships(tx, &postgress.PickDropDriver{}, "driver_id", driver.ID, updateById); err != nil {
 		tx.Rollback()
 		return err
 	}
 
-	if err := tx.Model(&postgress.GroupVehicle{}).
-		Where("driver_id = ?", driver.ID).
-		Update("status", constants.Membership_Status_Left).Error; err != nil {
+	if err := EndOpenMemberships(tx, &postgress.PickDropVehicle{}, "driver_id", driver.ID, updateById); err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -299,9 +301,9 @@ func DeleteDriver(orgCtx *gin.Context, driver postgress.Driver, updateById strin
 }
 
 // DeletePassenger archives a passenger account and unpicks everything it was still
-// attached to: the seats it holds on upcoming shifts go back to the manager, its
-// fleet memberships end, and its standing travel form is cleared. The mobile number
-// is prefixed on the archive row so it is free to register again.
+// attached to: it comes off its active shifts with the seats given back, its Pick &
+// Drop membership ends, and its weekly availability and shift requests are archived.
+// The mobile number is prefixed on the archive row so it is free to register again.
 func DeletePassenger(orgCtx *gin.Context, passenger postgress.Passenger, updateById string) error {
 	var cancel context.CancelFunc
 	ctx, cancel := context.WithTimeout(
@@ -338,87 +340,26 @@ func DeletePassenger(orgCtx *gin.Context, passenger postgress.Passenger, updateB
 		return err
 	}
 
-	////////// FREE THEIR UPCOMING SEATS //////////
-	var shiftIds []string
-	if err := tx.Model(&postgress.Shift{}).
-		Where("is_active = ?", true).
-		Where("start_datetime > ?", time.Now().Format(constants.DateTimeLayout)).
-		Pluck("id", &shiftIds).Error; err != nil {
+	////////// COME OFF EVERY ACTIVE SHIFT //////////
+	if _, err := RemovePassengerFromActiveShifts(tx, passenger.ID, "", constants.Removal_Reason_Account_Deleted, updateById); err != nil {
 		tx.Rollback()
 		return err
 	}
 
-	if len(shiftIds) > 0 {
-		if err := tx.Model(&postgress.ShiftSeat{}).
-			Where("shift_id IN ?", shiftIds).
-			Where("passenger_id = ?", passenger.ID).
-			Updates(map[string]interface{}{
-				"passenger_id": "",
-				"stop_id":      "",
-				"gender":       "",
-				"status":       constants.Seat_Status_Empty,
-			}).Error; err != nil {
-			tx.Rollback()
-			return err
-		}
-
-		if err := tx.Exec(`
-			UPDATE shifts
-			SET seats_taken = (
-				SELECT COUNT(*) FROM shift_seats
-				WHERE shift_seats.shift_id = shifts.id
-				  AND shift_seats.status = ?
-			)
-			WHERE shifts.id IN ?
-		`, constants.Seat_Status_Assigned, shiftIds).Error; err != nil {
-			tx.Rollback()
-			return err
-		}
-	}
-
-	////////// LEAVE EVERY FLEET //////////
-	if err := tx.Model(&postgress.GroupPassenger{}).
-		Where("passenger_id = ?", passenger.ID).
-		Update("status", constants.Membership_Status_Left).Error; err != nil {
+	////////// LEAVE PICK & DROP //////////
+	if err := EndOpenMemberships(tx, &postgress.PickDropPassenger{}, "passenger_id", passenger.ID, updateById); err != nil {
 		tx.Rollback()
 		return err
 	}
 
-	////////// ARCHIVE THE TRAVEL FORM //////////
-	// what this passenger had asked the fleet for is kept, the same way a deleted
-	// driver and their vehicles are kept
-	var preferences []postgress.PassengerLocationPreference
-	if err := tx.Where("passenger_id = ?", passenger.ID).Find(&preferences).Error; err != nil {
+	////////// ARCHIVE THE WEEKLY AVAILABILITY //////////
+	if err := archivePassengerAvailability(tx, passenger.ID, updateById); err != nil {
 		tx.Rollback()
 		return err
 	}
 
-	if len(preferences) > 0 {
-		archived := make([]postgress.DELPassengerLocationPreference, 0, len(preferences))
-		for _, preference := range preferences {
-			archived = append(archived, postgress.DELPassengerLocationPreference{
-				ID:            preference.ID,
-				PassengerID:   preference.PassengerID,
-				DayOfWeek:     preference.DayOfWeek,
-				Direction:     preference.Direction,
-				IsEnabled:     preference.IsEnabled,
-				Location:      preference.Location,
-				Lat:           preference.Lat,
-				Lng:           preference.Lng,
-				ScheduledTime: preference.ScheduledTime,
-				UpdateBy:      updateById,
-				CreatedAt:     preference.CreatedAt,
-				UpdatedAt:     time.Now(),
-			})
-		}
-
-		if err := tx.Create(&archived).Error; err != nil {
-			tx.Rollback()
-			return err
-		}
-	}
-
-	if err := tx.Where("passenger_id = ?", passenger.ID).Delete(&postgress.PassengerLocationPreference{}).Error; err != nil {
+	////////// ARCHIVE THE SHIFT REQUESTS //////////
+	if err := archivePassengerShiftRequests(tx, passenger.ID, updateById); err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -429,6 +370,141 @@ func DeletePassenger(orgCtx *gin.Context, passenger postgress.Passenger, updateB
 	}
 
 	return tx.Commit().Error
+}
+
+func archivePassengerAvailability(tx *gorm.DB, passengerId, deletedBy string) error {
+	var days []postgress.PassengerAvailability
+	if err := tx.Where("passenger_id = ?", passengerId).Find(&days).Error; err != nil {
+		return err
+	}
+
+	var locations []postgress.PassengerAvailabilityLocation
+	if err := tx.Where("passenger_id = ?", passengerId).Find(&locations).Error; err != nil {
+		return err
+	}
+
+	if len(days) > 0 {
+		archived := make([]postgress.DELPassengerAvailability, 0, len(days))
+		for _, day := range days {
+			archived = append(archived, postgress.DELPassengerAvailability{
+				ID:          day.ID,
+				PassengerID: day.PassengerID,
+				DayOfWeek:   day.DayOfWeek,
+				IsRequired:  day.IsRequired,
+				DeletedBy:   deletedBy,
+				CreatedAt:   day.CreatedAt,
+				UpdatedAt:   time.Now(),
+			})
+		}
+
+		if err := tx.Create(&archived).Error; err != nil {
+			return err
+		}
+	}
+
+	if len(locations) > 0 {
+		archived := make([]postgress.DELPassengerAvailabilityLocation, 0, len(locations))
+		for _, location := range locations {
+			archived = append(archived, postgress.DELPassengerAvailabilityLocation{
+				ID:          location.ID,
+				PassengerID: location.PassengerID,
+				DayOfWeek:   location.DayOfWeek,
+				Sequence:    location.Sequence,
+				Location:    location.Location,
+				Lat:         location.Lat,
+				Lng:         location.Lng,
+				Time:        location.Time,
+				CreatedAt:   location.CreatedAt,
+			})
+		}
+
+		if err := tx.Create(&archived).Error; err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Where("passenger_id = ?", passengerId).Delete(&postgress.PassengerAvailabilityLocation{}).Error; err != nil {
+		return err
+	}
+
+	return tx.Where("passenger_id = ?", passengerId).Delete(&postgress.PassengerAvailability{}).Error
+}
+
+func archivePassengerShiftRequests(tx *gorm.DB, passengerId, deletedBy string) error {
+	var requests []postgress.ShiftRequest
+	if err := tx.Where("passenger_id = ?", passengerId).Find(&requests).Error; err != nil {
+		return err
+	}
+
+	if len(requests) == 0 {
+		return nil
+	}
+
+	requestIds := make([]string, 0, len(requests))
+	for _, request := range requests {
+		requestIds = append(requestIds, request.ID)
+	}
+
+	return ArchiveShiftRequests(tx, requests, requestIds, deletedBy)
+}
+
+// ArchiveShiftRequests copies shift requests and their locations into the archive and
+// hard deletes the originals, the same pattern rides follow.
+func ArchiveShiftRequests(tx *gorm.DB, requests []postgress.ShiftRequest, requestIds []string, deletedBy string) error {
+	var locations []postgress.ShiftRequestLocation
+	if err := tx.Where("shift_request_id IN ?", requestIds).Find(&locations).Error; err != nil {
+		return err
+	}
+
+	archived := make([]postgress.DELShiftRequest, 0, len(requests))
+	for _, request := range requests {
+		archived = append(archived, postgress.DELShiftRequest{
+			ID:            request.ID,
+			PassengerID:   request.PassengerID,
+			ServiceID:     request.ServiceID,
+			ContactNumber: request.ContactNumber,
+			Note:          request.Note,
+			DaysOfWeek:    request.DaysOfWeek,
+			StartTime:     request.StartTime,
+			EndTime:       request.EndTime,
+			StartLocation: request.StartLocation,
+			EndLocation:   request.EndLocation,
+			RoutePoints:   request.RoutePoints,
+			DeletedBy:     deletedBy,
+			CreatedAt:     request.CreatedAt,
+			UpdatedAt:     time.Now(),
+		})
+	}
+
+	if err := tx.Create(&archived).Error; err != nil {
+		return err
+	}
+
+	if len(locations) > 0 {
+		archivedLocations := make([]postgress.DELShiftRequestLocation, 0, len(locations))
+		for _, location := range locations {
+			archivedLocations = append(archivedLocations, postgress.DELShiftRequestLocation{
+				ID:             location.ID,
+				ShiftRequestID: location.ShiftRequestID,
+				Sequence:       location.Sequence,
+				Location:       location.Location,
+				Lat:            location.Lat,
+				Lng:            location.Lng,
+				Time:           location.Time,
+				CreatedAt:      location.CreatedAt,
+			})
+		}
+
+		if err := tx.Create(&archivedLocations).Error; err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Where("shift_request_id IN ?", requestIds).Delete(&postgress.ShiftRequestLocation{}).Error; err != nil {
+		return err
+	}
+
+	return tx.Where("id IN ?", requestIds).Delete(&postgress.ShiftRequest{}).Error
 }
 
 func GetActivePassengerById(orgCtx *gin.Context, passengerId string) (passenger postgress.Passenger, err error) {
@@ -447,210 +523,6 @@ func GetPassengerById(orgCtx *gin.Context, passengerId string) (passenger postgr
 
 	err = DatabaseConn.Postgres.WithContext(ctx).Where(`id = ?`, passengerId).Find(&passenger).Error
 	return
-}
-
-func GetGroupById(orgCtx *gin.Context, groupId string) (group postgress.Group, err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	err = DatabaseConn.Postgres.WithContext(ctx).Where(`id = ?`, groupId).Where(`status = ?`, constants.Status_Active).First(&group).Error
-	return
-}
-
-// HasGroupPermission answers whether a driver holds a permission inside one group.
-// The permission is read from the role attached to the driver's membership, so an
-// admin can hand a new permission to a role, or invent a brand new role, without
-// any code change here. A membership that is not approved never holds anything.
-func HasGroupPermission(orgCtx *gin.Context, groupId, driverId, permissionCode string) (hasPermission bool, err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	var count int64
-
-	err = DatabaseConn.Postgres.WithContext(ctx).
-		Table("group_members").
-		Joins("JOIN role_permissions ON role_permissions.role_id = group_members.role_id").
-		Joins("JOIN permissions ON permissions.id = role_permissions.permission_id").
-		Where("group_members.group_id = ?", groupId).
-		Where("group_members.driver_id = ?", driverId).
-		Where("group_members.status = ?", constants.Membership_Status_Approved).
-		Where("permissions.code = ?", permissionCode).
-		Count(&count).Error
-
-	return count > 0, err
-}
-
-// IsApprovedGroupMember reports whether a driver is an approved member of a group,
-// with no regard to any role that driver may hold.
-func IsApprovedGroupMember(orgCtx *gin.Context, groupId, driverId string) (isMember bool, err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	var count int64
-
-	err = DatabaseConn.Postgres.WithContext(ctx).
-		Model(&postgress.GroupMember{}).
-		Where("group_id = ?", groupId).
-		Where("driver_id = ?", driverId).
-		Where("status = ?", constants.Membership_Status_Approved).
-		Count(&count).Error
-
-	return count > 0, err
-}
-
-// IsApprovedGroupPassenger reports whether a passenger is an approved member of a
-// group, a passenger can only be seated on the shifts of a group they belong to.
-func IsApprovedGroupPassenger(orgCtx *gin.Context, groupId, passengerId string) (isMember bool, err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	var count int64
-
-	err = DatabaseConn.Postgres.WithContext(ctx).
-		Model(&postgress.GroupPassenger{}).
-		Where("group_id = ?", groupId).
-		Where("passenger_id = ?", passengerId).
-		Where("status = ?", constants.Membership_Status_Approved).
-		Count(&count).Error
-
-	return count > 0, err
-}
-
-// VehicleHasShiftDuringTime reports whether a vehicle is already committed to a
-// shift that overlaps the given window. excludeShiftId lets a shift that is being
-// edited ignore its own row.
-func VehicleHasShiftDuringTime(orgCtx *gin.Context, vehicleId, startTime, endTime, excludeShiftId string) (hasShift bool, err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	var count int64
-
-	query := DatabaseConn.Postgres.WithContext(ctx).
-		Model(&postgress.Shift{}).
-		Where("vehicle_id = ?", vehicleId).
-		Where("is_active = ?", true).
-		Where("start_datetime < ? AND estimated_end_datetime > ?", endTime, startTime)
-
-	if excludeShiftId != "" {
-		query = query.Where("id <> ?", excludeShiftId)
-	}
-
-	err = query.Count(&count).Error
-
-	return count > 0, err
-}
-
-// DriverHasShiftDuringTime reports whether a driver is already driving a shift that
-// overlaps the given window.
-func DriverHasShiftDuringTime(orgCtx *gin.Context, driverId, startTime, endTime, excludeShiftId string) (hasShift bool, err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	var count int64
-
-	query := DatabaseConn.Postgres.WithContext(ctx).
-		Model(&postgress.Shift{}).
-		Where("driver_id = ?", driverId).
-		Where("is_active = ?", true).
-		Where("start_datetime < ? AND estimated_end_datetime > ?", endTime, startTime)
-
-	if excludeShiftId != "" {
-		query = query.Where("id <> ?", excludeShiftId)
-	}
-
-	err = query.Count(&count).Error
-
-	return count > 0, err
-}
-
-// PassengersBusyDuringTime returns which of the given passengers already hold a
-// seat on another shift overlapping the window. A person cannot be in two vehicles
-// at once any more than a driver or a vehicle can, and the whole batch is judged in
-// one query rather than one per passenger.
-func PassengersBusyDuringTime(orgCtx *gin.Context, passengerIds []string, startTime, endTime, excludeShiftId string) (busy map[string]string, err error) {
-	busy = map[string]string{}
-
-	if len(passengerIds) == 0 {
-		return
-	}
-
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	type row struct {
-		PassengerID   string
-		StartDatetime string
-	}
-
-	var rows []row
-
-	query := DatabaseConn.Postgres.WithContext(ctx).
-		Table("shift_seats").
-		Select("shift_seats.passenger_id, shifts.start_datetime").
-		Joins("JOIN shifts ON shifts.id = shift_seats.shift_id").
-		Where("shift_seats.passenger_id IN ?", passengerIds).
-		Where("shift_seats.status = ?", constants.Seat_Status_Assigned).
-		Where("shifts.is_active = ?", true).
-		Where("shifts.start_datetime < ? AND shifts.estimated_end_datetime > ?", endTime, startTime)
-
-	if excludeShiftId != "" {
-		query = query.Where("shifts.id <> ?", excludeShiftId)
-	}
-
-	if err = query.Find(&rows).Error; err != nil {
-		return
-	}
-
-	for _, r := range rows {
-		busy[r.PassengerID] = r.StartDatetime
-	}
-
-	return
-}
-
-// VehicleHasRideDuringTime reports whether a vehicle is already committed to a
-// carpool ride that overlaps the given window.
-func VehicleHasRideDuringTime(orgCtx *gin.Context, vehicleId, startTime, endTime string) (hasRide bool, err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	var count int64
-
-	err = DatabaseConn.Postgres.WithContext(ctx).
-		Model(&postgress.Ride{}).
-		Where("vehicle_id = ?", vehicleId).
-		Where("is_active = ?", true).
-		Where("start_datetime < ? AND estimated_end_datetime > ?", endTime, startTime).
-		Count(&count).Error
-
-	return count > 0, err
-}
-
-// DriverHasRideDuringTime reports whether a driver is already driving a carpool
-// ride that overlaps the given window.
-func DriverHasRideDuringTime(orgCtx *gin.Context, driverId, startTime, endTime string) (hasRide bool, err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	var count int64
-
-	err = DatabaseConn.Postgres.WithContext(ctx).
-		Model(&postgress.Ride{}).
-		Where("driver_id = ?", driverId).
-		Where("is_active = ?", true).
-		Where("start_datetime < ? AND estimated_end_datetime > ?", endTime, startTime).
-		Count(&count).Error
-
-	return count > 0, err
 }
 
 func GetDriverByRideId(orgCtx *gin.Context, rideId string) (
@@ -676,4 +548,878 @@ func GetDriverByRideId(orgCtx *gin.Context, rideId string) (
 
 	err = row.Scan(&driverID, &vehicleNumber, &driverMobile)
 	return
+}
+
+////////////////////////////// PICK & DROP //////////////////////////////
+
+// GetActiveServiceByOwner returns the Pick & Drop service a driver runs. A driver can
+// run at most one, the database refuses a second.
+func GetActiveServiceByOwner(orgCtx *gin.Context, driverId string) (service postgress.PickDropService, err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	err = DatabaseConn.Postgres.WithContext(ctx).
+		Where("owner_driver_id = ?", driverId).
+		Where("status = ?", constants.Status_Active).
+		First(&service).Error
+	return
+}
+
+func GetActiveServiceById(orgCtx *gin.Context, serviceId string) (service postgress.PickDropService, err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	err = DatabaseConn.Postgres.WithContext(ctx).
+		Where("id = ?", serviceId).
+		Where("status = ?", constants.Status_Active).
+		First(&service).Error
+	return
+}
+
+// GetApprovedPassengerMembership returns the membership a passenger currently holds.
+// A passenger belongs to at most one service, so there is never more than one.
+func GetApprovedPassengerMembership(orgCtx *gin.Context, passengerId string) (membership postgress.PickDropPassenger, err error) {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	err = DatabaseConn.Postgres.WithContext(ctx).
+		Where("passenger_id = ?", passengerId).
+		Where("status = ?", constants.Membership_Status_Approved).
+		First(&membership).Error
+	return
+}
+
+// EndOpenMemberships closes every open row of one person or vehicle: a request still
+// waiting is withdrawn and an approved one has left. It is what walking away from a
+// service looks like, whichever table the row lives in.
+func EndOpenMemberships(tx *gorm.DB, model interface{}, column, id, endedBy string) error {
+	now := time.Now()
+
+	if err := tx.Model(model).
+		Where(column+" = ?", id).
+		Where("status = ?", constants.Membership_Status_Pending).
+		Updates(map[string]interface{}{
+			"status":   constants.Membership_Status_Withdrawn,
+			"ended_by": endedBy,
+			"ended_at": &now,
+		}).Error; err != nil {
+		return err
+	}
+
+	return tx.Model(model).
+		Where(column+" = ?", id).
+		Where("status = ?", constants.Membership_Status_Approved).
+		Updates(map[string]interface{}{
+			"status":   constants.Membership_Status_Left,
+			"ended_by": endedBy,
+			"ended_at": &now,
+		}).Error
+}
+
+// CountActiveShiftAssignments reports how many active shifts a driver drives and how
+// many run on any of the given vehicles. A driver or a vehicle cannot walk away from
+// a shift people are counting on, so leaving is refused while either is above zero.
+func CountActiveShiftAssignments(db *gorm.DB, driverId string, vehicleIds []string) (driverShifts, vehicleShifts int64, err error) {
+	if driverId != "" {
+		if err = db.Model(&postgress.Shift{}).
+			Where("driver_id = ?", driverId).
+			Where("status = ?", constants.Shift_Status_Active).
+			Count(&driverShifts).Error; err != nil {
+			return
+		}
+	}
+
+	if len(vehicleIds) > 0 {
+		err = db.Model(&postgress.Shift{}).
+			Where("vehicle_id IN ?", vehicleIds).
+			Where("status = ?", constants.Shift_Status_Active).
+			Count(&vehicleShifts).Error
+	}
+
+	return
+}
+
+// RemovePassengerFromActiveShifts takes a passenger off every active shift, or only
+// the shifts of one service when serviceId is given. The shift passenger rows are
+// marked removed rather than deleted, so the participation stays on record, the
+// attendance of trips that have not started yet is dropped since those trips will
+// never include them, and the seats are given back. Attendance of trips already
+// travelled is left exactly as it is.
+func RemovePassengerFromActiveShifts(tx *gorm.DB, passengerId, serviceId, reason, removedBy string) (shiftIds []string, err error) {
+	query := tx.Model(&postgress.ShiftPassenger{}).
+		Joins("JOIN shifts ON shifts.id = shift_passengers.shift_id AND shifts.status = ?", constants.Shift_Status_Active).
+		Where("shift_passengers.passenger_id = ?", passengerId).
+		Where("shift_passengers.status = ?", constants.Shift_Passenger_Active)
+
+	if serviceId != "" {
+		query = query.Where("shift_passengers.service_id = ?", serviceId)
+	}
+
+	if err = query.Pluck("shift_passengers.shift_id", &shiftIds).Error; err != nil || len(shiftIds) == 0 {
+		return
+	}
+
+	// taking the shift rows first serialises this with an owner adding somebody to
+	// the same shift, so the seat count recomputed below always sees both changes
+	if err = LockShifts(tx, shiftIds); err != nil {
+		return
+	}
+
+	now := time.Now()
+
+	if err = tx.Model(&postgress.ShiftPassenger{}).
+		Where("passenger_id = ?", passengerId).
+		Where("status = ?", constants.Shift_Passenger_Active).
+		Where("shift_id IN ?", shiftIds).
+		Updates(map[string]interface{}{
+			"status":         constants.Shift_Passenger_Removed,
+			"removed_by":     removedBy,
+			"removed_at":     &now,
+			"removal_reason": reason,
+		}).Error; err != nil {
+		return
+	}
+
+	if err = DeleteUpcomingAttendance(tx, shiftIds, []string{passengerId}); err != nil {
+		return
+	}
+
+	err = SyncOccupiedSeats(tx, shiftIds)
+
+	return
+}
+
+// LockShifts takes the rows of the given shifts for update, always in id order so two
+// transactions locking overlapping sets can never deadlock each other.
+func LockShifts(tx *gorm.DB, shiftIds []string) error {
+	var locked []string
+
+	return tx.Model(&postgress.Shift{}).
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id IN ?", shiftIds).
+		Order("id").
+		Pluck("id", &locked).Error
+}
+
+// DeleteUpcomingAttendance drops the attendance rows of trips that have not started
+// yet. It is only ever used when somebody comes off a shift, a trip still ahead of
+// us will simply not include them.
+func DeleteUpcomingAttendance(tx *gorm.DB, shiftIds, passengerIds []string) error {
+	return tx.Exec(`
+		DELETE FROM shift_attendances
+		WHERE passenger_id IN ?
+		  AND occurrence_id IN (
+			SELECT id FROM shift_occurrences
+			WHERE shift_id IN ?
+			  AND starts_at > ?
+		  )
+	`, passengerIds, shiftIds, BusinessNowMinute()).Error
+}
+
+// SyncOccupiedSeats recomputes the taken seats of the given shifts from their active
+// passengers. The CHECK constraint on shifts turns an overbooked result into an error.
+func SyncOccupiedSeats(tx *gorm.DB, shiftIds []string) error {
+	return tx.Exec(`
+		UPDATE shifts
+		SET occupied_seats = (
+			SELECT COUNT(*) FROM shift_passengers
+			WHERE shift_passengers.shift_id = shifts.id
+			  AND shift_passengers.status = ?
+		),
+		updated_at = ?
+		WHERE shifts.id IN ?
+	`, constants.Shift_Passenger_Active, time.Now(), shiftIds).Error
+}
+
+////////////////////////////// SCHEDULE TIME //////////////////////////////
+
+// BusinessNow is the current time on the business wall clock.
+func BusinessNow() time.Time {
+	return time.Now().In(constants.Business_Location)
+}
+
+func BusinessToday() string {
+	return BusinessNow().Format(constants.Date_Layout)
+}
+
+func BusinessNowMinute() string {
+	return BusinessNow().Format(constants.Minute_Datetime_Layout)
+}
+
+// AddDays moves a YYYY-MM-DD date by a number of days.
+func AddDays(date string, days int) string {
+	day, err := time.ParseInLocation(constants.Date_Layout, date, constants.Business_Location)
+	if err != nil {
+		return date
+	}
+
+	return day.AddDate(0, 0, days).Format(constants.Date_Layout)
+}
+
+func IntArray(values []int) pq.Int64Array {
+	array := make(pq.Int64Array, 0, len(values))
+	for _, value := range values {
+		array = append(array, int64(value))
+	}
+
+	return array
+}
+
+func IntsFromArray(values pq.Int64Array) []int {
+	ints := make([]int, 0, len(values))
+	for _, value := range values {
+		ints = append(ints, int(value))
+	}
+
+	return ints
+}
+
+// ISOWeekday numbers the days the way the whole product does, Monday 1 to Sunday 7.
+func ISOWeekday(day time.Time) int {
+	weekday := int(day.Weekday())
+	if weekday == 0 {
+		return 7
+	}
+
+	return weekday
+}
+
+// WeekdayDate labels a date for a person, "Wednesday 2026-09-16".
+func WeekdayDate(date string) string {
+	day, err := time.ParseInLocation(constants.Date_Layout, date, constants.Business_Location)
+	if err != nil {
+		return date
+	}
+
+	return day.Weekday().String() + " " + date
+}
+
+func containsInt(values []int, target int) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+
+	return false
+}
+
+// OccursOn reports whether a shift runs on a given date.
+func OccursOn(window ShiftWindow, date string) bool {
+	if date < window.StartDate {
+		return false
+	}
+
+	if window.EndDate != "" && date > window.EndDate {
+		return false
+	}
+
+	day, err := time.ParseInLocation(constants.Date_Layout, date, constants.Business_Location)
+	if err != nil {
+		return false
+	}
+
+	return containsInt(window.DaysOfWeek, ISOWeekday(day))
+}
+
+// FirstSharedDate finds the first date both windows actually run on. Sharing a
+// weekday is not enough: a Monday to Friday shift ending on the 10th and a Wednesday
+// shift starting on the 20th never meet. Any seven consecutive days contain every
+// weekday, so looking at most seven days into the overlap of the two date ranges
+// settles it exactly.
+func FirstSharedDate(a, b ShiftWindow) (string, bool) {
+	start := a.StartDate
+	if b.StartDate > start {
+		start = b.StartDate
+	}
+
+	var end string
+	switch {
+	case a.EndDate == "":
+		end = b.EndDate
+	case b.EndDate == "":
+		end = a.EndDate
+	case a.EndDate < b.EndDate:
+		end = a.EndDate
+	default:
+		end = b.EndDate
+	}
+
+	first, err := time.ParseInLocation(constants.Date_Layout, start, constants.Business_Location)
+	if err != nil {
+		return "", false
+	}
+
+	for offset := 0; offset < 7; offset++ {
+		day := first.AddDate(0, 0, offset)
+		date := day.Format(constants.Date_Layout)
+
+		if end != "" && date > end {
+			break
+		}
+
+		weekday := ISOWeekday(day)
+		if containsInt(a.DaysOfWeek, weekday) && containsInt(b.DaysOfWeek, weekday) {
+			return date, true
+		}
+	}
+
+	return "", false
+}
+
+// NextOccurrence is the next date a shift runs that has not started yet, or empty
+// when it will never run again.
+func NextOccurrence(window ShiftWindow, now time.Time) string {
+	today := now.Format(constants.Date_Layout)
+	clock := now.Format(constants.Clock_Layout)
+
+	start := today
+	if window.StartDate > start {
+		start = window.StartDate
+	}
+
+	first, err := time.ParseInLocation(constants.Date_Layout, start, constants.Business_Location)
+	if err != nil {
+		return ""
+	}
+
+	// eight days, today may already be under way
+	for offset := 0; offset < 8; offset++ {
+		date := first.AddDate(0, 0, offset).Format(constants.Date_Layout)
+
+		if !OccursOn(window, date) {
+			if window.EndDate != "" && date > window.EndDate {
+				return ""
+			}
+			continue
+		}
+
+		if date == today && window.StartTime <= clock {
+			continue
+		}
+
+		return date
+	}
+
+	return ""
+}
+
+// UpcomingWindow drops the part of a window already behind us. A shift that has run
+// for months is judged only on the trips still to come, so a clash that only existed
+// last month can never stop it being edited today.
+func UpcomingWindow(window ShiftWindow) ShiftWindow {
+	if today := BusinessToday(); window.StartDate < today {
+		window.StartDate = today
+	}
+
+	return window
+}
+
+// rideOverlapsWindow walks every calendar day a ride touches and checks it against the
+// shift's trip on that day, if the shift runs then. It returns the date of the first
+// trip the ride runs into.
+func rideOverlapsWindow(window ShiftWindow, start, end time.Time) (string, bool) {
+	start, end = start.In(constants.Business_Location), end.In(constants.Business_Location)
+	day := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, constants.Business_Location)
+
+	for !day.After(end) {
+		date := day.Format(constants.Date_Layout)
+
+		if OccursOn(window, date) {
+			tripStart, err := time.ParseInLocation(constants.Minute_Datetime_Layout, date+" "+window.StartTime, constants.Business_Location)
+			if err != nil {
+				return "", false
+			}
+
+			tripEnd, err := time.ParseInLocation(constants.Minute_Datetime_Layout, date+" "+window.EndTime, constants.Business_Location)
+			if err != nil {
+				return "", false
+			}
+
+			if start.Before(tripEnd) && end.After(tripStart) {
+				return date, true
+			}
+		}
+
+		day = day.AddDate(0, 0, 1)
+	}
+
+	return "", false
+}
+
+////////////////////////////// CLASHES //////////////////////////////
+
+type shiftClashRow struct {
+	ID        string
+	Name      string
+	SubjectID string
+	Subject   string
+	// without the type gorm cannot parse the field and silently leaves it empty, and a
+	// shift with no days never shares a date with anything, so every clash is missed
+	DaysOfWeek pq.Int64Array `gorm:"type:integer[]"`
+	StartDate  string
+	EndDate    string
+	StartTime  string
+	EndTime    string
+}
+
+const shiftClashColumns = "shifts.id, shifts.name, shifts.days_of_week, shifts.start_date, shifts.end_date, shifts.start_time, shifts.end_time"
+
+// shiftOverlapQuery narrows the active shifts down to the ones that could possibly
+// clash with a window: their clock times overlap, they share a weekday and their date
+// ranges touch. Touching times do not overlap, a shift ending at 09:00 leaves the
+// driver free for one starting at 09:00. The exact shared date is settled afterwards.
+func shiftOverlapQuery(db *gorm.DB, window ShiftWindow, excludeShiftId string) *gorm.DB {
+	query := db.Table("shifts").
+		Where("shifts.status = ?", constants.Shift_Status_Active).
+		Where("shifts.start_time < ? AND shifts.end_time > ?", window.EndTime, window.StartTime).
+		Where("shifts.days_of_week && ?::integer[]", IntArray(window.DaysOfWeek)).
+		Where("(shifts.end_date = '' OR shifts.end_date >= ?)", window.StartDate)
+
+	if window.EndDate != "" {
+		query = query.Where("shifts.start_date <= ?", window.EndDate)
+	}
+
+	if excludeShiftId != "" {
+		query = query.Where("shifts.id <> ?", excludeShiftId)
+	}
+
+	return query
+}
+
+// FindShiftClashes looks for any driver, vehicle or passenger already committed to an
+// overlapping shift, in any Pick & Drop service. It costs one query per kind however
+// many ids are asked about, and returns the clash of every id that has one.
+func FindShiftClashes(db *gorm.DB, window ShiftWindow, driverIds, vehicleIds, passengerIds []string, excludeShiftId string) (clashes map[string]ShiftClash, err error) {
+	clashes = map[string]ShiftClash{}
+	window = UpcomingWindow(window)
+
+	collect := func(kind string, rows []shiftClashRow) {
+		for _, row := range rows {
+			if _, known := clashes[row.SubjectID]; known {
+				continue
+			}
+
+			other := ShiftWindow{
+				DaysOfWeek: IntsFromArray(row.DaysOfWeek),
+				StartDate:  row.StartDate,
+				EndDate:    row.EndDate,
+				StartTime:  row.StartTime,
+				EndTime:    row.EndTime,
+			}
+
+			date, shared := FirstSharedDate(window, other)
+			if !shared {
+				continue
+			}
+
+			clashes[row.SubjectID] = ShiftClash{
+				Kind:      kind,
+				SubjectID: row.SubjectID,
+				Subject:   row.Subject,
+				ShiftName: row.Name,
+				Date:      WeekdayDate(date),
+				StartTime: row.StartTime,
+				EndTime:   row.EndTime,
+			}
+		}
+	}
+
+	if len(driverIds) > 0 {
+		var rows []shiftClashRow
+		if err = shiftOverlapQuery(db, window, excludeShiftId).
+			Select(shiftClashColumns+", shifts.driver_id AS subject_id, 'Driver ' || COALESCE(drivers.driver_name, '') AS subject").
+			Joins("LEFT JOIN drivers ON drivers.id = shifts.driver_id").
+			Where("shifts.driver_id IN ?", driverIds).
+			Find(&rows).Error; err != nil {
+			return
+		}
+		collect(Clash_Kind_Driver, rows)
+	}
+
+	if len(vehicleIds) > 0 {
+		var rows []shiftClashRow
+		if err = shiftOverlapQuery(db, window, excludeShiftId).
+			Select(shiftClashColumns+", shifts.vehicle_id AS subject_id, 'Vehicle ' || COALESCE(vehicles.vehicle_number, '') AS subject").
+			Joins("LEFT JOIN vehicles ON vehicles.id = shifts.vehicle_id").
+			Where("shifts.vehicle_id IN ?", vehicleIds).
+			Find(&rows).Error; err != nil {
+			return
+		}
+		collect(Clash_Kind_Vehicle, rows)
+	}
+
+	if len(passengerIds) > 0 {
+		var rows []shiftClashRow
+		if err = shiftOverlapQuery(db, window, excludeShiftId).
+			Select(shiftClashColumns+", shift_passengers.passenger_id AS subject_id, 'Passenger ' || COALESCE(passengers.passenger_name, '') AS subject").
+			Joins("JOIN shift_passengers ON shift_passengers.shift_id = shifts.id AND shift_passengers.status = ?", constants.Shift_Passenger_Active).
+			Joins("LEFT JOIN passengers ON passengers.id = shift_passengers.passenger_id").
+			Where("shift_passengers.passenger_id IN ?", passengerIds).
+			Find(&rows).Error; err != nil {
+			return
+		}
+		collect(Clash_Kind_Passenger, rows)
+	}
+
+	return
+}
+
+// FindRideClashes looks for ride share rides of the given drivers or vehicles that
+// overlap any trip of the window. A driver and a vehicle are the same things in both
+// halves of the product, they cannot be on a ride and a shift at once.
+func FindRideClashes(db *gorm.DB, window ShiftWindow, driverIds, vehicleIds []string) (clashes map[string]ShiftClash, err error) {
+	clashes = map[string]ShiftClash{}
+
+	if len(driverIds) == 0 && len(vehicleIds) == 0 {
+		return
+	}
+
+	window = UpcomingWindow(window)
+
+	// a ride already over is history, whatever date the window starts on
+	from := window.StartDate + " 00:00:00"
+	if now := BusinessNow().Format(constants.DateTimeLayout); now > from {
+		from = now
+	}
+
+	query := db.Table("rides").
+		Select("id, driver_id, vehicle_id, start_datetime, estimated_end_datetime").
+		Where("is_active = ?", true).
+		Where("(driver_id IN ? OR vehicle_id IN ?)", driverIds, vehicleIds).
+		Where("estimated_end_datetime > ?", from)
+
+	if window.EndDate != "" {
+		query = query.Where("start_datetime <= ?", window.EndDate+" 23:59:59")
+	}
+
+	var rows []rideClashRow
+	if err = query.Find(&rows).Error; err != nil {
+		return
+	}
+
+	drivers := map[string]bool{}
+	for _, id := range driverIds {
+		drivers[id] = true
+	}
+
+	vehicles := map[string]bool{}
+	for _, id := range vehicleIds {
+		vehicles[id] = true
+	}
+
+	for _, ride := range rows {
+		start, e := time.ParseInLocation(constants.DateTimeLayout, ride.StartDatetime, constants.Business_Location)
+		if e != nil {
+			continue
+		}
+
+		end, e := time.ParseInLocation(constants.DateTimeLayout, ride.EstimatedEndDatetime, constants.Business_Location)
+		if e != nil {
+			continue
+		}
+
+		if _, overlaps := rideOverlapsWindow(window, start, end); !overlaps {
+			continue
+		}
+
+		clash := ShiftClash{
+			IsRide:    true,
+			StartTime: start.Format(constants.Minute_Datetime_Layout),
+			EndTime:   end.Format(constants.Minute_Datetime_Layout),
+		}
+
+		if _, known := clashes[ride.DriverID]; drivers[ride.DriverID] && !known {
+			clash.Kind, clash.SubjectID, clash.Subject = Clash_Kind_Driver, ride.DriverID, "The driver"
+			clashes[ride.DriverID] = clash
+		}
+
+		if _, known := clashes[ride.VehicleID]; vehicles[ride.VehicleID] && !known {
+			clash.Kind, clash.SubjectID, clash.Subject = Clash_Kind_Vehicle, ride.VehicleID, "The vehicle"
+			clashes[ride.VehicleID] = clash
+		}
+	}
+
+	return
+}
+
+type rideClashRow struct {
+	ID                   string
+	DriverID             string
+	VehicleID            string
+	StartDatetime        string
+	EstimatedEndDatetime string
+}
+
+// FindRideScheduleClash is the ride share side of the same rule: whether any slot a
+// ride request lays down overlaps an active ride of the driver on any vehicle, an
+// active ride of the vehicle whoever drives it, or a trip of an active shift either
+// of them is on. It costs two queries however long the series is, and returns the
+// clash of the earliest slot. Run it in the transaction that writes the rides, after
+// LockShiftResources has locked the driver and the vehicle.
+func FindRideScheduleClash(tx *gorm.DB, driverId, vehicleId string, slots []RideSlot, excludeRideId string) (clash *ShiftClash, err error) {
+	if len(slots) == 0 {
+		return
+	}
+
+	first, last := slots[0].Start, slots[0].End
+	for _, slot := range slots {
+		if slot.Start.Before(first) {
+			first = slot.Start
+		}
+		if slot.End.After(last) {
+			last = slot.End
+		}
+	}
+	first, last = first.In(constants.Business_Location), last.In(constants.Business_Location)
+
+	query := tx.Table("rides").
+		Select("id, driver_id, vehicle_id, start_datetime, estimated_end_datetime").
+		Where("is_active = ?", true).
+		Where("(driver_id = ? OR vehicle_id = ?)", driverId, vehicleId).
+		Where("start_datetime < ? AND estimated_end_datetime > ?", last.Format(constants.DateTimeLayout), first.Format(constants.DateTimeLayout)).
+		Order("start_datetime ASC")
+
+	if excludeRideId != "" {
+		query = query.Where("id <> ?", excludeRideId)
+	}
+
+	var rows []rideClashRow
+	if err = query.Find(&rows).Error; err != nil {
+		return
+	}
+
+	type booked struct {
+		row        rideClashRow
+		start, end time.Time
+	}
+
+	rides := make([]booked, 0, len(rows))
+	for _, row := range rows {
+		start, e := time.ParseInLocation(constants.DateTimeLayout, row.StartDatetime, constants.Business_Location)
+		if e != nil {
+			continue
+		}
+
+		end, e := time.ParseInLocation(constants.DateTimeLayout, row.EstimatedEndDatetime, constants.Business_Location)
+		if e != nil {
+			continue
+		}
+
+		rides = append(rides, booked{row: row, start: start, end: end})
+	}
+
+	var shifts []postgress.Shift
+	if err = tx.
+		Where("status = ?", constants.Shift_Status_Active).
+		Where("(driver_id = ? OR vehicle_id = ?)", driverId, vehicleId).
+		Where("(end_date = '' OR end_date >= ?)", first.Format(constants.Date_Layout)).
+		Where("start_date <= ?", last.Format(constants.Date_Layout)).
+		Order("start_time ASC").
+		Find(&shifts).Error; err != nil {
+		return
+	}
+
+	// the driver is named when it is them, the vehicle only when somebody else drives it
+	subject := func(isDriver bool) (string, string, string) {
+		if isDriver {
+			return Clash_Kind_Driver, driverId, "The driver"
+		}
+
+		return Clash_Kind_Vehicle, vehicleId, "The vehicle"
+	}
+
+	for _, slot := range slots {
+		for _, ride := range rides {
+			if !slot.Start.Before(ride.end) || !slot.End.After(ride.start) {
+				continue
+			}
+
+			found := ShiftClash{
+				IsRide:    true,
+				StartTime: ride.start.Format(constants.Minute_Datetime_Layout),
+				EndTime:   ride.end.Format(constants.Minute_Datetime_Layout),
+			}
+			found.Kind, found.SubjectID, found.Subject = subject(ride.row.DriverID == driverId)
+
+			return &found, nil
+		}
+
+		for _, shift := range shifts {
+			window := ShiftWindow{
+				DaysOfWeek: IntsFromArray(shift.DaysOfWeek),
+				StartDate:  shift.StartDate,
+				EndDate:    shift.EndDate,
+				StartTime:  shift.StartTime,
+				EndTime:    shift.EndTime,
+			}
+
+			date, overlaps := rideOverlapsWindow(window, slot.Start, slot.End)
+			if !overlaps {
+				continue
+			}
+
+			found := ShiftClash{
+				ShiftName: shift.Name,
+				Date:      WeekdayDate(date),
+				StartTime: shift.StartTime,
+				EndTime:   shift.EndTime,
+			}
+			found.Kind, found.SubjectID, found.Subject = subject(shift.DriverID == driverId)
+
+			return &found, nil
+		}
+	}
+
+	return nil, nil
+}
+
+// LockShiftResources takes a transaction scoped advisory lock on every driver, vehicle
+// and passenger about to be put on a shift or a ride. The clash checks read what is
+// already committed, so without this two owners assigning the same driver at the same
+// moment, or a driver creating a ride while their owner puts them on a shift, could
+// both pass and both write. Keys are taken in sorted order so two assignments sharing
+// resources can never deadlock, and the locks end with the transaction.
+func LockShiftResources(tx *gorm.DB, driverIds, vehicleIds, passengerIds []string) error {
+	seen := map[string]bool{}
+	keys := []string{}
+
+	add := func(kind string, ids []string) {
+		for _, id := range ids {
+			if id == "" {
+				continue
+			}
+
+			key := "shift:" + kind + ":" + id
+			if !seen[key] {
+				seen[key] = true
+				keys = append(keys, key)
+			}
+		}
+	}
+
+	add(Clash_Kind_Driver, driverIds)
+	add(Clash_Kind_Vehicle, vehicleIds)
+	add(Clash_Kind_Passenger, passengerIds)
+
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", key).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+////////////////////////////// OCCURRENCES //////////////////////////////
+
+// CreateOccurrences writes the trips active shifts make between two dates, one row a
+// day, freezing the driver, vehicle, names and route as they stand. It is written in
+// one statement however many shifts there are, never invents a trip from before the
+// shift existed, and is safe to run again and again: a day already written is left
+// untouched.
+func CreateOccurrences(db *gorm.DB, fromDate, toDate, shiftId string) error {
+	sql := `
+		INSERT INTO shift_occurrences (
+			id, shift_id, service_id, occurrence_date, start_time, end_time, starts_at, ends_at,
+			driver_id, vehicle_id, shift_name, service_name, driver_name, driver_mobile, vehicle_number,
+			route, status, created_at, updated_at
+		)
+		SELECT
+			gen_random_uuid()::text, s.id, s.service_id, days.day, s.start_time, s.end_time,
+			days.day || ' ' || s.start_time, days.day || ' ' || s.end_time,
+			s.driver_id, s.vehicle_id, s.name,
+			COALESCE(pick_drop_services.name, ''), COALESCE(drivers.driver_name, ''),
+			COALESCE(drivers.driver_mobile, ''), COALESCE(vehicles.vehicle_number, ''),
+			COALESCE((
+				SELECT json_agg(json_build_object(
+					'sequence', l.sequence, 'location', l.location, 'lat', l.lat, 'lng', l.lng, 'time', l.time
+				) ORDER BY l.sequence)
+				FROM shift_locations l WHERE l.shift_id = s.id
+			)::text, '[]'),
+			?, now(), now()
+		FROM shifts s
+		CROSS JOIN (
+			SELECT to_char(g, 'YYYY-MM-DD') AS day, EXTRACT(ISODOW FROM g)::int AS weekday
+			FROM generate_series(?::date, ?::date, interval '1 day') AS g
+		) days
+		LEFT JOIN pick_drop_services ON pick_drop_services.id = s.service_id
+		LEFT JOIN drivers ON drivers.id = s.driver_id
+		LEFT JOIN vehicles ON vehicles.id = s.vehicle_id
+		WHERE s.status = ?
+		  AND days.weekday = ANY(s.days_of_week)
+		  AND days.day >= s.start_date
+		  AND (s.end_date = '' OR days.day <= s.end_date)
+		  AND days.day || ' ' || s.start_time >= to_char(s.created_at AT TIME ZONE ?, 'YYYY-MM-DD HH24:MI')`
+
+	args := []interface{}{
+		constants.Occurrence_Status_Scheduled,
+		fromDate,
+		toDate,
+		constants.Shift_Status_Active,
+		constants.Business_Location_Name,
+	}
+
+	if shiftId != "" {
+		sql += " AND s.id = ?"
+		args = append(args, shiftId)
+	}
+
+	sql += " ON CONFLICT (shift_id, occurrence_date) DO NOTHING"
+
+	return db.Exec(sql, args...).Error
+}
+
+// FillOccurrenceAttendance gives every passenger who was on a shift when a trip was
+// due to start their present by default attendance row for that trip. Who was on it
+// is read from when they were added and removed, never from who is on it now, so a
+// replacement passenger never lands on a trip that was made before them. Like
+// CreateOccurrences it is idempotent.
+func FillOccurrenceAttendance(db *gorm.DB, fromDate, toDate, shiftId string) error {
+	sql := `
+		INSERT INTO shift_attendances (
+			id, occurrence_id, shift_id, passenger_id, occurrence_date,
+			location_sequence, location, location_time, status, created_at, updated_at
+		)
+		SELECT
+			gen_random_uuid()::text, o.id, o.shift_id, sp.passenger_id, o.occurrence_date,
+			sp.location_sequence, COALESCE(l.location, ''), COALESCE(l.time, ''), ?, now(), now()
+		FROM shift_occurrences o
+		JOIN shift_passengers sp ON sp.shift_id = o.shift_id
+		LEFT JOIN shift_locations l ON l.shift_id = o.shift_id AND l.sequence = sp.location_sequence
+		WHERE o.occurrence_date >= ?
+		  AND o.occurrence_date <= ?
+		  AND to_char(sp.added_at AT TIME ZONE ?, 'YYYY-MM-DD HH24:MI') <= o.starts_at
+		  AND (sp.removed_at IS NULL OR to_char(sp.removed_at AT TIME ZONE ?, 'YYYY-MM-DD HH24:MI') > o.starts_at)`
+
+	args := []interface{}{
+		constants.Attendance_Present,
+		fromDate,
+		toDate,
+		constants.Business_Location_Name,
+		constants.Business_Location_Name,
+	}
+
+	if shiftId != "" {
+		sql += " AND o.shift_id = ?"
+		args = append(args, shiftId)
+	}
+
+	sql += " ON CONFLICT (occurrence_id, passenger_id) DO NOTHING"
+
+	return db.Exec(sql, args...).Error
+}
+
+// MaterializeOccurrences writes the trips between two dates and their attendance.
+func MaterializeOccurrences(db *gorm.DB, fromDate, toDate, shiftId string) error {
+	if err := CreateOccurrences(db, fromDate, toDate, shiftId); err != nil {
+		return err
+	}
+
+	return FillOccurrenceAttendance(db, fromDate, toDate, shiftId)
 }

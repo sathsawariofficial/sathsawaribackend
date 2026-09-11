@@ -141,26 +141,44 @@ func passengerOTPResp(message, otp string) utils.APIResponse {
 	}
 }
 
-func passengerScheduleResp(preferences []postgress.PassengerLocationPreference) utils.APIResponse {
-	schedule := []SchedulePreference{}
+// availabilityResp always answers with the whole week, a day never filled in reads as
+// not required.
+func availabilityResp(serviceId string, days []postgress.PassengerAvailability, locations []postgress.PassengerAvailabilityLocation) utils.APIResponse {
+	byDay := map[int][]utils.RouteLocation{}
+	for _, location := range locations {
+		byDay[location.DayOfWeek] = append(byDay[location.DayOfWeek], utils.RouteLocation{
+			Location: location.Location,
+			Lat:      location.Lat,
+			Lng:      location.Lng,
+			Time:     location.Time,
+		})
+	}
 
-	for _, preference := range preferences {
-		schedule = append(schedule, SchedulePreference{
-			DayOfWeek:     preference.DayOfWeek,
-			Direction:     preference.Direction,
-			IsEnabled:     preference.IsEnabled,
-			Location:      preference.Location,
-			Lat:           preference.Lat,
-			Lng:           preference.Lng,
-			ScheduledTime: preference.ScheduledTime,
+	required := map[int]bool{}
+	for _, day := range days {
+		required[day.DayOfWeek] = day.IsRequired
+	}
+
+	week := make([]AvailabilityDay, 0, constants.Day_Of_Week_Max_Value)
+	for day := constants.Day_Of_Week_Min_Value; day <= constants.Day_Of_Week_Max_Value; day++ {
+		dayLocations := byDay[day]
+		if dayLocations == nil {
+			dayLocations = []utils.RouteLocation{}
+		}
+
+		week = append(week, AvailabilityDay{
+			DayOfWeek:  day,
+			IsRequired: required[day],
+			Locations:  dayLocations,
 		})
 	}
 
 	return utils.APIResponse{
 		Code:    http.StatusOK,
 		Message: constants.Success,
-		Data: PassengerScheduleResponse{
-			Preferences: schedule,
+		Data: AvailabilityResponse{
+			ServiceId: serviceId,
+			Days:      week,
 		},
 	}
 }

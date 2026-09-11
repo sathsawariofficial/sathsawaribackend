@@ -83,7 +83,7 @@ func RideRequestHandler(ctx *gin.Context) {
 		return
 	}
 
-	openURL, requestId, err := RequestRide(ctx, sessionId, request)
+	requestId, openURL, err := RequestRide(ctx, sessionId, request)
 	if err != nil {
 		logger.LogError(sessionId, "failed to save ride request error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
@@ -432,26 +432,26 @@ func DeletePassengerProfileHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(fmt.Sprintf(constants.Deleted_Successfully, "Passenger")))
 }
 
-// replaces the whole weekly travel form of the passenger in one call
-func SetPassengerScheduleHandler(ctx *gin.Context) {
+// an approved Pick & Drop passenger sets the days and places they need the service
+func SetAvailabilityHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
-	logger.LogInfo("Request received in SetPassengerScheduleHandler", sessionId)
+	logger.LogInfo("Request received in SetAvailabilityHandler", sessionId)
 
 	passengerId := ctx.GetString(constants.User_KEY)
 
-	var request PassengerScheduleRequest
+	var request AvailabilityRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
 		logger.LogError(sessionId, "binding error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
-			Message: fmt.Sprintf(constants.Update_Failed, "schedule"),
+			Message: fmt.Sprintf(constants.Update_Failed, "availability"),
 		})
 		return
 	}
 
-	logger.LogDebug2("Request received in SetPassengerScheduleHandler", sessionId, request)
+	logger.LogDebug2("Request received in SetAvailabilityHandler", sessionId, request)
 
-	if err := ValidatePassengerSchedule(&request); err != nil {
+	if err := ValidateAvailability(&request); err != nil {
 		logger.LogError(sessionId, "validation error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
@@ -460,8 +460,8 @@ func SetPassengerScheduleHandler(ctx *gin.Context) {
 		return
 	}
 
-	if err := SetPassengerSchedule(ctx, sessionId, passengerId, request); err != nil {
-		logger.LogError(sessionId, "set schedule error: "+err.Error())
+	if err := SetAvailability(ctx, sessionId, passengerId, request); err != nil {
+		logger.LogError(sessionId, "set availability error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
 			Message: err.Error(),
@@ -469,21 +469,21 @@ func SetPassengerScheduleHandler(ctx *gin.Context) {
 		return
 	}
 
-	logger.LogInfo("Response returned from SetPassengerScheduleHandler", sessionId)
+	logger.LogInfo("Response returned from SetAvailabilityHandler", sessionId)
 
-	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(fmt.Sprintf(constants.Updated_Successfully, "Schedule")))
+	ctx.JSON(http.StatusOK, utils.GeneralSuccessResp(fmt.Sprintf(constants.Updated_Successfully, "Availability")))
 }
 
-// returns the weekly travel form of the passenger
-func GetPassengerScheduleHandler(ctx *gin.Context) {
+// the whole week of the passenger's requirement
+func GetAvailabilityHandler(ctx *gin.Context) {
 	sessionId := xid.New().String()
-	logger.LogInfo("Request received in GetPassengerScheduleHandler", sessionId)
+	logger.LogInfo("Request received in GetAvailabilityHandler", sessionId)
 
 	passengerId := ctx.GetString(constants.User_KEY)
 
-	preferences, err := GetPassengerSchedule(ctx, sessionId, passengerId)
+	serviceId, days, locations, err := GetAvailability(ctx, sessionId, passengerId)
 	if err != nil {
-		logger.LogError(sessionId, "get schedule error: "+err.Error())
+		logger.LogError(sessionId, "get availability error: "+err.Error())
 		ctx.JSON(http.StatusBadRequest, utils.APIResponse{
 			Code:    http.StatusBadRequest,
 			Message: err.Error(),
@@ -491,9 +491,7 @@ func GetPassengerScheduleHandler(ctx *gin.Context) {
 		return
 	}
 
-	scheduleResp := passengerScheduleResp(preferences)
+	logger.LogInfo("Response returned from GetAvailabilityHandler", sessionId)
 
-	logger.LogInfo("Response returned from GetPassengerScheduleHandler", sessionId)
-
-	ctx.JSON(http.StatusOK, scheduleResp)
+	ctx.JSON(http.StatusOK, availabilityResp(serviceId, days, locations))
 }

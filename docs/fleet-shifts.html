@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SathSawari Fleet Shifts</title>
+<title>SathSawari Pick &amp; Drop and Shifts</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -243,7 +243,7 @@
     border: 1px solid var(--rule);
   }
   .fig-scroll { overflow-x: auto; padding: 1.5rem; }
-  figure svg { display: block; max-width: 100%; height: auto; min-width: 620px; margin: 0 auto; }
+  figure svg { display: block; max-width: 100%; height: auto; min-width: 620px; margin: 0 auto; color: var(--ink); }
   figcaption {
     border-top: 1px solid var(--rule-soft);
     padding: 0.85rem 1.25rem;
@@ -375,25 +375,25 @@
 
   <header class="masthead">
     <p class="eyebrow">SathSawari · backend feature</p>
-    <h1>Fleet Shifts</h1>
-    <p class="standfirst">A group is a fleet of vehicles and drivers. A shift is one vehicle taking one driver and a set of passengers along an ordered route, on one day, in one direction.</p>
+    <h1>Pick &amp; Drop and Shifts</h1>
+    <p class="standfirst">A driver enables Pick &amp; Drop and becomes the one owner of a service. The owner builds shifts: recurring trips that pin a driver, a vehicle and passengers to the stops of a route.</p>
     <div class="facts">
       <div>branch <b>feature/shift-management</b></div>
-      <div>tables <b>14 new</b></div>
-      <div>endpoints <b>56 new</b></div>
-      <div>verified <b>118/118 live</b></div>
-      <div>packages <b>group · shift</b></div>
+      <div>packages <b>pickdrop · shift</b></div>
+      <div>tables <b>24 new</b></div>
+      <div>endpoints <b>47 new</b></div>
+      <div>verified <b>206/206 calls · 38/38 checks</b></div>
     </div>
   </header>
 
   <nav class="toc">
     <a href="#model"><span>01</span>The model</a>
     <a href="#shift"><span>02</span>What a shift is</a>
-    <a href="#directions"><span>03</span>Two directions</a>
+    <a href="#clashes"><span>03</span>Clashes</a>
     <a href="#roles"><span>04</span>Who may do what</a>
     <a href="#rules"><span>05</span>Enforced rules</a>
-    <a href="#flow"><span>06</span>Test flow</a>
-    <a href="#admin"><span>07</span>Admin console</a>
+    <a href="#trips"><span>06</span>Trips and attendance</a>
+    <a href="#notifications"><span>07</span>Notifications</a>
     <a href="#archive"><span>08</span>Records kept</a>
     <a href="#reference"><span>09</span>Endpoints</a>
   </nav>
@@ -401,114 +401,109 @@
   <!-- ================================================== 1 -->
   <section id="model">
     <div class="col">
-      <h2><span class="num">01 / the model</span>What the system is made of</h2>
-      <p class="lede">Drivers and their vehicles already existed for carpooling. Everything to the right of them is new.</p>
-      <p>A driver creates a group and becomes its owner, which in this product is the same thing as its manager. Other drivers ask to join, bringing vehicles, offering only to drive, or only lending a vehicle. Passengers ask to join too. Nothing is granted on request — the manager decides.</p>
-      <p>Once the fleet exists, the manager builds shifts out of it. Each shift pins one vehicle and one driver to a window of time and hangs an ordered list of stops off it, with every seat of the vehicle accounted for.</p>
+      <h2><span class="num">01 / the model</span>Two things, never one</h2>
+      <p class="lede">Pick &amp; Drop is the service. A shift is one recurring trip of that service. They live in separate packages, routes and tables.</p>
+      <p>A registered driver enables Pick &amp; Drop and becomes its <strong>only owner</strong>. There are no managers or sub-managers, and the admin does not run it. Other drivers ask to join and may propose their vehicles, passengers ask to join, and the owner approves or rejects each request. A driver belongs to at most one service, as owner or member, and so does a passenger.</p>
+      <p>A driver joins in one of two ways. <strong>As a driver</strong>, they can be put behind the wheel of the service's shifts and may bring vehicles. <strong>With vehicles only</strong>, they belong to the service through the vehicles they offer, at least one, and never drive its shifts: the owner puts each of their vehicles on shifts with the owner or another driver behind the wheel, different vehicles on different shifts, even at the same time. They see those shifts, are told what happens to their vehicles, and keep at least one vehicle for as long as they stay.</p>
+      <p>The owner builds shifts out of what the service has: themselves or an approved driver, an approved vehicle with a seat count, and approved passengers. Every run of a shift on a date is written down as an <em>occurrence</em>, which is what attendance, reminders and travel history hang off.</p>
     </div>
 
     <figure>
       <div class="fig-scroll">
-        <svg viewBox="0 0 940 560" role="img" aria-label="Entity map: drivers, vehicles and passengers join a group through three membership tables; the group owns shifts, which own ordered stops and gender-locked seats; roles and permissions govern who may act.">
+        <svg viewBox="0 0 960 530" role="img" aria-label="Entity map: drivers, vehicles and passengers join a Pick and Drop service with one owner through three request tables; the service runs shifts, which own an ordered route, passengers pinned to stops, occurrences and attendance. Passengers also keep weekly availability and put out shift requests; owners publish advertisements.">
           <defs>
             <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
             </marker>
           </defs>
 
-          <!-- column headers -->
           <text x="30" y="26" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1.6" fill="currentColor" opacity="0.55">EXISTING</text>
-          <text x="320" y="26" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1.6" fill="currentColor" opacity="0.55">THE FLEET</text>
-          <text x="670" y="26" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1.6" fill="currentColor" opacity="0.55">THE WORK</text>
+          <text x="290" y="26" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1.6" fill="var(--drop)">PICK &amp; DROP · services/pickdrop</text>
+          <text x="650" y="26" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1.6" fill="var(--pickup)">SHIFTS · services/shift</text>
 
-          <!-- existing column -->
-          <rect x="30" y="46" width="180" height="58" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
+          <!-- existing -->
+          <rect x="30" y="46" width="190" height="58" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
           <text x="44" y="70" font-family="JetBrains Mono, monospace" font-size="13" font-weight="600" fill="currentColor">Driver</text>
-          <text x="44" y="90" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">mobile · gender</text>
+          <text x="44" y="90" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">one service at most</text>
 
-          <rect x="30" y="130" width="180" height="72" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
+          <rect x="30" y="130" width="190" height="72" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
           <text x="44" y="154" font-family="JetBrains Mono, monospace" font-size="13" font-weight="600" fill="currentColor">Vehicle</text>
           <text x="44" y="174" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">seats · a/c · heating</text>
-          <text x="44" y="191" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">+3 new columns</text>
+          <text x="44" y="191" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">seats cap rides + shifts</text>
 
-          <rect x="30" y="300" width="180" height="72" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
+          <rect x="30" y="300" width="190" height="58" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
           <text x="44" y="324" font-family="JetBrains Mono, monospace" font-size="13" font-weight="600" fill="currentColor">Passenger</text>
-          <text x="44" y="344" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">account · gender</text>
-          <text x="44" y="361" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">brand new table</text>
+          <text x="44" y="344" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">one service at most</text>
 
-          <rect x="30" y="400" width="180" height="72" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.55"/>
-          <text x="44" y="424" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">Travel form</text>
-          <text x="44" y="443" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">per day, per</text>
-          <text x="44" y="460" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">direction</text>
-          <line x1="120" y1="372" x2="120" y2="398" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)" opacity="0.75"/>
+          <!-- pick & drop -->
+          <rect x="290" y="46" width="290" height="58" fill="var(--drop-wash)" stroke="var(--drop)" stroke-width="2"/>
+          <text x="306" y="70" font-family="JetBrains Mono, monospace" font-size="13" font-weight="600" fill="currentColor">pick_drop_services</text>
+          <text x="306" y="90" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.7">exactly one owner driver</text>
 
-          <!-- fleet column -->
-          <rect x="290" y="46" width="270" height="58" fill="var(--surface-2)" stroke="currentColor" stroke-width="2"/>
-          <text x="306" y="70" font-family="JetBrains Mono, monospace" font-size="13" font-weight="600" fill="currentColor">Group</text>
-          <text x="306" y="90" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">owner = manager</text>
+          <rect x="290" y="128" width="290" height="40" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
+          <text x="306" y="153" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">pick_drop_drivers</text>
+          <rect x="290" y="176" width="290" height="40" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
+          <text x="306" y="201" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">pick_drop_vehicles</text>
+          <rect x="290" y="224" width="290" height="40" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
+          <text x="306" y="249" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">pick_drop_passengers</text>
+          <text x="290" y="286" font-family="Barlow Condensed, sans-serif" font-size="12.5" font-weight="600" letter-spacing="0.8" fill="currentColor" opacity="0.6">EVERY REQUEST: pending → approved · rejected · withdrawn · left · removed</text>
 
-          <rect x="290" y="130" width="270" height="42" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
-          <text x="306" y="156" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">GroupMember · role, join type</text>
+          <rect x="290" y="306" width="290" height="58" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.6"/>
+          <text x="306" y="330" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">passenger_availabilities</text>
+          <text x="306" y="350" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">per day · up to 6 places with times</text>
 
-          <rect x="290" y="182" width="270" height="42" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
-          <text x="306" y="208" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">GroupVehicle</text>
+          <rect x="290" y="382" width="290" height="58" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.6"/>
+          <text x="306" y="406" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">pick_drop_advertisements</text>
+          <text x="306" y="426" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">public · limit = vehicles × 2</text>
 
-          <rect x="290" y="234" width="270" height="42" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
-          <text x="306" y="260" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">GroupPassenger</text>
+          <!-- shifts -->
+          <rect x="650" y="46" width="280" height="58" fill="var(--pickup-wash)" stroke="var(--pickup)" stroke-width="2"/>
+          <text x="666" y="70" font-family="JetBrains Mono, monospace" font-size="13" font-weight="600" fill="currentColor">shifts</text>
+          <text x="666" y="90" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.7">days · dates · seats · status</text>
 
-          <text x="290" y="298" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1" fill="currentColor" opacity="0.55">EVERY ROW: pending → approved / rejected / removed</text>
+          <rect x="650" y="128" width="280" height="40" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
+          <text x="666" y="153" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">shift_locations · route with times</text>
+          <rect x="650" y="176" width="280" height="40" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
+          <text x="666" y="201" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">shift_passengers · → stop</text>
 
-          <!-- rbac -->
-          <rect x="290" y="330" width="270" height="100" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.55"/>
-          <text x="306" y="354" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">Role → RolePermission → Permission</text>
-          <text x="306" y="376" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">group_owner · group_submanager</text>
-          <text x="306" y="395" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">seeded at boot, admin may add more</text>
-          <text x="306" y="416" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">GroupMember.role_id points here</text>
-          <line x1="425" y1="172" x2="425" y2="328" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#a1)" opacity="0.5"/>
+          <rect x="650" y="240" width="280" height="58" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
+          <text x="666" y="264" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">shift_occurrences</text>
+          <text x="666" y="284" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">one per trip · route frozen</text>
+          <rect x="650" y="316" width="280" height="40" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
+          <text x="666" y="341" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">shift_attendances · present</text>
+          <rect x="650" y="364" width="280" height="40" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
+          <text x="666" y="389" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">shift_driver_updates</text>
 
-          <!-- work column -->
-          <rect x="640" y="46" width="270" height="58" fill="var(--surface-2)" stroke="currentColor" stroke-width="2"/>
-          <text x="656" y="70" font-family="JetBrains Mono, monospace" font-size="13" font-weight="600" fill="currentColor">Shift</text>
-          <text x="656" y="90" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">vehicle · driver · direction · window</text>
-
-          <rect x="640" y="130" width="270" height="42" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
-          <text x="656" y="156" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">ShiftStop · sequence 1..n</text>
-
-          <rect x="640" y="182" width="270" height="60" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.75"/>
-          <text x="656" y="206" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">ShiftSeat · gender locked</text>
-          <text x="656" y="226" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">→ passenger, → stop</text>
-
-          <rect x="640" y="330" width="270" height="60" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.55"/>
-          <text x="656" y="354" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">ShiftTemplate</text>
-          <text x="656" y="374" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">+ stops + seat plan</text>
-          <line x1="775" y1="242" x2="775" y2="328" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#a1)" opacity="0.5"/>
-          <text x="785" y="290" font-family="Barlow Condensed, sans-serif" font-size="12" letter-spacing="0.5" fill="currentColor" opacity="0.6">saved from</text>
+          <rect x="650" y="430" width="280" height="58" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.6"/>
+          <text x="666" y="454" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">shift_requests</text>
+          <text x="666" y="474" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">a passenger's need · owners search</text>
 
           <!-- joins -->
-          <line x1="210" y1="75" x2="288" y2="75" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
-          <text x="216" y="66" font-family="Barlow Condensed, sans-serif" font-size="12.5" letter-spacing="0.5" fill="currentColor">creates</text>
+          <line x1="220" y1="75" x2="288" y2="75" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+          <text x="226" y="66" font-family="Barlow Condensed, sans-serif" font-size="12.5" fill="currentColor">enables</text>
+          <line x1="220" y1="95" x2="288" y2="146" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+          <text x="224" y="130" font-family="Barlow Condensed, sans-serif" font-size="12.5" fill="currentColor">asks</text>
+          <line x1="220" y1="170" x2="288" y2="196" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+          <text x="224" y="198" font-family="Barlow Condensed, sans-serif" font-size="12.5" fill="currentColor">offered</text>
+          <line x1="220" y1="320" x2="288" y2="248" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+          <text x="224" y="290" font-family="Barlow Condensed, sans-serif" font-size="12.5" fill="currentColor">asks</text>
+          <line x1="220" y1="340" x2="288" y2="336" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#a1)" opacity="0.7"/>
 
-          <line x1="210" y1="151" x2="288" y2="151" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
-          <text x="214" y="142" font-family="Barlow Condensed, sans-serif" font-size="12.5" letter-spacing="0.5" fill="currentColor">asks to join</text>
+          <line x1="580" y1="75" x2="648" y2="75" stroke="currentColor" stroke-width="2" marker-end="url(#a1)"/>
+          <text x="586" y="66" font-family="Barlow Condensed, sans-serif" font-size="12.5" fill="currentColor">owner builds</text>
+          <line x1="790" y1="104" x2="790" y2="126" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+          <line x1="700" y1="104" x2="700" y2="174" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+          <path d="M 918 104 L 918 238" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#a1)" opacity="0.8"/>
+          <text x="838" y="228" font-family="Barlow Condensed, sans-serif" font-size="12" fill="currentColor" opacity="0.75">scheduler</text>
+          <line x1="790" y1="298" x2="790" y2="314" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+          <line x1="580" y1="244" x2="648" y2="196" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#a1)" opacity="0.6"/>
+          <text x="586" y="232" font-family="Barlow Condensed, sans-serif" font-size="12" fill="currentColor" opacity="0.75">approved only</text>
 
-          <line x1="210" y1="196" x2="288" y2="203" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
-          <text x="212" y="188" font-family="Barlow Condensed, sans-serif" font-size="12.5" letter-spacing="0.5" fill="currentColor">offered</text>
-
-          <line x1="210" y1="320" x2="288" y2="262" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
-          <text x="212" y="300" font-family="Barlow Condensed, sans-serif" font-size="12.5" letter-spacing="0.5" fill="currentColor">asks to join</text>
-
-          <line x1="560" y1="75" x2="638" y2="75" stroke="currentColor" stroke-width="2" marker-end="url(#a1)"/>
-          <text x="566" y="66" font-family="Barlow Condensed, sans-serif" font-size="12.5" letter-spacing="0.5" fill="currentColor">runs</text>
-
-          <line x1="775" y1="104" x2="775" y2="128" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
-          <line x1="700" y1="104" x2="700" y2="180" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
-
-          <!-- form feeds the manager -->
-          <path d="M 210 436 L 250 436 L 250 500 L 700 500 L 700 246" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#a1)" opacity="0.8"/>
-          <text x="330" y="493" font-family="Barlow Condensed, sans-serif" font-size="12.5" letter-spacing="0.5" fill="currentColor" opacity="0.85">the manager reads the forms, then seats people by hand</text>
+          <path d="M 125 358 L 125 510 L 790 510 L 790 490" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#a1)" opacity="0.8"/>
+          <text x="140" y="503" font-family="Barlow Condensed, sans-serif" font-size="12.5" fill="currentColor" opacity="0.85">puts out a requirement, with or without a service in mind</text>
         </svg>
       </div>
-      <figcaption><b>Solid boxes are tables, dashed boxes are the supporting ones.</b> The travel form never creates a shift — it is only the sheet a manager reads while deciding who to seat. Every membership row moves through the same four states, which is why one endpoint can settle drivers, vehicles and passengers in a single call.</figcaption>
+      <figcaption><b>Solid boxes are the core tables, dashed ones the supporting ones.</b> Requests are never reused: asking again after leaving writes a new row, so who joined and left when stays answerable. Partial unique indexes allow one open request or membership per driver, vehicle and passenger.</figcaption>
     </figure>
   </section>
 
@@ -516,142 +511,110 @@
   <section id="shift">
     <div class="col">
       <h2><span class="num">02 / anatomy</span>What a shift actually is</h2>
-      <p class="lede">One vehicle, one driver, one day, one direction — and a route the manager arranges by hand.</p>
-      <p>The stops are sent in the order they should be driven, and each seat hangs off the stop its passenger waits at. Every physical seat of the vehicle gets a row, so an empty seat is just as visible as a taken one and the manager can see the gaps left to fill.</p>
-      <p>A seat carries the gender it is kept for. The seat's gender and the person sitting in it must always agree, so nobody ever lands in a seat reserved for the other gender. The manager can re-declare that gender while swapping the occupant, which is how a male rider is exchanged for a female one in a single request.</p>
+      <p class="lede">One recurring entity: a driver, a vehicle, a route with times, passengers pinned to its stops, and the days it runs.</p>
+      <p>A shift is named after its vehicle's number, and renaming the vehicle renames its active shifts and their upcoming trips. It runs on its days of the week (1 is Monday, 7 is Sunday), from its start date until its end date, or until it is changed when there is none. Its route is 2 to 20 places, each reached after the one before, so a trip lasts from the time of the first place to the time of the last and never spans midnight. Each passenger waits at one stop.</p>
+      <p>Seats are kept on the shift: the total is the vehicle's seat count, the occupied count is kept in step with the passengers on it inside the same transaction, and a database check stops occupied from ever exceeding total. Changing the vehicle's seats changes every active shift on it, and is refused below what a shift already carries.</p>
     </div>
 
     <figure>
       <div class="fig-scroll">
-        <svg viewBox="0 0 900 400" role="img" aria-label="A pickup shift: three ordered stops along a route, with each vehicle seat drawn below and linked to the stop where its passenger boards. Two of seven seats are taken, five are free.">
-          <defs>
-            <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--pickup)"/>
-            </marker>
-          </defs>
+        <svg viewBox="0 0 900 380" role="img" aria-label="A shift: a route of three stops at 07:00, 07:25 and 08:00 with two passengers pinned to the first two stops, running every day between a start and an end date, with seven seats of which two are occupied.">
+          <line x1="120" y1="110" x2="780" y2="110" stroke="var(--pickup)" stroke-width="3"/>
+          <circle cx="120" cy="110" r="9" fill="var(--surface)" stroke="var(--pickup)" stroke-width="3"/>
+          <circle cx="450" cy="110" r="9" fill="var(--surface)" stroke="var(--pickup)" stroke-width="3"/>
+          <circle cx="780" cy="110" r="9" fill="var(--pickup)" stroke="var(--pickup)" stroke-width="3"/>
 
-          <text x="40" y="30" font-family="Barlow Condensed, sans-serif" font-size="14" font-weight="600" letter-spacing="1.6" fill="var(--pickup)">PICKUP · MON 14 SEP · FLEET-001 · 7 SEATS</text>
+          <text x="120" y="70" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">1 · Bahria Town</text>
+          <text x="120" y="88" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="var(--pickup)">07:00</text>
+          <text x="450" y="70" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">2 · DHA Phase 2</text>
+          <text x="450" y="88" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="var(--pickup)">07:25</text>
+          <text x="780" y="70" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">3 · Roots School</text>
+          <text x="780" y="88" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="var(--pickup)">08:00</text>
 
-          <!-- route line -->
-          <line x1="80" y1="105" x2="830" y2="105" stroke="var(--pickup)" stroke-width="3" marker-end="url(#a2)"/>
+          <line x1="120" y1="120" x2="120" y2="160" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 3" opacity="0.6"/>
+          <rect x="60" y="160" width="120" height="32" fill="var(--surface-2)" stroke="currentColor" stroke-width="1" opacity="0.9"/>
+          <text x="120" y="181" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">Ayesha</text>
+          <line x1="450" y1="120" x2="450" y2="160" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 3" opacity="0.6"/>
+          <rect x="390" y="160" width="120" height="32" fill="var(--surface-2)" stroke="currentColor" stroke-width="1" opacity="0.9"/>
+          <text x="450" y="181" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">Bilal</text>
 
-          <!-- stops -->
-          <circle cx="120" cy="105" r="11" fill="var(--pickup)"/>
-          <text x="120" y="110" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600" fill="var(--surface)">1</text>
-          <text x="120" y="76" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">Bahria Phase 4</text>
-          <text x="120" y="58" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="var(--pickup)">07:15</text>
+          <text x="450" y="226" text-anchor="middle" font-family="Barlow Condensed, sans-serif" font-size="13" letter-spacing="0.5" fill="currentColor" opacity="0.75">the trip lasts from the first place's time to the last: 07:00 → 08:00</text>
 
-          <circle cx="430" cy="105" r="11" fill="var(--pickup)"/>
-          <text x="430" y="110" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600" fill="var(--surface)">2</text>
-          <text x="430" y="76" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">DHA Phase 2</text>
-          <text x="430" y="58" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="var(--pickup)">07:35</text>
+          <!-- days -->
+          <text x="60" y="276" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1.2" fill="currentColor" opacity="0.6">DAYS OF WEEK</text>
+          <g font-family="JetBrains Mono, monospace" font-size="12" text-anchor="middle">
+            <rect x="60" y="288" width="36" height="36" fill="var(--pickup-wash)" stroke="var(--pickup)"/><text x="78" y="311" fill="currentColor">1</text>
+            <rect x="100" y="288" width="36" height="36" fill="var(--pickup-wash)" stroke="var(--pickup)"/><text x="118" y="311" fill="currentColor">2</text>
+            <rect x="140" y="288" width="36" height="36" fill="var(--pickup-wash)" stroke="var(--pickup)"/><text x="158" y="311" fill="currentColor">3</text>
+            <rect x="180" y="288" width="36" height="36" fill="var(--pickup-wash)" stroke="var(--pickup)"/><text x="198" y="311" fill="currentColor">4</text>
+            <rect x="220" y="288" width="36" height="36" fill="var(--pickup-wash)" stroke="var(--pickup)"/><text x="238" y="311" fill="currentColor">5</text>
+            <rect x="260" y="288" width="36" height="36" fill="none" stroke="currentColor" opacity="0.4"/><text x="278" y="311" fill="currentColor" opacity="0.5">6</text>
+            <rect x="300" y="288" width="36" height="36" fill="none" stroke="currentColor" opacity="0.4"/><text x="318" y="311" fill="currentColor" opacity="0.5">7</text>
+          </g>
+          <text x="60" y="350" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.65">start_date → end_date (empty: until changed)</text>
 
-          <circle cx="740" cy="105" r="11" fill="none" stroke="var(--pickup)" stroke-width="3"/>
-          <text x="740" y="76" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">Roots School F-8</text>
-          <text x="740" y="58" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="var(--pickup)">08:20 · destination</text>
-
-          <!-- boarding links -->
-          <path d="M 120 116 L 120 210 L 155 210" fill="none" stroke="var(--pickup)" stroke-width="1.5" stroke-dasharray="4 3"/>
-          <path d="M 430 116 L 430 250 L 255 250" fill="none" stroke="var(--pickup)" stroke-width="1.5" stroke-dasharray="4 3"/>
-
-          <!-- seat map -->
-          <text x="40" y="200" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1.4" fill="currentColor" opacity="0.55">SEATS</text>
-
-          <!-- seat 1 -->
-          <rect x="160" y="188" width="92" height="62" fill="var(--pickup-wash)" stroke="var(--pickup)" stroke-width="1.5"/>
-          <text x="170" y="206" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.7">seat 1</text>
-          <text x="170" y="224" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">Ayesha</text>
-          <rect x="170" y="230" width="20" height="15" fill="none" stroke="currentColor" stroke-width="1"/>
-          <text x="180" y="242" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" font-weight="600" fill="currentColor">F</text>
-          <text x="196" y="242" font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor" opacity="0.6">stop 1</text>
-
-          <!-- seat 2 -->
-          <rect x="264" y="188" width="92" height="62" fill="var(--pickup-wash)" stroke="var(--pickup)" stroke-width="1.5"/>
-          <text x="274" y="206" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.7">seat 2</text>
-          <text x="274" y="224" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">Bilal</text>
-          <rect x="274" y="230" width="20" height="15" fill="none" stroke="currentColor" stroke-width="1"/>
-          <text x="284" y="242" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" font-weight="600" fill="currentColor">M</text>
-          <text x="300" y="242" font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor" opacity="0.6">stop 2</text>
-
-          <!-- empty seats -->
-          <rect x="368" y="188" width="92" height="62" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.5"/>
-          <text x="378" y="206" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.55">seat 3</text>
-          <text x="378" y="226" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" opacity="0.5">free</text>
-
-          <rect x="472" y="188" width="92" height="62" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.5"/>
-          <text x="482" y="206" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.55">seat 4</text>
-          <text x="482" y="226" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" opacity="0.5">free</text>
-
-          <rect x="576" y="188" width="92" height="62" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.5"/>
-          <text x="586" y="206" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.55">seat 5</text>
-          <text x="586" y="226" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" opacity="0.5">free</text>
-
-          <rect x="680" y="188" width="92" height="62" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.5"/>
-          <text x="690" y="206" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.55">seat 6</text>
-          <text x="690" y="226" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" opacity="0.5">free</text>
-
-          <rect x="784" y="188" width="92" height="62" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.5"/>
-          <text x="794" y="206" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.55">seat 7</text>
-          <text x="794" y="226" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" opacity="0.5">free</text>
-
-          <!-- notified -->
-          <line x1="40" y1="300" x2="860" y2="300" stroke="currentColor" stroke-width="1" opacity="0.25"/>
-          <text x="40" y="330" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1.4" fill="currentColor" opacity="0.55">ON COMMIT, EVERYONE IS TOLD</text>
-          <text x="40" y="356" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">driver → route, seat count, stop count</text>
-          <text x="40" y="376" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">each passenger → their stop, their time, the driver's number, the manager's number</text>
+          <!-- seats -->
+          <text x="520" y="276" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1.2" fill="currentColor" opacity="0.6">SEATS</text>
+          <g>
+            <rect x="520" y="288" width="36" height="36" fill="var(--pickup)"/>
+            <rect x="560" y="288" width="36" height="36" fill="var(--pickup)"/>
+            <rect x="600" y="288" width="36" height="36" fill="none" stroke="currentColor" opacity="0.5"/>
+            <rect x="640" y="288" width="36" height="36" fill="none" stroke="currentColor" opacity="0.5"/>
+            <rect x="680" y="288" width="36" height="36" fill="none" stroke="currentColor" opacity="0.5"/>
+            <rect x="720" y="288" width="36" height="36" fill="none" stroke="currentColor" opacity="0.5"/>
+            <rect x="760" y="288" width="36" height="36" fill="none" stroke="currentColor" opacity="0.5"/>
+          </g>
+          <text x="520" y="350" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.65">total 7 · occupied 2 · remaining 5</text>
         </svg>
       </div>
-      <figcaption><b>Seat 3 to 7 exist as rows even though nobody sits in them.</b> The dashed links show which stop a seat boards at — that is what <code>stopSequence</code> refers to when seats are reassigned later. Every message carries both the driver's number and the number of the manager who built the shift, so anyone with a problem on the day knows who to call.</figcaption>
+      <figcaption><b>Only the owner creates, edits or deletes a shift.</b> Every edit runs the same checks as creating one. Trips that have not started are rewritten to the new route, driver and vehicle, trips already under way or done keep what they were.</figcaption>
     </figure>
   </section>
 
   <!-- ================================================== 3 -->
-  <section id="directions">
+  <section id="clashes">
     <div class="col">
-      <h2><span class="num">03 / directions</span>Going and coming back are two shifts</h2>
-      <p class="lede">The passenger experiences one journey. The system holds two entirely separate objects.</p>
-      <p>A pickup and a drop-off are never linked. They have their own routes, their own stop order, their own seat assignments, and they are cancelled independently. That is deliberate: the evening rarely retraces the morning, and somebody who rides in one direction often does not ride in the other.</p>
+      <h2><span class="num">03 / clashes</span>Nobody is in two places at once</h2>
+      <p class="lede">A driver, a vehicle or a passenger is never on two shifts whose trips overlap, in any service, a driver or vehicle is never on a carpool ride during a trip, and a driver is never on two carpool rides at once, whichever vehicles they drive.</p>
+      <p>The test is a real interval overlap, <code>start &lt; other end AND end &gt; other start</code>, so a trip ending at 08:00 leaves everyone free for one starting at 08:00. Times are only half of it: two shifts clash only if there is a date both actually run on. Sharing a weekday is not enough, a Monday to Friday shift that ends on the 10th never meets a Wednesday shift that starts on the 20th, so the check walks the first seven days of the overlap of their date ranges to find a real shared date. Only what is still to come counts, a clash on a date already behind us never stops a shift that has run for months from being edited.</p>
+      <p>The check reads what is already committed, so every shift create, edit and passenger change, and every ride created or switched back on, takes a transaction scoped advisory lock on each driver, vehicle and passenger involved, in sorted order, before it looks. Rides and shifts share the same lock keys, so an owner putting a driver on a shift and that driver creating a ride at the same moment are serialised instead of both passing.</p>
     </div>
 
     <figure>
       <div class="fig-scroll">
-        <svg viewBox="0 0 900 330" role="img" aria-label="Two independent shifts on the same day: the morning pickup runs Bahria to DHA to the school, the evening drop runs the school to F-8 Markaz to DHA. The drop points differ from the morning pickup points and the stop order is reversed.">
+        <svg viewBox="0 0 900 300" role="img" aria-label="Timeline from 06:30 to 09:00. An existing morning run from 07:00 to 08:00. A second shift for the same driver from 07:30 to 08:30 overlaps between 07:30 and 08:00 and is refused. A shift from 08:00 to 08:30 only touches and is allowed.">
           <defs>
-            <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--pickup)"/>
-            </marker>
-            <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--drop)"/>
-            </marker>
+            <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <line x1="0" y1="0" x2="0" y2="6" stroke="var(--signal)" stroke-width="3"/>
+            </pattern>
           </defs>
 
-          <!-- morning -->
-          <rect x="30" y="30" width="840" height="110" fill="var(--pickup-wash)" opacity="0.45"/>
-          <text x="48" y="58" font-family="Barlow Condensed, sans-serif" font-size="15" font-weight="700" letter-spacing="1.6" fill="var(--pickup)">SHIFT A · DIRECTION = PICKUP</text>
-          <line x1="110" y1="105" x2="800" y2="105" stroke="var(--pickup)" stroke-width="3" marker-end="url(#a3)"/>
-          <circle cx="140" cy="105" r="9" fill="var(--pickup)"/>
-          <text x="140" y="128" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">Bahria · 07:15</text>
-          <circle cx="420" cy="105" r="9" fill="var(--pickup)"/>
-          <text x="420" y="128" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">DHA · 07:35</text>
-          <circle cx="710" cy="105" r="9" fill="none" stroke="var(--pickup)" stroke-width="3"/>
-          <text x="710" y="128" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">School · 08:20</text>
+          <g font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.7" text-anchor="middle">
+            <line x1="120" y1="250" x2="820" y2="250" stroke="currentColor" stroke-width="1"/>
+            <line x1="120" y1="245" x2="120" y2="255" stroke="currentColor"/><text x="120" y="272">06:30</text>
+            <line x1="260" y1="245" x2="260" y2="255" stroke="currentColor"/><text x="260" y="272">07:00</text>
+            <line x1="400" y1="245" x2="400" y2="255" stroke="currentColor"/><text x="400" y="272">07:30</text>
+            <line x1="540" y1="245" x2="540" y2="255" stroke="currentColor"/><text x="540" y="272">08:00</text>
+            <line x1="680" y1="245" x2="680" y2="255" stroke="currentColor"/><text x="680" y="272">08:30</text>
+            <line x1="820" y1="245" x2="820" y2="255" stroke="currentColor"/><text x="820" y="272">09:00</text>
+          </g>
+          <line x1="540" y1="30" x2="540" y2="245" stroke="currentColor" stroke-width="1" stroke-dasharray="2 4" opacity="0.4"/>
 
-          <!-- evening -->
-          <rect x="30" y="170" width="840" height="110" fill="var(--drop-wash)" opacity="0.45"/>
-          <text x="48" y="198" font-family="Barlow Condensed, sans-serif" font-size="15" font-weight="700" letter-spacing="1.6" fill="var(--drop)">SHIFT B · DIRECTION = DROP</text>
-          <line x1="110" y1="245" x2="800" y2="245" stroke="var(--drop)" stroke-width="3" marker-end="url(#a4)"/>
-          <circle cx="140" cy="245" r="9" fill="var(--drop)"/>
-          <text x="140" y="268" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">School · 17:00</text>
-          <circle cx="420" cy="245" r="9" fill="var(--drop)"/>
-          <text x="420" y="268" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">F-8 Markaz · 17:30</text>
-          <circle cx="710" cy="245" r="9" fill="none" stroke="var(--drop)" stroke-width="3"/>
-          <text x="710" y="268" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">DHA · 18:10</text>
+          <text x="20" y="62" font-family="Barlow Condensed, sans-serif" font-size="14" font-weight="600" fill="currentColor">Morning run</text>
+          <rect x="260" y="44" width="280" height="30" fill="var(--pickup)"/>
+          <text x="400" y="64" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="var(--surface)">existing · driver A</text>
 
-          <!-- the point -->
-          <text x="30" y="308" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" opacity="0.75">no foreign key joins these two · different stops · different order · cancelled separately</text>
+          <text x="20" y="127" font-family="Barlow Condensed, sans-serif" font-size="14" font-weight="600" fill="currentColor">New, same driver</text>
+          <rect x="400" y="109" width="280" height="30" fill="none" stroke="var(--signal)" stroke-width="2"/>
+          <rect x="400" y="109" width="140" height="30" fill="url(#hatch)" opacity="0.55"/>
+          <text x="690" y="129" font-family="JetBrains Mono, monospace" font-size="12" fill="var(--signal)">refused · 07:30–08:00 overlaps</text>
+
+          <text x="20" y="192" font-family="Barlow Condensed, sans-serif" font-size="14" font-weight="600" fill="currentColor">New, touching</text>
+          <rect x="540" y="174" width="140" height="30" fill="var(--drop-wash)" stroke="var(--drop)" stroke-width="2"/>
+          <text x="690" y="194" font-family="JetBrains Mono, monospace" font-size="12" fill="var(--drop)">allowed · touching is not overlapping</text>
         </svg>
       </div>
-      <figcaption><b>Ayesha rides in both, and is dropped at F-8 Markaz rather than picked up from Bahria.</b> Her travel form records that asymmetry per day and per direction — which is also how she switches off the evening leg on a Tuesday while keeping the morning one.</figcaption>
+      <figcaption><b>The same rule in both directions for rides.</b> Creating a shift checks the driver's and vehicle's carpool rides, and creating a ride checks the driver's other rides on any vehicle, the vehicle's rides and both their shift trips. A recurring ride series is checked date by date before anything is written, against everything already booked and against its own rides, and one clashing date refuses the whole series, naming that date.</figcaption>
     </figure>
   </section>
 
@@ -659,78 +622,39 @@
   <section id="roles">
     <div class="col">
       <h2><span class="num">04 / authority</span>Who may do what</h2>
-      <p class="lede">Nothing in the code tests a role by name. Every check asks the database what the caller's role is allowed to do.</p>
-      <p>That is what makes the system extensible: an admin can invent a new role and map permissions onto it, and the group and shift endpoints honour it immediately without a deploy. A sub-manager exists to take the shift-building load off the manager, and holds none of the membership permissions.</p>
+      <p class="lede">Every route checks its token type in the middleware, and every action checks ownership or membership in the service before it touches anything.</p>
     </div>
-
-    <figure>
-      <div class="fig-scroll">
-        <svg viewBox="0 0 900 190" role="img" aria-label="Permission resolution: a caller's driver id and group id find their group member row, which points at a role, which maps through role permissions to a permission code. An admin edits the middle two links without any code change.">
-          <defs>
-            <marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
-            </marker>
-          </defs>
-
-          <rect x="20" y="52" width="150" height="56" fill="none" stroke="currentColor" stroke-width="1.5"/>
-          <text x="95" y="76" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">caller + group</text>
-          <text x="95" y="94" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">from the token</text>
-
-          <rect x="210" y="52" width="160" height="56" fill="none" stroke="currentColor" stroke-width="1.5"/>
-          <text x="290" y="76" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">group_members</text>
-          <text x="290" y="94" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">must be approved</text>
-
-          <rect x="410" y="52" width="160" height="56" fill="var(--pickup-wash)" stroke="var(--pickup)" stroke-width="2"/>
-          <text x="490" y="76" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" font-weight="600" fill="currentColor">role_permissions</text>
-          <text x="490" y="94" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.7">admin edits this</text>
-
-          <rect x="610" y="52" width="160" height="56" fill="none" stroke="currentColor" stroke-width="1.5"/>
-          <text x="690" y="76" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">permissions.code</text>
-          <text x="690" y="94" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">shift.create …</text>
-
-          <rect x="810" y="52" width="70" height="56" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3"/>
-          <text x="845" y="84" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">allow</text>
-
-          <line x1="170" y1="80" x2="208" y2="80" stroke="currentColor" stroke-width="1.5" marker-end="url(#a5)"/>
-          <line x1="370" y1="80" x2="408" y2="80" stroke="currentColor" stroke-width="1.5" marker-end="url(#a5)"/>
-          <line x1="570" y1="80" x2="608" y2="80" stroke="currentColor" stroke-width="1.5" marker-end="url(#a5)"/>
-          <line x1="770" y1="80" x2="808" y2="80" stroke="currentColor" stroke-width="1.5" marker-end="url(#a5)"/>
-
-          <text x="20" y="150" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" opacity="0.75">one joined query · a member with no role resolves to no permissions · a rejected member resolves to none either</text>
-        </svg>
-      </div>
-      <figcaption><b>The blue link is the only one an admin touches.</b> Adding a role, or handing an existing role a permission it did not have, changes behaviour with no deploy — the code only ever asks whether a permission code resolves.</figcaption>
-    </figure>
 
     <div class="table-scroll">
       <table>
         <thead>
-          <tr>
-            <th>Permission</th>
-            <th>Owner / manager</th>
-            <th>Sub-manager</th>
-            <th>Joined driver</th>
-          </tr>
+          <tr><th>Action</th><th>Owner</th><th>Member driver</th><th>Passenger</th><th>Public</th><th>Admin</th></tr>
         </thead>
         <tbody>
-          <tr><td class="mono">group.manage_members</td><td class="yes">yes</td><td class="no">no</td><td class="no">no</td></tr>
-          <tr><td class="mono">group.manage_vehicles</td><td class="yes">yes</td><td class="no">no</td><td class="no">no</td></tr>
-          <tr><td class="mono">group.manage_submanagers</td><td class="yes">yes</td><td class="no">no</td><td class="no">no</td></tr>
-          <tr><td class="mono">group.delete</td><td class="yes">yes</td><td class="no">no</td><td class="no">no</td></tr>
-          <tr><td class="mono">shift.create</td><td class="yes">yes</td><td class="yes">yes</td><td class="no">no</td></tr>
-          <tr><td class="mono">shift.assign_seats</td><td class="yes">yes</td><td class="yes">yes</td><td class="no">no</td></tr>
-          <tr><td class="mono">shift.cancel</td><td class="yes">yes</td><td class="yes">yes</td><td class="no">no</td></tr>
-          <tr><td class="mono">shift.manage_templates</td><td class="yes">yes</td><td class="yes">yes</td><td class="no">no</td></tr>
+          <tr><td>Enable or disable Pick &amp; Drop</td><td class="yes">yes</td><td class="no">no</td><td class="no">no</td><td class="no">no</td><td class="no">no</td></tr>
+          <tr><td>Decide join requests, add own vehicles</td><td class="yes">yes</td><td class="no">no</td><td class="no">no</td><td class="no">no</td><td class="no">no</td></tr>
+          <tr><td>Ask to join, offer or withdraw a vehicle, leave</td><td class="no">no</td><td class="yes">yes</td><td class="yes">join, leave</td><td class="no">no</td><td class="no">no</td></tr>
+          <tr><td>Be put behind the wheel of a shift</td><td class="yes">yes</td><td class="yes">joined as a driver, never with vehicles only</td><td class="no">no</td><td class="no">no</td><td class="no">no</td></tr>
+          <tr><td>Create, edit, delete shifts, change their passengers</td><td class="yes">yes</td><td class="no">no</td><td class="no">no</td><td class="no">no</td><td class="no">no</td></tr>
+          <tr><td>Read a shift and its trip attendance</td><td class="yes">every shift</td><td class="yes">shifts they drive, and read the shifts their vehicles are on</td><td class="yes">shifts they are on</td><td class="no">no</td><td class="no">no</td></tr>
+          <tr><td>Send a location update</td><td class="yes">shifts they drive</td><td class="yes">shifts they drive</td><td class="no">no</td><td class="no">no</td><td class="no">no</td></tr>
+          <tr><td>Mark absent or present</td><td class="no">no</td><td class="no">no</td><td class="yes">their own trips</td><td class="no">no</td><td class="no">no</td></tr>
+          <tr><td>Weekly availability, shift requests, travel history</td><td class="no">no</td><td class="no">no</td><td class="yes">their own</td><td class="no">no</td><td class="no">no</td></tr>
+          <tr><td>Advertisements</td><td class="yes">create, delete</td><td class="no">no</td><td class="yes">search</td><td class="yes">search</td><td class="no">no</td></tr>
+          <tr><td>Search shift requests, available lists, histories</td><td class="yes">yes</td><td class="no">no</td><td class="no">no</td><td class="no">no</td><td class="no">no</td></tr>
+          <tr><td>Accounts: overview, suspend, delete</td><td class="no">no</td><td class="no">no</td><td class="no">no</td><td class="no">no</td><td class="yes">yes</td></tr>
+          <tr><td>See Pick &amp; Drop services, shifts, advertisements, open demand</td><td class="yes">their own</td><td class="no">no</td><td class="no">no</td><td class="no">no</td><td class="yes">every one, read only</td></tr>
         </tbody>
       </table>
     </div>
 
-    <div class="col">
-      <div class="note">
-        <span class="label">The rule you insisted on</span>
-        <p>A sub-manager can only be promoted from somebody who is <strong>already an approved driver-member of that same fleet</strong>. Anyone else comes back in the <code>skipped</code> list with a reason, never promoted. The owner can never be demoted — that would leave the fleet with nobody in charge.</p>
-      </div>
-      <p>A role's default permissions are written only the first time that role is created. If an admin later strips <code>shift.cancel</code> from sub-managers, a restart will not quietly hand it back.</p>
+    <div class="note">
+      <span class="label">Removed from this branch</span>
+      <p>Groups, sub-managers, the role and permission tables and their admin APIs, gender locked seats, shift templates, pickup and drop directions, and the admin screens that <em>managed</em> a group or a shift are gone. Their tables are dropped once at boot when the old schema is detected. Main never had them.</p>
+    </div>
+    <div class="note">
+      <span class="label">Added back, read only</span>
+      <p>An admin console still needs to see the whole platform. <code>/api/v1/admin/pickdrop/services</code>, <code>/pickdrop/service</code>, <code>/pickdrop/advertisements</code>, <code>/shifts</code> and <code>/shift/requests</code> let an admin browse and search every service, shift, advertisement and open rider request on the platform, and the overview counts them. None of it can be changed from there — creating, editing or deciding anything about a service or a shift is still only ever the owner's, exactly as above. The overview, service and shift queries are written again in <code>services/admin</code> rather than imported from <code>services/pickdrop</code> or <code>services/shift</code>, because no service package imports another.</p>
     </div>
   </section>
 
@@ -738,320 +662,124 @@
   <section id="rules">
     <div class="col">
       <h2><span class="num">05 / safety</span>What the system refuses to do</h2>
-      <p class="lede">Every rule is checked before a single row is written, and the whole shift is written in one transaction.</p>
-      <p>The clash rules are the ones with teeth. A vehicle and a driver can each be in one place at a time, and the check spans both fleet shifts <em>and</em> the existing carpool rides — because a driver is the same person in both halves of the product.</p>
+      <p class="lede">Each of these is proved by a call in <code>tools/flow_test.py</code> that is meant to fail, and its real response is saved in the Postman collection.</p>
     </div>
 
-    <figure>
-      <div class="fig-scroll">
-        <svg viewBox="0 0 900 300" role="img" aria-label="A timeline for one vehicle and its driver across a day. The morning shift, an afternoon carpool ride and the evening shift occupy the vehicle. A proposed shift overlapping the morning is refused, and so is a carpool ride overlapping the evening shift.">
-          <!-- axis -->
-          <line x1="90" y1="255" x2="860" y2="255" stroke="currentColor" stroke-width="1.5"/>
-          <g font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6" text-anchor="middle">
-            <text x="120" y="275">06:00</text>
-            <text x="245" y="275">09:00</text>
-            <text x="370" y="275">12:00</text>
-            <text x="495" y="275">15:00</text>
-            <text x="620" y="275">18:00</text>
-            <text x="745" y="275">21:00</text>
-          </g>
-          <g stroke="currentColor" stroke-width="1" opacity="0.2">
-            <line x1="120" y1="60" x2="120" y2="255"/>
-            <line x1="245" y1="60" x2="245" y2="255"/>
-            <line x1="370" y1="60" x2="370" y2="255"/>
-            <line x1="495" y1="60" x2="495" y2="255"/>
-            <line x1="620" y1="60" x2="620" y2="255"/>
-            <line x1="745" y1="60" x2="745" y2="255"/>
-          </g>
-
-          <!-- committed row -->
-          <text x="20" y="105" font-family="Barlow Condensed, sans-serif" font-size="13.5" font-weight="600" letter-spacing="1" fill="currentColor">COMMITTED</text>
-          <rect x="162" y="82" width="62" height="34" fill="var(--pickup-wash)" stroke="var(--pickup)" stroke-width="1.5"/>
-          <text x="193" y="104" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor">shift</text>
-
-          <rect x="412" y="82" width="83" height="34" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3"/>
-          <text x="453" y="104" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor">carpool ride</text>
-
-          <rect x="578" y="82" width="62" height="34" fill="var(--drop-wash)" stroke="var(--drop)" stroke-width="1.5"/>
-          <text x="609" y="104" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor">shift</text>
-
-          <!-- refused row -->
-          <text x="20" y="175" font-family="Barlow Condensed, sans-serif" font-size="13.5" font-weight="600" letter-spacing="1" fill="var(--signal)">REFUSED</text>
-          <rect x="183" y="152" width="83" height="34" fill="var(--signal-wash)" stroke="var(--signal)" stroke-width="1.5" stroke-dasharray="5 3"/>
-          <text x="224" y="174" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="var(--signal)">new shift</text>
-          <line x1="183" y1="186" x2="266" y2="152" stroke="var(--signal)" stroke-width="1.2"/>
-
-          <rect x="599" y="152" width="83" height="34" fill="var(--signal-wash)" stroke="var(--signal)" stroke-width="1.5" stroke-dasharray="5 3"/>
-          <text x="640" y="174" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="var(--signal)">new ride</text>
-          <line x1="599" y1="186" x2="682" y2="152" stroke="var(--signal)" stroke-width="1.2"/>
-
-          <text x="277" y="174" font-family="JetBrains Mono, monospace" font-size="11" fill="var(--signal)">overlaps a shift</text>
-          <text x="693" y="174" font-family="JetBrains Mono, monospace" font-size="11" fill="var(--signal)">overlaps a shift → the ride is refused too</text>
-
-          <!-- the four checks -->
-          <text x="20" y="222" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1.2" fill="currentColor" opacity="0.55">FOUR CHECKS RUN BEFORE ANY SHIFT IS WRITTEN</text>
-          <text x="20" y="242" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">vehicle vs shifts · vehicle vs rides · driver vs shifts · driver vs rides</text>
-          <text x="20" y="262" font-family="JetBrains Mono, monospace" font-size="11.5" fill="var(--pickup)">and every passenger being seated, who cannot be in two vans at once either</text>
-        </svg>
-      </div>
-      <figcaption><b>The check runs in both directions, and covers the people as well as the machines.</b> Creating a carpool ride asks whether that driver or vehicle is on a shift, and a recurring series asks it again for every date it lays down — the first ride being clean never meant the twentieth was. A date that clashes is skipped rather than failing the whole series.</figcaption>
-    </figure>
-
-    <div class="col">
-      <h3>Everything else that is refused</h3>
-      <ul class="plain">
-        <li>A seat whose declared gender does not match the passenger being put in it.</li>
-        <li>The same passenger holding two seats on one shift — judged against the shift as it will look after the change, not just the seats in the request.</li>
-        <li>A seat number the vehicle does not have.</li>
-        <li>A driver, vehicle or passenger who is not an approved member of that fleet.</li>
-        <li>A vehicle joining a fleet without declaring how many seats it has.</li>
-        <li>A group created with no vehicle at all.</li>
-        <li>Cancelling a shift that starts within two hours — the same guard carpool rides already use.</li>
-        <li>Deleting a fleet that still has shifts ahead of it.</li>
-        <li>Deleting a role that is still held by a member, or renaming a system role.</li>
-        <li>A driver leaving a fleet while shifts still expect them behind the wheel.</li>
-        <li>A driver leaving while a vehicle they lent is carrying a shift — even one somebody else drives, because their vehicles leave with them.</li>
-        <li>The owner leaving their own fleet — they delete it instead.</li>
-        <li>A passenger being seated on two shifts that overlap in time.</li>
-        <li>A shift scheduled in the past, or rescheduled backwards into it.</li>
-        <li>Rescheduling a shift that departs within two hours — people are already on their way to the stop.</li>
-        <li>Lowering a vehicle's seat count beneath a shift already built on it.</li>
-      </ul>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Rule</th><th>Refused when</th></tr></thead>
+        <tbody>
+          <tr><td>One service per driver</td><td>An owner enables a second service or asks to join one, a member or a driver with a request waiting enables one.</td></tr>
+          <tr><td>One service per passenger</td><td>A passenger with a pending or approved membership asks again.</td></tr>
+          <tr><td>Vehicles follow their driver</td><td>A vehicle is approved before the driver who offered it (skipped with the reason).</td></tr>
+          <tr><td>Vehicles only members</td><td>Joining with vehicles only and no vehicle, approving such a member with no vehicle left on offer, putting them behind the wheel of a shift, or taking their last vehicle out, they leave the service instead.</td></tr>
+          <tr><td>Only approved can be removed</td><td>Removing a request that was never approved (skipped).</td></tr>
+          <tr><td>Availability after approval</td><td>A passenger who is not an approved member sets availability, a day carries more than six places, a day off carries places.</td></tr>
+          <tr><td>Advertisement limit</td><td>An owner holds approved vehicles × 2 advertisements already, or sends more than ten places.</td></tr>
+          <tr><td>Only the owner builds</td><td>A member driver creates or edits a shift or adds vehicles to the service.</td></tr>
+          <tr><td>Eligible resources</td><td>The driver is not the owner or approved, the vehicle is not approved or has no seats, a passenger is not approved.</td></tr>
+          <tr><td>Capacity</td><td>More passengers than the vehicle's seats, a vehicle shrunk below an active shift's passengers, a ride with more seats than its vehicle, a ride shrunk below its bookings.</td></tr>
+          <tr><td>No overlapping trips</td><td>The driver, vehicle or a passenger is on another shift on a shared date at an overlapping time, or the driver or vehicle is on a carpool ride then.</td></tr>
+          <tr><td>No overlapping rides</td><td>A ride whose driver is already on another ride on any vehicle, whose vehicle already carries one, or that lands on a shift trip of either. A recurring series with any such date, or whose rides run into each other, is refused whole and nothing of it is written.</td></tr>
+          <tr><td>No shifts in the past</td><td>A start date before today, an end date before today or before the start.</td></tr>
+          <tr><td>Ownership of rides</td><td>A ride on another driver's vehicle, a ride updated by a driver who does not own it, a ride that has already ended switched back on.</td></tr>
+          <tr><td>Suspended passengers</td><td>A suspended passenger logs in, or keeps using a session they already held.</td></tr>
+          <tr><td>Attendance</td><td>A date the shift does not run, a trip that has started, a passenger who is not on the shift.</td></tr>
+          <tr><td>Driver updates</td><td>From anybody but the shift's driver, or on a day it does not run.</td></tr>
+          <tr><td>Leaving</td><td>An owner leaves, a driver leaves while they or a vehicle they brought are on an active shift. A passenger leaving is taken off the shifts instead.</td></tr>
+          <tr><td>Disabling</td><td>The service still has active shifts.</td></tr>
+          <tr><td>Deleting accounts</td><td>A driver who owns a service or drives an active shift.</td></tr>
+        </tbody>
+      </table>
     </div>
   </section>
 
   <!-- ================================================== 6 -->
-  <section id="flow">
+  <section id="trips">
     <div class="col">
-      <h2><span class="num">06 / test flow</span>The order to call things in</h2>
-      <p class="lede">The Postman collection is arranged in exactly this order, and chains the ids for you through test scripts.</p>
-      <p>These steps really are sequential — each one depends on state the previous one created, which is why they are numbered.</p>
-    </div>
-
-    <ol class="flow">
-      <li>
-        <div>
-          <h4>Register and activate the owner driver</h4>
-          <p>Register, verify the OTP with <code>ACTIVATE_DRIVER</code>, log in, set a pin. The fleet's owner is an ordinary driver.</p>
-          <span class="ep">POST /driver/register → POST /otp/verify → POST /driver/login → POST /driver/pin</span>
-        </div>
-      </li>
-      <li>
-        <div>
-          <h4>Register a vehicle with its seats</h4>
-          <p>This is the step that did not exist before. A vehicle must declare <code>numberOfSeats</code> before it can ever join a fleet; AC and heating ride along with it.</p>
-          <span class="ep">POST /vehicle/register → POST /otp/verify (ACTIVATE_VEHICLE)</span>
-        </div>
-      </li>
-      <li>
-        <div>
-          <h4>Do the same for a second driver and two passengers</h4>
-          <p>Use one passenger of each gender — the seat rules only become visible with both. Passengers activate with <code>ACTIVATE_PASSENGER</code>, their own operation.</p>
-          <span class="ep">POST /passenger/register → POST /otp/verify → POST /passenger/login</span>
-        </div>
-      </li>
-      <li>
-        <div>
-          <h4>Have each passenger file their weekly travel form</h4>
-          <p>One call carries the whole week, one row per day per direction. Switch off Tuesday's drop leg to see a passenger who rides in only in the morning.</p>
-          <span class="ep">PUT /passenger/schedule</span>
-        </div>
-      </li>
-      <li>
-        <div>
-          <h4>Create the group</h4>
-          <p>The owner's vehicle goes in at creation. The owner's membership row is written at the same time, carrying the <code>group_owner</code> role.</p>
-          <span class="ep">POST /group</span>
-        </div>
-      </li>
-      <li>
-        <div>
-          <h4>Everyone else finds the fleet, then asks to join</h4>
-          <p>Search returns the joinable fleets with your own request status on each row — this is the only way to learn a group id. Then the second driver requests with <code>joinType: both</code> and their vehicle, and both passengers request on their own tokens.</p>
-          <span class="ep">GET /group/search → POST /group/request/driver · POST /passenger/group/request</span>
-        </div>
-      </li>
-      <li>
-        <div>
-          <h4>Approve the queue in one call</h4>
-          <p>List the pending requests to get the membership row ids, then approve drivers, vehicles and passengers together. The response separates what applied from what was skipped and why.</p>
-          <span class="ep">GET /group/requests → PATCH /group/requests</span>
-        </div>
-      </li>
-      <li>
-        <div>
-          <h4>Promote the second driver to sub-manager</h4>
-          <p>Only works because they are already inside the fleet. Try it with a driver who never joined and watch it land in <code>skipped</code>.</p>
-          <span class="ep">PATCH /group/submanagers</span>
-        </div>
-      </li>
-      <li>
-        <div>
-          <h4>Read the travel forms, then build the morning shift</h4>
-          <p>Pull the forms for Monday pickup, then send the stops in route order with the passengers seated under them. Set <code>makeTemplate</code> to save the shape.</p>
-          <span class="ep">GET /group/passengers/schedules → POST /shift</span>
-        </div>
-      </li>
-      <li>
-        <div>
-          <h4>Build the evening drop shift separately</h4>
-          <p>Different route, reversed stop order, different drop points. Nothing links it to the morning.</p>
-          <span class="ep">POST /shift</span>
-        </div>
-      </li>
-      <li>
-        <div>
-          <h4>Prove the clash rule</h4>
-          <p>Try a second shift on the same vehicle overlapping the morning window. It should fail with “Vehicle already has a ride or a shift scheduled for this duration”.</p>
-          <span class="ep">POST /shift — expected to fail</span>
-        </div>
-      </li>
-      <li>
-        <div>
-          <h4>Swap the riders and reshuffle seats</h4>
-          <p>Move the female passenger into the male's seat and vice versa in one request, re-declaring each seat's gender as you go. Then free a seat by sending an empty <code>passengerId</code>.</p>
-          <span class="ep">PUT /shift/seats</span>
-        </div>
-      </li>
-      <li>
-        <div>
-          <h4>Look at it from every side</h4>
-          <p>The manager's roster, the driver's own shifts, and the passenger's own shifts — the last two are the same handler seen through different tokens.</p>
-          <span class="ep">GET /shift · GET /shift/mine · GET /passenger/shifts · GET /shift/detail</span>
-        </div>
-      </li>
-      <li>
-        <div>
-          <h4>Push the departure back without losing the seats</h4>
-          <p>Move the window and the individual stop times in one call. Stops are matched by sequence, so the seats stay attached and the clash check re-runs ignoring this shift's own row.</p>
-          <span class="ep">PATCH /shift</span>
-        </div>
-      </li>
-      <li>
-        <div>
-          <h4>Have somebody leave</h4>
-          <p>A passenger leaving has their upcoming seats freed automatically. A driver is refused while shifts still expect them at the wheel.</p>
-          <span class="ep">DELETE /passenger/group/leave · DELETE /group/leave</span>
-        </div>
-      </li>
-      <li>
-        <div>
-          <h4>Reuse the template, then clean up</h4>
-          <p>Fetch the template, prefill the create form with it, change the date and post it back to the same create endpoint. Then cancel the shifts and delete the fleet.</p>
-          <span class="ep">GET /shift/templates → POST /shift → DELETE /shift → DELETE /group</span>
-        </div>
-      </li>
-    </ol>
-  </section>
-
-  <!-- ================================================== 7 -->
-  <section id="admin">
-    <div class="col">
-      <h2><span class="num">07 / oversight</span>What the admin can see</h2>
-      <p class="lede">The fleet feature created three whole populations the admin console could not see: passenger accounts, groups, and shifts.</p>
-      <p>The admin already had drivers, vehicles, rides and broadcasts. Everything this feature added was invisible to it — a passenger could be suspended nowhere, a fleet could misbehave with no way to shut it down, and a shift could go wrong with no way to look at who was on it.</p>
-      <p>Moderation is deliberately two-tiered. Switching an account or a fleet <em>off</em> stops it being used while leaving its history intact; deleting is separate, permanent, and unpicks every reference to it.</p>
+      <h2><span class="num">06 / trips</span>Trips, attendance and history</h2>
+      <p class="lede">A shift is one row, but every date it runs becomes an occurrence with its own attendance, written ahead by the scheduler.</p>
+      <p>On every tick the worker writes the trips of the day before, today and the day after, in one statement for every shift, and never for a time before the shift existed. Marking absent days ahead writes that trip on the spot. Each occurrence freezes the driver, vehicle, names and route of that day, which is why travel history still reads true after the shift is edited or deleted, the passenger leaves, or the account is removed.</p>
+      <p>Attendance is one row per trip and passenger, present unless they mark themselves absent. Who was on a trip is worked out from when each passenger was added to and removed from the shift, so a replacement passenger never inherits a trip made before them, and a removed passenger's row is kept rather than reused.</p>
     </div>
 
     <figure>
       <div class="fig-scroll">
-        <svg viewBox="0 0 900 300" role="img" aria-label="The admin console's reach: it could already see drivers, vehicles, rides and broadcasts, and now also reaches passenger accounts, fleets and shifts, with a soft suspend and a permanent delete for each.">
+        <svg viewBox="0 0 900 240" role="img" aria-label="Lifecycle of a trip: written ahead by the scheduler as scheduled, reminded fifteen minutes before the first stop, started, and completed once its end time passes. Attendance is present by default and can be marked absent until the trip starts.">
           <defs>
-            <marker id="a6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
             </marker>
           </defs>
+          <g font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">
+            <rect x="20" y="40" width="190" height="64" fill="var(--pickup-wash)" stroke="var(--pickup)" stroke-width="1.5"/>
+            <text x="34" y="66" font-weight="600">scheduled</text>
+            <text x="34" y="86" font-size="11" opacity="0.7">written today−1 … today+1</text>
 
-          <rect x="20" y="100" width="150" height="70" fill="var(--surface-2)" stroke="currentColor" stroke-width="2"/>
-          <text x="95" y="130" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="13" font-weight="600" fill="currentColor">admin</text>
-          <text x="95" y="150" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.6">admin_token</text>
+            <rect x="250" y="40" width="190" height="64" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.8"/>
+            <text x="264" y="66" font-weight="600">reminder</text>
+            <text x="264" y="86" font-size="11" opacity="0.7">15 min before · claimed once</text>
 
-          <text x="240" y="46" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1.6" fill="currentColor" opacity="0.55">ALREADY REACHED</text>
-          <rect x="240" y="58" width="290" height="46" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>
-          <text x="256" y="86" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" opacity="0.8">drivers · vehicles · rides · broadcasts</text>
+            <rect x="480" y="40" width="190" height="64" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.8"/>
+            <text x="494" y="66" font-weight="600">started</text>
+            <text x="494" y="86" font-size="11" opacity="0.7">attendance is fixed</text>
 
-          <text x="240" y="140" font-family="Barlow Condensed, sans-serif" font-size="13" font-weight="600" letter-spacing="1.6" fill="var(--pickup)">NEWLY REACHED</text>
-          <rect x="240" y="152" width="290" height="46" fill="var(--pickup-wash)" stroke="var(--pickup)" stroke-width="2"/>
-          <text x="256" y="180" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">passengers · fleets · shifts</text>
+            <rect x="710" y="40" width="170" height="64" fill="var(--drop-wash)" stroke="var(--drop)" stroke-width="1.5"/>
+            <text x="724" y="66" font-weight="600">completed</text>
+            <text x="724" y="86" font-size="11" opacity="0.7">in travel history</text>
+          </g>
+          <line x1="210" y1="72" x2="248" y2="72" stroke="currentColor" stroke-width="1.5" marker-end="url(#a4)"/>
+          <line x1="440" y1="72" x2="478" y2="72" stroke="currentColor" stroke-width="1.5" marker-end="url(#a4)"/>
+          <line x1="670" y1="72" x2="708" y2="72" stroke="currentColor" stroke-width="1.5" marker-end="url(#a4)"/>
 
-          <rect x="240" y="216" width="290" height="46" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.6"/>
-          <text x="256" y="244" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor" opacity="0.8">roles · permissions</text>
-
-          <line x1="170" y1="120" x2="238" y2="82" stroke="currentColor" stroke-width="1.5" marker-end="url(#a6)" opacity="0.6"/>
-          <line x1="170" y1="135" x2="238" y2="175" stroke="var(--pickup)" stroke-width="2" marker-end="url(#a6)"/>
-          <line x1="170" y1="150" x2="238" y2="238" stroke="currentColor" stroke-width="1.5" marker-end="url(#a6)" opacity="0.6"/>
-
-          <!-- two tiers of moderation -->
-          <rect x="600" y="100" width="130" height="46" fill="none" stroke="currentColor" stroke-width="1.5"/>
-          <text x="665" y="122" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="currentColor">suspend</text>
-          <text x="665" y="138" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="currentColor" opacity="0.6">history kept</text>
-
-          <rect x="750" y="100" width="130" height="46" fill="var(--signal-wash)" stroke="var(--signal)" stroke-width="1.5"/>
-          <text x="815" y="122" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="var(--signal)">delete</text>
-          <text x="815" y="138" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="var(--signal)" opacity="0.85">refs unpicked</text>
-
-          <line x1="530" y1="175" x2="640" y2="150" stroke="currentColor" stroke-width="1.5" marker-end="url(#a6)"/>
-          <line x1="530" y1="175" x2="790" y2="150" stroke="var(--signal)" stroke-width="1.5" marker-end="url(#a6)"/>
-
-          <text x="600" y="188" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.7">deleting a driver is refused while they own a fleet</text>
-          <text x="600" y="206" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor" opacity="0.7">or still have shifts to drive</text>
+          <rect x="20" y="150" width="650" height="46" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.6"/>
+          <text x="36" y="178" font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">present by default  ⇄  absent · the driver and owner are told, other passengers see it</text>
+          <line x1="345" y1="104" x2="345" y2="148" stroke="currentColor" stroke-width="1" stroke-dasharray="2 3" opacity="0.5"/>
         </svg>
       </div>
-      <figcaption><b>A deleted account must not leave anything pointing at it.</b> Removing a passenger frees their seats on upcoming shifts and corrects each shift's taken count; removing a driver is refused outright while they own an active fleet or are still expected behind the wheel, because neither can be reassigned automatically.</figcaption>
+      <figcaption><b>Reminders are idempotent.</b> Each reminder is claimed by one <code>UPDATE … WHERE reminder_at IS NULL RETURNING</code> on its own row, the driver's on the occurrence and each passenger's on their attendance, before it is sent. A retried tick or a second worker finds nothing left to claim. An absent passenger is not reminded.</figcaption>
     </figure>
+  </section>
+
+  <!-- ================================================== 7 -->
+  <section id="notifications">
+    <div class="col">
+      <h2><span class="num">07 / notifications</span>Who is told what</h2>
+      <p class="lede">Notifications are worked out inside the transaction and sent only after it commits, through the existing queue.</p>
+    </div>
 
     <div class="table-scroll">
       <table>
-        <thead><tr><th>Method</th><th>Path</th><th>What it does</th></tr></thead>
+        <thead><tr><th>Event</th><th>Told</th></tr></thead>
         <tbody>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/admin/overview</td><td>The whole platform counted in one query</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/admin/passengers</td><td>Passenger accounts, searchable by name or number</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/admin/passenger</td><td>One account: their fleets and their travel form</td></tr>
-          <tr><td><span class="verb">PATCH</span></td><td class="mono">/admin/passenger/status</td><td>Suspend or restore a passenger</td></tr>
-          <tr><td><span class="verb">DELETE</span></td><td class="mono">/admin/passenger</td><td>Delete, freeing their upcoming seats</td></tr>
-          <tr><td><span class="verb">PATCH</span></td><td class="mono">/admin/driver/status</td><td>Suspend or restore a driver</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/admin/groups</td><td>Every fleet with owner and size</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/admin/group</td><td>Full rosters, including who was turned away</td></tr>
-          <tr><td><span class="verb">PATCH</span></td><td class="mono">/admin/group/status</td><td>Shut a fleet down or bring it back</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/admin/shifts</td><td>Every shift, filterable</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/admin/shift</td><td>One trip with its route and everybody aboard</td></tr>
+          <tr><td>A driver, vehicle or passenger asks to join, a driver leaves or withdraws a vehicle</td><td>The owner</td></tr>
+          <tr><td>A request is approved, rejected, or a member removed</td><td>That driver or passenger</td></tr>
+          <tr><td>A passenger leaves the service</td><td>The owner</td></tr>
+          <tr><td>The service is disabled</td><td>Its drivers and passengers</td></tr>
+          <tr><td>A shift is created, edited or deleted</td><td>Its driver and passengers (a replaced driver too)</td></tr>
+          <tr><td>A vehicle is put on or taken off a shift, or its shift is edited or cancelled</td><td>The driver who brought the vehicle, unless they drive it themselves</td></tr>
+          <tr><td>Passengers added, moved or removed</td><td>Those passengers and the driver</td></tr>
+          <tr><td>A passenger marks absent or present again</td><td>The driver of that trip and the owner</td></tr>
+          <tr><td>A trip starts in 15 minutes</td><td>Its driver and every passenger travelling</td></tr>
+          <tr><td>A driver sends a location update</td><td>Only the passengers travelling on that shift today</td></tr>
         </tbody>
       </table>
-    </div>
-
-    <div class="col">
-      <p>The existing <code>GET /admin/vehicles</code> also changed: it now returns the seat count and the comfort flags, and its total-pages count was fixed — it had been counting a query that already had the page limit applied, so it could never report more than one page.</p>
     </div>
   </section>
 
-  <!-- ================================================== 7b -->
+  <!-- ================================================== 8 -->
   <section id="archive">
     <div class="col">
       <h2><span class="num">08 / records</span>Nothing that mattered is thrown away</h2>
-      <p class="lede">Deleting a row copies it to its own archive table first, the way this codebase already treated drivers, vehicles and rides.</p>
-      <p>The fleet feature added things worth keeping, and two of them were being dropped on the floor: a passenger's standing travel form, and a role an admin deleted. Both are now archived — the role together with the permission codes it held at that moment, written inline so the record still reads correctly long after those permissions have changed.</p>
-      <p>Shifts and memberships are never hard-deleted at all. A cancelled shift, a rejected request, a member who left: each is a status on a row that stays exactly where it was.</p>
-    </div>
-
-    <div class="table-scroll">
-      <table>
-        <thead><tr><th>When this is deleted</th><th>What is kept</th><th>Added by</th></tr></thead>
-        <tbody>
-          <tr><td class="mono">driver</td><td class="mono">del_drivers</td><td>already existed</td></tr>
-          <tr><td class="mono">vehicle</td><td class="mono">del_vehicles</td><td>already existed</td></tr>
-          <tr><td class="mono">ride</td><td class="mono">del_rides</td><td>already existed</td></tr>
-          <tr><td class="mono">passenger</td><td class="mono">del_passengers</td><td>this feature</td></tr>
-          <tr><td class="mono">passenger travel form</td><td class="mono">del_passenger_location_preferences</td><td>this feature</td></tr>
-          <tr><td class="mono">role</td><td class="mono">del_roles + its permission codes</td><td>this feature</td></tr>
-          <tr><td class="mono">shift</td><td class="no">never deleted — cancelled in place</td><td>—</td></tr>
-          <tr><td class="mono">membership</td><td class="no">never deleted — status moves to left / removed / rejected</td><td>—</td></tr>
-          <tr><td class="mono">shift template</td><td class="no">not archived, matching how ride templates already behave</td><td>—</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="col">
-      <p>The rule the archives protect is that a deletion must not leave anything pointing at what is gone. A verified count against the live database after the full run: <strong>zero</strong> seats still holding a passenger who no longer exists.</p>
+      <p class="lede">Deletions follow the ride share pattern: copy to a <code>del_*</code> table, then hard delete.</p>
+      <ul class="plain">
+        <li><strong>Shifts</strong> go to <code>del_shifts</code> and <code>del_shift_locations</code>. Their <code>shift_passengers</code>, occurrences and attendance stay, which is what shift history, passenger history and travel history read.</li>
+        <li><strong>Advertisements</strong> go to <code>del_pick_drop_advertisements</code> and their locations, when deleted or when the service is disabled.</li>
+        <li><strong>Shift requests</strong> go to <code>del_shift_requests</code> and their locations.</li>
+        <li><strong>Availability</strong> goes to <code>del_passenger_availabilities</code> and its locations when the passenger's account is deleted.</li>
+        <li><strong>Memberships</strong> in <code>pick_drop_drivers</code>, <code>pick_drop_vehicles</code> and <code>pick_drop_passengers</code> are never deleted, they end with a status and who ended them when.</li>
+        <li>Deleting a driver or passenger account ends their memberships and takes a passenger off active shifts first, so nothing is left pointing at somebody who no longer exists. <code>./sath db dangling</code> checks it.</li>
+      </ul>
     </div>
   </section>
 
@@ -1059,98 +787,97 @@
   <section id="reference">
     <div class="col">
       <h2><span class="num">09 / reference</span>Every new endpoint</h2>
-      <p class="lede">Thirty-seven routes across four packages. Bulk wherever the domain allows it.</p>
+      <p class="lede">All under <code>/api/v1</code>. Lists take <code>page</code>. Dates are <code>YYYY-MM-DD</code>, times <code>HH:MM</code>, all in Pakistan time.</p>
     </div>
 
-    <h3>Group · driver token</h3>
+    <h3>Pick &amp; Drop · driver token</h3>
     <div class="table-scroll">
       <table>
-        <thead><tr><th>Method</th><th>Path</th><th>What it does</th><th>Needs</th></tr></thead>
+        <thead><tr><th>Verb</th><th class="mono">Path</th><th>What</th></tr></thead>
         <tbody>
-          <tr><td><span class="verb">POST</span></td><td class="mono">/group</td><td>Create a fleet with its first vehicle</td><td class="mono">—</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/group/mine</td><td>Fleets you own or belong to</td><td class="mono">—</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/group/search</td><td>Find a fleet to ask to join</td><td class="mono">—</td></tr>
-          <tr><td><span class="verb">DELETE</span></td><td class="mono">/group/leave</td><td>Walk out of a fleet</td><td class="mono">membership</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/group</td><td>One fleet with its three rosters</td><td class="mono">membership</td></tr>
-          <tr><td><span class="verb">POST</span></td><td class="mono">/group/request/driver</td><td>Ask to join, with or without vehicles</td><td class="mono">—</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/group/requests</td><td>Everyone still waiting</td><td class="mono">manage_members</td></tr>
-          <tr><td><span class="verb">PATCH</span></td><td class="mono">/group/requests</td><td>Approve, reject or remove in bulk</td><td class="mono">manage_members</td></tr>
-          <tr><td><span class="verb">PATCH</span></td><td class="mono">/group/submanagers</td><td>Promote and demote in bulk</td><td class="mono">manage_submanagers</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/group/passengers/schedules</td><td>The travel forms you build shifts from</td><td class="mono">assign_seats</td></tr>
-          <tr><td><span class="verb">DELETE</span></td><td class="mono">/group</td><td>Close the fleet down</td><td class="mono">group.delete</td></tr>
+          <tr><td><span class="verb">POST</span></td><td class="mono">/pickdrop</td><td>Enable Pick &amp; Drop, optionally with vehicles</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/pickdrop</td><td>The caller's service as owner, member or nobody, with counts</td></tr>
+          <tr><td><span class="verb">DELETE</span></td><td class="mono">/pickdrop</td><td>Disable the service</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/pickdrop/search</td><td>Find services to join</td></tr>
+          <tr><td><span class="verb">POST</span></td><td class="mono">/pickdrop/vehicles</td><td>Owner adds own vehicles</td></tr>
+          <tr><td><span class="verb">DELETE</span></td><td class="mono">/pickdrop/vehicle</td><td>Owner takes a vehicle out</td></tr>
+          <tr><td><span class="verb">POST</span></td><td class="mono">/pickdrop/request</td><td>Driver asks to join, as a driver or with vehicles only (joinType)</td></tr>
+          <tr><td><span class="verb">POST</span></td><td class="mono">/pickdrop/vehicles/offer</td><td>Member driver offers more vehicles</td></tr>
+          <tr><td><span class="verb">DELETE</span></td><td class="mono">/pickdrop/vehicle/offer</td><td>Withdraw an offered or approved vehicle</td></tr>
+          <tr><td><span class="verb">DELETE</span></td><td class="mono">/pickdrop/leave</td><td>Driver withdraws a request or leaves</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/pickdrop/requests</td><td>Requests of one type: driver, vehicle or passenger</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/pickdrop/request</td><td>One request in detail</td></tr>
+          <tr><td><span class="verb">PATCH</span></td><td class="mono">/pickdrop/requests</td><td>Approve, reject or remove in bulk</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/pickdrop/drivers/available</td><td>Owner and approved drivers, free or not for a schedule</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/pickdrop/vehicles/available</td><td>Approved vehicles with seats</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/pickdrop/passengers/available</td><td>Approved passengers with weekly demand</td></tr>
+          <tr><td><span class="verb">POST</span></td><td class="mono">/pickdrop/advertisement</td><td>Create an advertisement</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/pickdrop/advertisements</td><td>The owner's advertisements with count and limit</td></tr>
+          <tr><td><span class="verb">DELETE</span></td><td class="mono">/pickdrop/advertisement</td><td>Archive and delete an advertisement</td></tr>
         </tbody>
       </table>
     </div>
 
-    <h3>Shift · driver token</h3>
+    <h3>Public · open token</h3>
     <div class="table-scroll">
       <table>
-        <thead><tr><th>Method</th><th>Path</th><th>What it does</th><th>Needs</th></tr></thead>
+        <thead><tr><th>Verb</th><th class="mono">Path</th><th>What</th></tr></thead>
         <tbody>
-          <tr><td><span class="verb">POST</span></td><td class="mono">/shift</td><td>Build a shift, optionally saving a template</td><td class="mono">shift.create</td></tr>
-          <tr><td><span class="verb">PATCH</span></td><td class="mono">/shift</td><td>Move the time or route, keeping the seat plan</td><td class="mono">shift.create</td></tr>
-          <tr><td><span class="verb">PUT</span></td><td class="mono">/shift/seats</td><td>Reseat the vehicle in bulk</td><td class="mono">assign_seats</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/shift/detail</td><td>Shift, stops in order, every seat</td><td class="mono">membership or a seat</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/shift</td><td>The manager's roster, filtered</td><td class="mono">membership</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/shift/mine</td><td>What you drive or ride</td><td class="mono">—</td></tr>
-          <tr><td><span class="verb">DELETE</span></td><td class="mono">/shift</td><td>Cancel and tell everyone</td><td class="mono">shift.cancel</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/shift/templates</td><td>Saved shapes, with stops and seat plan</td><td class="mono">membership</td></tr>
-          <tr><td><span class="verb">DELETE</span></td><td class="mono">/shift/template</td><td>Delete a template</td><td class="mono">manage_templates</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/pickdrop/advertisements/search</td><td>Search advertisements by place, day and time</td></tr>
         </tbody>
       </table>
     </div>
 
-    <h3>Passenger</h3>
+    <h3>Shifts · driver token</h3>
     <div class="table-scroll">
       <table>
-        <thead><tr><th>Method</th><th>Path</th><th>What it does</th><th>Token</th></tr></thead>
+        <thead><tr><th>Verb</th><th class="mono">Path</th><th>What</th></tr></thead>
         <tbody>
-          <tr><td><span class="verb">POST</span></td><td class="mono">/passenger/register</td><td>Create an account</td><td class="mono">open</td></tr>
-          <tr><td><span class="verb">POST</span></td><td class="mono">/passenger/login</td><td>Issue a passenger token</td><td class="mono">open</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/password/forgot</td><td>Send a reset OTP</td><td class="mono">open</td></tr>
-          <tr><td><span class="verb">POST</span></td><td class="mono">/passenger/password/reset</td><td>Change the password</td><td class="mono">passenger</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/info</td><td>Profile</td><td class="mono">passenger</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/logout</td><td>Drop the session</td><td class="mono">passenger</td></tr>
-          <tr><td><span class="verb">DELETE</span></td><td class="mono">/passenger/delete</td><td>Archive and remove the account</td><td class="mono">passenger</td></tr>
-          <tr><td><span class="verb">PUT</span></td><td class="mono">/passenger/schedule</td><td>Write the whole weekly form at once</td><td class="mono">passenger</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/schedule</td><td>Read it back</td><td class="mono">passenger</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/groups/search</td><td>Find a fleet to ask to join</td><td class="mono">passenger</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/groups</td><td>Fleets you are in or waiting on</td><td class="mono">passenger</td></tr>
-          <tr><td><span class="verb">POST</span></td><td class="mono">/passenger/group/request</td><td>Ask to join a fleet</td><td class="mono">passenger</td></tr>
-          <tr><td><span class="verb">DELETE</span></td><td class="mono">/passenger/group/leave</td><td>Walk out, freeing your upcoming seats</td><td class="mono">passenger</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/shifts</td><td>Shifts you hold a seat on</td><td class="mono">passenger</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/shift/detail</td><td>One of them, with contacts</td><td class="mono">passenger</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/notifications</td><td>Your notifications</td><td class="mono">passenger</td></tr>
+          <tr><td><span class="verb">POST</span></td><td class="mono">/shift</td><td>Owner creates a recurring shift</td></tr>
+          <tr><td><span class="verb">PATCH</span></td><td class="mono">/shift</td><td>Owner edits a shift</td></tr>
+          <tr><td><span class="verb">DELETE</span></td><td class="mono">/shift</td><td>Owner archives and deletes a shift</td></tr>
+          <tr><td><span class="verb">PUT</span></td><td class="mono">/shift/passengers</td><td>Add, move and remove passengers in one call</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/shift</td><td>The service's shifts, by vehicle number or place and a start/end time window</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/shift/detail</td><td>One shift, for its owner or driver</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/shift/mine</td><td>Shifts the caller drives or their vehicles are on</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/shift/history</td><td>Every shift the service ran, deleted ones included</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/shift/passengers/history</td><td>Passenger participation with join and added dates</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/shift/occurrences</td><td>Trips with present and absent counts</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/shift/attendance</td><td>Who travels on one trip</td></tr>
+          <tr><td><span class="verb">POST</span></td><td class="mono">/shift/location</td><td>Driver tells today's passengers where they are</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/shift/requests</td><td>Owner searches passengers' shift requests by place and time window</td></tr>
         </tbody>
       </table>
     </div>
 
-    <h3>Admin · roles and permissions</h3>
+    <h3>Passenger token</h3>
     <div class="table-scroll">
       <table>
-        <thead><tr><th>Method</th><th>Path</th><th>What it does</th></tr></thead>
+        <thead><tr><th>Verb</th><th class="mono">Path</th><th>What</th></tr></thead>
         <tbody>
-          <tr><td><span class="verb">POST</span></td><td class="mono">/admin/role</td><td>Create a role</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/admin/roles</td><td>Roles with their permissions, two queries, no N+1</td></tr>
-          <tr><td><span class="verb">PATCH</span></td><td class="mono">/admin/role</td><td>Edit it — a system role keeps its name</td></tr>
-          <tr><td><span class="verb">DELETE</span></td><td class="mono">/admin/role</td><td>Delete it, unless it is system or still held</td></tr>
-          <tr><td><span class="verb">POST</span></td><td class="mono">/admin/permission</td><td>Create a permission code</td></tr>
-          <tr><td><span class="verb">GET</span></td><td class="mono">/admin/permissions</td><td>List them</td></tr>
-          <tr><td><span class="verb">PUT</span></td><td class="mono">/admin/role/permissions</td><td>Replace a role's whole permission set</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/pickdrop/search</td><td>Find services to join</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/pickdrop</td><td>The caller's membership</td></tr>
+          <tr><td><span class="verb">POST</span></td><td class="mono">/passenger/pickdrop/request</td><td>Ask to join a service</td></tr>
+          <tr><td><span class="verb">DELETE</span></td><td class="mono">/passenger/pickdrop/leave</td><td>Withdraw the request or leave</td></tr>
+          <tr><td><span class="verb">PUT</span></td><td class="mono">/passenger/availability</td><td>Set weekly availability</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/availability</td><td>The whole week of availability</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/shifts</td><td>Shifts the caller is on</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/shift/detail</td><td>One shift, with the caller's stop</td></tr>
+          <tr><td><span class="verb">PATCH</span></td><td class="mono">/passenger/shift/attendance</td><td>Mark absent or present for a date</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/shift/attendance</td><td>Who travels on one trip</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/shift/history</td><td>Travel history</td></tr>
+          <tr><td><span class="verb">POST</span></td><td class="mono">/passenger/shift/request</td><td>Put out a shift request</td></tr>
+          <tr><td><span class="verb">GET</span></td><td class="mono">/passenger/shift/requests</td><td>The caller's shift requests</td></tr>
+          <tr><td><span class="verb">DELETE</span></td><td class="mono">/passenger/shift/request</td><td>Archive and delete a shift request</td></tr>
         </tbody>
       </table>
     </div>
   </section>
 
   <footer>
-    <div class="col">
-      <p><strong>Driven end to end against a live database.</strong> One hundred and nine calls covering every endpoint — the fleet feature, the admin console and the existing carpool — all behaved as expected, including the refusals that prove each rule. Every saved response in the Postman collection is a real one captured from that run, not written by hand.</p>
-      <p>Two faults only the run could find. The app could not restart: seeding a permission passed a struct already carrying a fresh id, GORM folded that id into the lookup, so every boot after the first tried to insert a code that already existed and panicked. And no passenger could use their session: the token verifier knew driver, admin and open tokens and fell through to “invalid token type” for the passenger one, so every passenger route rejected a perfectly good login. Both fixed.</p>
-      <p>One pre-existing typo left untouched, because changing it would alter responses your app may already match on: <code>Deleted_Successfully</code> and <code>DELETE_Failed</code> both read “updated”, so every delete endpoint — old and new — replies “updated successfully”.</p>
-      </div>
+    SathSawari backend · Pick &amp; Drop and Shifts · regenerate the collection with <code>./sath collection</code>, prove the rules with <code>./sath test</code>.
   </footer>
 
 </div>
-
 </body>
 </html>

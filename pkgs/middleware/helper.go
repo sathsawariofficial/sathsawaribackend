@@ -42,6 +42,14 @@ func checkUserStatusById(userId, tokenType string) error {
 			return err
 		}
 
+		// a suspended passenger is refused a new token at login, and the sessions they
+		// already hold stop working the moment they are suspended
+		if passenger.Status != constants.Status_Active {
+			err = errors.New(constants.Operation_Not_Permitted)
+			logger.LogError(Middleware_Session, "passenger is not active")
+			return err
+		}
+
 		return nil
 	} else {
 		var driver postgress.Driver

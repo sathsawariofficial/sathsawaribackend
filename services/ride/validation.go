@@ -62,13 +62,14 @@ func ValidateRideCreation(sessionId, driverId string, request *RideCreationReque
 		return fmt.Errorf("route points should be not be more then %v", constants.RoutePoints_Max_Len)
 	}
 
-	// Parse with local timezone (important for consistency)
-	startDate, err := time.ParseInLocation(constants.DateTimeLayout, request.StartDatetime, time.Local)
+	// ride times are Pakistan wall clock, the worker closes rides and the clash checks
+	// read them the same way, whatever time zone the server runs in
+	startDate, err := time.ParseInLocation(constants.DateTimeLayout, request.StartDatetime, constants.Business_Location)
 	if err != nil {
 		return fmt.Errorf("invalid start date")
 	}
 
-	endDate, err := time.ParseInLocation(constants.DateTimeLayout, request.EstimatedEndDatetime, time.Local)
+	endDate, err := time.ParseInLocation(constants.DateTimeLayout, request.EstimatedEndDatetime, constants.Business_Location)
 	if err != nil {
 		return fmt.Errorf("invalid estimated end date")
 	}

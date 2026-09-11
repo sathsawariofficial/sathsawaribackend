@@ -346,31 +346,25 @@ func updateVehicleInfo(orgCtx *gin.Context, sessionId, driverId string, request 
 
 	// Archive and delete if vehicle is being inactivated
 	if request.Status == constants.Status_InActive {
-		////////// FLEET TIES //////////
-		// retiring the vehicle deletes the row outright, so a shift still expecting
-		// it would be left pointing at nothing and would drop out of every roster
-		var upcomingShifts int64
-		if err := tx.Model(&postgress.Shift{}).
-			Where("vehicle_id = ?", request.VehicleId).
-			Where("is_active = ?", true).
-			Where("start_datetime > ?", time.Now().Format(constants.DateTimeLayout)).
-			Count(&upcomingShifts).Error; err != nil {
+		////////// PICK & DROP TIES //////////
+		// retiring the vehicle deletes the row outright, so an active shift still
+		// running on it would be left pointing at nothing
+		_, activeShifts, countErr := database.CountActiveShiftAssignments(tx, "", []string{request.VehicleId})
+		if countErr != nil {
 			tx.Rollback()
-			logger.LogError(sessionId, err)
+			logger.LogError(sessionId, countErr)
 			return errors.New(constants.General_Error)
 		}
 
-		if upcomingShifts > 0 {
+		if activeShifts > 0 {
 			tx.Rollback()
-			err := fmt.Errorf("this vehicle is on %d upcoming shift(s), cancel those before retiring it", upcomingShifts)
+			err := fmt.Errorf(constants.On_Active_Shifts, "This vehicle is", activeShifts)
 			logger.LogError(sessionId, err)
 			return err
 		}
 
-		// the fleets it was lent to stop counting on it
-		if err := tx.Model(&postgress.GroupVehicle{}).
-			Where("vehicle_id = ?", request.VehicleId).
-			Update("status", constants.Membership_Status_Left).Error; err != nil {
+		// the service it was offered to stops counting on it
+		if err := database.EndOpenMemberships(tx, &postgress.PickDropVehicle{}, "vehicle_id", request.VehicleId, driverId); err != nil {
 			tx.Rollback()
 			logger.LogError(sessionId, err)
 			return errors.New(constants.General_Error)
@@ -464,27 +458,60 @@ func updateVehicleInfo(orgCtx *gin.Context, sessionId, driverId string, request 
 		return nil
 	}
 
-	// a shift snapshots the seat count it was built with, so shrinking the vehicle
-	// under a shift that is already seated leaves the trip claiming places the
-	// vehicle no longer has
-	if request.NumberOfSeats > 0 && request.NumberOfSeats < existingVehicle.NumberOfSeats {
-		var biggest int
+	// an active shift holds the seat count of its vehicle, so the vehicle can never
+	// drop below the passengers such a shift already carries, and every active shift
+	// on it takes the new count with it
+	if request.NumberOfSeats > 0 && request.NumberOfSeats != existingVehicle.NumberOfSeats {
+		var carried int
 		if err := tx.Model(&postgress.Shift{}).
 			Where("vehicle_id = ?", request.VehicleId).
-			Where("is_active = ?", true).
-			Where("start_datetime > ?", time.Now().Format(constants.DateTimeLayout)).
-			Select("COALESCE(MAX(number_of_seats), 0)").
-			Scan(&biggest).Error; err != nil {
+			Where("status = ?", constants.Shift_Status_Active).
+			Select("COALESCE(MAX(occupied_seats), 0)").
+			Scan(&carried).Error; err != nil {
 			tx.Rollback()
 			logger.LogError(sessionId, err)
 			return errors.New(constants.General_Error)
 		}
 
-		if request.NumberOfSeats < biggest {
+		if request.NumberOfSeats < carried {
 			tx.Rollback()
-			err := fmt.Errorf("an upcoming shift is built on %d seats, this vehicle cannot drop to %d", biggest, request.NumberOfSeats)
+			err := fmt.Errorf("an active shift carries %d passenger(s) in this vehicle, it cannot drop to %d seat(s)", carried, request.NumberOfSeats)
 			logger.LogError(sessionId, err)
 			return err
+		}
+
+		if err := tx.Model(&postgress.Shift{}).
+			Where("vehicle_id = ?", request.VehicleId).
+			Where("status = ?", constants.Shift_Status_Active).
+			Update("seat_capacity", request.NumberOfSeats).Error; err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return errors.New(constants.General_Error)
+		}
+	}
+
+	// a shift is named after its vehicle, so a renamed vehicle renames its active
+	// shifts and the trips they have not made yet
+	if request.VehicleNumber != "" && request.VehicleNumber != existingVehicle.VehicleNumber {
+		if err := tx.Model(&postgress.Shift{}).
+			Where("vehicle_id = ?", request.VehicleId).
+			Where("status = ?", constants.Shift_Status_Active).
+			Update("name", request.VehicleNumber).Error; err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return errors.New(constants.General_Error)
+		}
+
+		if err := tx.Model(&postgress.ShiftOccurrence{}).
+			Where("vehicle_id = ?", request.VehicleId).
+			Where("starts_at > ?", database.BusinessNowMinute()).
+			Updates(map[string]interface{}{
+				"shift_name":     request.VehicleNumber,
+				"vehicle_number": request.VehicleNumber,
+			}).Error; err != nil {
+			tx.Rollback()
+			logger.LogError(sessionId, err)
+			return errors.New(constants.General_Error)
 		}
 	}
 
@@ -647,7 +674,9 @@ func getActiveDriverAndVehicles(orgCtx *gin.Context, sessionId, driverId, status
 func validatePin(orgCtx *gin.Context, sessionId string, driver postgress.Driver, pin string) bool {
 	driverPin := driver.Pin
 	if utils.IsStringEmpty(driverPin) {
-		driver, err := database.GetActiveDriverById(orgCtx, driver.ID)
+		// a credential check, not a status check: an inactive driver still has to prove
+		// their pin to reactivate their own profile, so this must not filter by status
+		driver, err := database.GetDriverById(orgCtx, driver.ID)
 		if err != nil {
 			logger.LogError(sessionId, err)
 			err = fmt.Errorf(constants.Invalid_Data, "pin")

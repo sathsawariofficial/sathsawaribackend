@@ -383,8 +383,9 @@ func DeletePassengerProfile(ctx *gin.Context, sessionId, passengerId string) (er
 		return
 	}
 
-	// the shared helper also frees the seats they hold on upcoming shifts and ends
-	// their fleet memberships, so nothing is left pointing at a deleted account
+	// the shared helper also takes them off their active shifts, ends their Pick &
+	// Drop membership and archives their availability and shift requests, so nothing
+	// is left pointing at a deleted account
 	if err = database.DeletePassenger(ctx, passenger, passengerId); err != nil {
 		logger.LogError(sessionId, "failed to delete passenger error: "+err.Error())
 		err = fmt.Errorf(constants.DELETE_Failed, "passenger")
@@ -401,41 +402,53 @@ func DeletePassengerProfile(ctx *gin.Context, sessionId, passengerId string) (er
 	return
 }
 
-// SetPassengerSchedule replaces the passenger's standing weekly form in one call.
-// The form is what a group manager reads while deciding who to seat on which shift,
-// it never creates a shift by itself.
-func SetPassengerSchedule(ctx *gin.Context, sessionId, passengerId string, request PassengerScheduleRequest) (err error) {
-	logger.LogInfo("Request received in SetPassengerSchedule", sessionId)
+// SetAvailability records the weekly requirement of a passenger. It is only open to a
+// passenger who has been approved into a Pick & Drop service, it is what that
+// service's owner reads while building shifts, and it never creates a shift by itself.
+func SetAvailability(ctx *gin.Context, sessionId, passengerId string, request AvailabilityRequest) (err error) {
+	logger.LogInfo("Request received in SetAvailability", sessionId)
 
-	passenger, err := database.GetActivePassengerById(ctx, passengerId)
-	if err != nil || utils.IsStringEmpty(passenger.ID) {
-		logger.LogError(sessionId, "get passenger error")
-		err = errors.New(constants.Passenger_Not_Found)
+	if _, err = database.GetApprovedPassengerMembership(ctx, passengerId); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = errors.New(constants.Not_Service_Member)
+		} else {
+			logger.LogError(sessionId, "failed to read the membership error: "+err.Error())
+			err = errors.New(constants.Unknown_Error)
+		}
+		logger.LogError(sessionId, err)
 		return
 	}
 
-	if err = savePassengerSchedule(ctx, sessionId, passengerId, request.Preferences); err != nil {
-		logger.LogError(sessionId, "failed to save the schedule error: "+err.Error())
-		err = fmt.Errorf(constants.Update_Failed, "schedule")
+	if err = saveAvailability(ctx, sessionId, passengerId, request.Days); err != nil {
+		logger.LogError(sessionId, "failed to save the availability error: "+err.Error())
+		err = fmt.Errorf(constants.Update_Failed, "availability")
 		return
 	}
 
-	logger.LogInfo("Response returned from SetPassengerSchedule", sessionId)
+	logger.LogInfo("Response returned from SetAvailability", sessionId)
 
 	return
 }
 
-func GetPassengerSchedule(ctx *gin.Context, sessionId, passengerId string) (preferences []postgress.PassengerLocationPreference, err error) {
-	logger.LogInfo("Request received in GetPassengerSchedule", sessionId)
+func GetAvailability(ctx *gin.Context, sessionId, passengerId string) (serviceId string, days []postgress.PassengerAvailability, locations []postgress.PassengerAvailabilityLocation, err error) {
+	logger.LogInfo("Request received in GetAvailability", sessionId)
 
-	preferences, err = getPassengerSchedule(ctx, passengerId)
-	if err != nil {
-		logger.LogError(sessionId, "failed to get the schedule error: "+err.Error())
-		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the schedule")
+	membership, e := database.GetApprovedPassengerMembership(ctx, passengerId)
+	if e == nil {
+		serviceId = membership.ServiceID
+	} else if !errors.Is(e, gorm.ErrRecordNotFound) {
+		logger.LogError(sessionId, "failed to read the membership error: "+e.Error())
+		err = errors.New(constants.Unknown_Error)
 		return
 	}
 
-	logger.LogInfo("Response returned from GetPassengerSchedule", sessionId)
+	if days, locations, err = getAvailability(ctx, passengerId); err != nil {
+		logger.LogError(sessionId, "failed to get the availability error: "+err.Error())
+		err = fmt.Errorf(constants.Failed_To_Do_Job, "get the availability")
+		return
+	}
+
+	logger.LogInfo("Response returned from GetAvailability", sessionId)
 
 	return
 }

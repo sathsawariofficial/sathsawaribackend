@@ -95,12 +95,15 @@ func getAllRides(orgCtx *gin.Context, page int) (rides []postgress.RideDetails, 
 			rides.updated_at
 		`).
 		Joins("JOIN drivers ON rides.driver_id = drivers.id").
-		Joins("JOIN vehicles ON rides.vehicle_id = vehicles.id").
-		Limit(pageSize).
-		Offset(offset)
+		Joins("JOIN vehicles ON rides.vehicle_id = vehicles.id")
 
-	err = query.Order("created_at desc").Find(&rides).Error
-	err = query.Count(&totalRows).Error
+	// counted before Limit/Offset are applied, on a clean clone, or this would never
+	// report more than one page
+	if err = query.Session(&gorm.Session{}).Count(&totalRows).Error; err != nil {
+		return
+	}
+
+	err = query.Order("created_at desc").Limit(pageSize).Offset(offset).Find(&rides).Error
 
 	return
 }
@@ -311,346 +314,6 @@ func createAccouncement(orgCtx *gin.Context, sessionId string, request AdminBroa
 	return nil
 }
 
-func createRole(orgCtx *gin.Context, sessionId string, request AdminRoleRequest) (role postgress.Role, err error) {
-	logger.LogInfo("Request received in createRole", sessionId)
-
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	role = postgress.Role{
-		ID:          database.GenerateUUID(),
-		Name:        request.Name,
-		Description: request.Description,
-		IsSystem:    false,
-	}
-
-	err = database.DatabaseConn.Postgres.WithContext(ctx).Create(&role).Error
-
-	logger.LogInfo("Response returned from createRole", sessionId)
-
-	return
-}
-
-func getRoleById(orgCtx *gin.Context, roleId string) (role postgress.Role, err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	err = database.DatabaseConn.Postgres.WithContext(ctx).Where(`id = ?`, roleId).First(&role).Error
-	return
-}
-
-func countRolesByName(orgCtx *gin.Context, name, excludeRoleId string) (count int64, err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	query := database.DatabaseConn.Postgres.WithContext(ctx).
-		Model(&postgress.Role{}).
-		Where("name = ?", name)
-
-	if !utils.IsStringEmpty(excludeRoleId) {
-		query = query.Where("id <> ?", excludeRoleId)
-	}
-
-	err = query.Count(&count).Error
-	return
-}
-
-// getRolesPage reads one page of roles together with their permissions in exactly
-// two queries, the page of roles and then a single joined query for every
-// permission of every role on that page, which is then stitched in memory. Asking
-// per role would be an N+1.
-func getRolesPage(orgCtx *gin.Context, sessionId string, page int) (roles []postgress.Role, permissions map[string][]adminRolePermissionRow, totalRows int64, err error) {
-	logger.LogInfo("Request received in getRolesPage", sessionId)
-
-	pageSize := configuration.ConfigurationData.PageSize
-	offset := (page - 1) * pageSize
-
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	db := database.DatabaseConn.Postgres.WithContext(ctx)
-
-	if err = db.Model(&postgress.Role{}).Count(&totalRows).Error; err != nil {
-		logger.LogError(sessionId, err)
-		return
-	}
-
-	if err = db.Model(&postgress.Role{}).
-		Order("created_at ASC").
-		Limit(pageSize).
-		Offset(offset).
-		Find(&roles).Error; err != nil {
-		logger.LogError(sessionId, err)
-		return
-	}
-
-	permissions = map[string][]adminRolePermissionRow{}
-	if len(roles) == 0 {
-		return
-	}
-
-	roleIds := make([]string, 0, len(roles))
-	for _, role := range roles {
-		roleIds = append(roleIds, role.ID)
-	}
-
-	var rows []adminRolePermissionRow
-	if err = db.Table("role_permissions").
-		Select(`
-			role_permissions.role_id,
-			permissions.id,
-			permissions.code,
-			permissions.description,
-			permissions.is_system,
-			permissions.created_at
-		`).
-		Joins("JOIN permissions ON permissions.id = role_permissions.permission_id").
-		Where("role_permissions.role_id IN ?", roleIds).
-		Order("permissions.code ASC").
-		Find(&rows).Error; err != nil {
-		logger.LogError(sessionId, err)
-		return
-	}
-
-	for _, row := range rows {
-		permissions[row.RoleID] = append(permissions[row.RoleID], row)
-	}
-
-	logger.LogInfo("Response returned from getRolesPage", sessionId)
-
-	return
-}
-
-func updateRole(orgCtx *gin.Context, sessionId, roleId string, updates map[string]interface{}) (err error) {
-	logger.LogInfo("Request received in updateRole", sessionId)
-
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	err = database.DatabaseConn.Postgres.WithContext(ctx).
-		Model(&postgress.Role{}).
-		Where("id = ?", roleId).
-		Updates(updates).Error
-
-	logger.LogInfo("Response returned from updateRole", sessionId)
-
-	return
-}
-
-// countMembersUsingRole reports how many group memberships still point at a role,
-// a role that is still handed out to somebody must not disappear under them.
-func countMembersUsingRole(orgCtx *gin.Context, roleId string) (count int64, err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	err = database.DatabaseConn.Postgres.WithContext(ctx).
-		Model(&postgress.GroupMember{}).
-		Where("role_id = ?", roleId).
-		Count(&count).Error
-
-	return
-}
-
-func deleteRole(orgCtx *gin.Context, sessionId, adminId string, role postgress.Role) (err error) {
-	logger.LogInfo("Request received in deleteRole", sessionId)
-
-	roleId := role.ID
-
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	tx := database.DatabaseConn.Postgres.WithContext(ctx).Begin()
-	if tx.Error != nil {
-		return tx.Error
-	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-
-	////////// ARCHIVE THE ROLE //////////
-	// who was allowed to do what is worth being able to answer later, so the role is
-	// kept with the permission codes it held at this moment, inline, so the record
-	// still reads correctly even after those permissions themselves change
-	var codes []string
-	if err = tx.Table("role_permissions").
-		Joins("JOIN permissions ON permissions.id = role_permissions.permission_id").
-		Where("role_permissions.role_id = ?", roleId).
-		Pluck("permissions.code", &codes).Error; err != nil {
-		tx.Rollback()
-		logger.LogError(sessionId, err)
-		return
-	}
-
-	if err = tx.Create(&postgress.DELRole{
-		ID:              role.ID,
-		Name:            role.Name,
-		Description:     role.Description,
-		PermissionCodes: codes,
-		UpdateBy:        adminId,
-		CreatedAt:       role.CreatedAt,
-		UpdatedAt:       time.Now(),
-	}).Error; err != nil {
-		tx.Rollback()
-		logger.LogError(sessionId, err)
-		return
-	}
-
-	if err = tx.Where("role_id = ?", roleId).Delete(&postgress.RolePermission{}).Error; err != nil {
-		tx.Rollback()
-		logger.LogError(sessionId, err)
-		return
-	}
-
-	if err = tx.Where("id = ?", roleId).Delete(&postgress.Role{}).Error; err != nil {
-		tx.Rollback()
-		logger.LogError(sessionId, err)
-		return
-	}
-
-	err = tx.Commit().Error
-
-	logger.LogInfo("Response returned from deleteRole", sessionId)
-
-	return
-}
-
-func createPermission(orgCtx *gin.Context, sessionId string, request AdminPermissionRequest) (permission postgress.Permission, err error) {
-	logger.LogInfo("Request received in createPermission", sessionId)
-
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	permission = postgress.Permission{
-		ID:          database.GenerateUUID(),
-		Code:        request.Code,
-		Description: request.Description,
-		IsSystem:    false,
-	}
-
-	err = database.DatabaseConn.Postgres.WithContext(ctx).Create(&permission).Error
-
-	logger.LogInfo("Response returned from createPermission", sessionId)
-
-	return
-}
-
-func countPermissionsByCode(orgCtx *gin.Context, code string) (count int64, err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	err = database.DatabaseConn.Postgres.WithContext(ctx).
-		Model(&postgress.Permission{}).
-		Where("code = ?", code).
-		Count(&count).Error
-
-	return
-}
-
-func getPermissionsPage(orgCtx *gin.Context, sessionId string, page int) (permissions []postgress.Permission, totalRows int64, err error) {
-	logger.LogInfo("Request received in getPermissionsPage", sessionId)
-
-	pageSize := configuration.ConfigurationData.PageSize
-	offset := (page - 1) * pageSize
-
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	db := database.DatabaseConn.Postgres.WithContext(ctx)
-
-	if err = db.Model(&postgress.Permission{}).Count(&totalRows).Error; err != nil {
-		logger.LogError(sessionId, err)
-		return
-	}
-
-	err = db.Model(&postgress.Permission{}).
-		Order("code ASC").
-		Limit(pageSize).
-		Offset(offset).
-		Find(&permissions).Error
-
-	logger.LogInfo("Response returned from getPermissionsPage", sessionId)
-
-	return
-}
-
-// countPermissionsByIds validates a whole batch of permission ids with one query
-// rather than one lookup per id.
-func countPermissionsByIds(orgCtx *gin.Context, permissionIds []string) (count int64, err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	err = database.DatabaseConn.Postgres.WithContext(ctx).
-		Model(&postgress.Permission{}).
-		Where("id IN ?", permissionIds).
-		Count(&count).Error
-
-	return
-}
-
-// replaceRolePermissions swaps the whole permission set of a role in one
-// transaction, so a role is never seen holding half of its new set.
-func replaceRolePermissions(orgCtx *gin.Context, sessionId, roleId string, permissionIds []string) (err error) {
-	logger.LogInfo("Request received in replaceRolePermissions", sessionId)
-
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	tx := database.DatabaseConn.Postgres.WithContext(ctx).Begin()
-	if tx.Error != nil {
-		return tx.Error
-	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-
-	if err = tx.Where("role_id = ?", roleId).Delete(&postgress.RolePermission{}).Error; err != nil {
-		tx.Rollback()
-		logger.LogError(sessionId, err)
-		return
-	}
-
-	if len(permissionIds) > 0 {
-		rolePermissions := make([]postgress.RolePermission, 0, len(permissionIds))
-		for _, permissionId := range permissionIds {
-			rolePermissions = append(rolePermissions, postgress.RolePermission{
-				ID:           database.GenerateUUID(),
-				RoleID:       roleId,
-				PermissionID: permissionId,
-			})
-		}
-
-		if err = tx.Create(&rolePermissions).Error; err != nil {
-			tx.Rollback()
-			logger.LogError(sessionId, err)
-			return
-		}
-	}
-
-	err = tx.Commit().Error
-
-	logger.LogInfo("Response returned from replaceRolePermissions", sessionId)
-
-	return
-}
-
 // getPlatformOverview counts the whole product in a single round trip rather than a
 // dozen, since every number on the admin's first screen is just a count.
 func getPlatformOverview(orgCtx *gin.Context, sessionId string) (overview postgress.PlatformOverview, err error) {
@@ -660,32 +323,30 @@ func getPlatformOverview(orgCtx *gin.Context, sessionId string) (overview postgr
 	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
 	defer cancel()
 
-	now := time.Now().Format(constants.DateTimeLayout)
-
 	err = database.DatabaseConn.Postgres.WithContext(ctx).Raw(`
 		SELECT
-			(SELECT COUNT(*) FROM drivers)                                            AS total_drivers,
-			(SELECT COUNT(*) FROM drivers WHERE status = ?)                           AS active_drivers,
-			(SELECT COUNT(*) FROM passengers)                                         AS total_passengers,
-			(SELECT COUNT(*) FROM passengers WHERE status = ?)                        AS active_passengers,
-			(SELECT COUNT(*) FROM vehicles)                                           AS total_vehicles,
-			(SELECT COUNT(*) FROM vehicles WHERE number_of_seats > 0)                 AS seated_vehicles,
-			(SELECT COUNT(*) FROM groups)                                             AS total_groups,
-			(SELECT COUNT(*) FROM groups WHERE status = ?)                            AS active_groups,
-			(SELECT COUNT(*) FROM shifts)                                             AS total_shifts,
-			(SELECT COUNT(*) FROM shifts WHERE is_active = true AND start_datetime > ?) AS upcoming_shifts,
-			(SELECT COUNT(*) FROM rides)                                              AS total_rides,
-			(SELECT COUNT(*) FROM rides WHERE is_active = true)                       AS active_rides,
-			(
-				(SELECT COUNT(*) FROM group_members WHERE status = ?) +
-				(SELECT COUNT(*) FROM group_vehicles WHERE status = ?) +
-				(SELECT COUNT(*) FROM group_passengers WHERE status = ?)
-			)                                                                          AS pending_requests
+			(SELECT COUNT(*) FROM drivers)                            AS total_drivers,
+			(SELECT COUNT(*) FROM drivers WHERE status = ?)           AS active_drivers,
+			(SELECT COUNT(*) FROM passengers)                         AS total_passengers,
+			(SELECT COUNT(*) FROM passengers WHERE status = ?)        AS active_passengers,
+			(SELECT COUNT(*) FROM vehicles)                           AS total_vehicles,
+			(SELECT COUNT(*) FROM vehicles WHERE number_of_seats > 0) AS seated_vehicles,
+			(SELECT COUNT(*) FROM rides)                              AS total_rides,
+			(SELECT COUNT(*) FROM rides WHERE is_active = true)       AS active_rides,
+			(SELECT COUNT(*) FROM pick_drop_services)                 AS total_services,
+			(SELECT COUNT(*) FROM pick_drop_services WHERE status = ?) AS active_services,
+			(SELECT COUNT(*) FROM shifts)                             AS total_shifts,
+			(SELECT COUNT(*) FROM shifts WHERE status = ?)            AS active_shifts,
+			(SELECT COUNT(*) FROM pick_drop_advertisements)           AS total_advertisements,
+			(SELECT COUNT(*) FROM shift_requests)                     AS open_shift_requests,
+			(SELECT COUNT(*) FROM pick_drop_drivers WHERE status = ?)
+				+ (SELECT COUNT(*) FROM pick_drop_vehicles WHERE status = ?)
+				+ (SELECT COUNT(*) FROM pick_drop_passengers WHERE status = ?) AS pending_join_requests
 	`,
 		constants.Status_Active,
 		constants.Status_Active,
 		constants.Status_Active,
-		now,
+		constants.Shift_Status_Active,
 		constants.Membership_Status_Pending,
 		constants.Membership_Status_Pending,
 		constants.Membership_Status_Pending,
@@ -745,45 +406,6 @@ func getPassengerById(orgCtx *gin.Context, passengerId string) (passenger postgr
 	return
 }
 
-// getPassengerContext loads the fleets a passenger belongs to and their standing
-// travel form, which together explain what that account is actually doing.
-func getPassengerContext(orgCtx *gin.Context, passengerId string) (
-	groups []postgress.GroupPassengerDetails,
-	preferences []postgress.PassengerLocationPreference,
-	err error,
-) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	db := database.DatabaseConn.Postgres.WithContext(ctx)
-
-	if err = db.Table("group_passengers").
-		Select(`
-			group_passengers.id,
-			group_passengers.group_id,
-			group_passengers.passenger_id,
-			groups.name AS passenger_name,
-			passengers.passenger_mobile,
-			passengers.gender,
-			group_passengers.status,
-			group_passengers.created_at
-		`).
-		Joins("JOIN groups ON groups.id = group_passengers.group_id").
-		Joins("JOIN passengers ON passengers.id = group_passengers.passenger_id").
-		Where("group_passengers.passenger_id = ?", passengerId).
-		Order("group_passengers.created_at DESC").
-		Find(&groups).Error; err != nil {
-		return
-	}
-
-	err = db.Where("passenger_id = ?", passengerId).
-		Order("day_of_week ASC, direction ASC").
-		Find(&preferences).Error
-
-	return
-}
-
 func updatePassengerStatus(orgCtx *gin.Context, sessionId, passengerId, status, updatedBy string) (err error) {
 	logger.LogInfo("Request received in updatePassengerStatus", sessionId)
 
@@ -824,319 +446,342 @@ func updateDriverStatus(orgCtx *gin.Context, sessionId, driverId, status, update
 	return
 }
 
-// getAllGroups lists every fleet on the platform with the size of each, counted with
-// subselects so the page costs one query rather than one per fleet.
-func getAllGroups(orgCtx *gin.Context, sessionId, search, status string, page int) (groups []postgress.AdminGroupOverview, totalRows int64, err error) {
-	logger.LogInfo("Request received in getAllGroups", sessionId)
+////////////////////////////// PICK & DROP OVERSIGHT //////////////////////////////
+// Read only. services/admin never imports services/pickdrop or services/shift, so
+// these queries are written again here against the shared postgres models rather
+// than reusing the owner-scoped ones those packages keep to themselves.
 
+// getAllPickDropServices lists every Pick & Drop service on the platform, active or
+// disabled, with the same roster counts an owner sees on their own service.
+func getAllPickDropServices(orgCtx *gin.Context, search, status string, page int) (services []postgress.PickDropServiceDetails, totalRows int64, err error) {
 	pageSize := configuration.ConfigurationData.PageSize
 	offset := (page - 1) * pageSize
 
-	var cancel context.CancelFunc
 	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
 	defer cancel()
 
-	base := database.DatabaseConn.Postgres.WithContext(ctx).
-		Table("groups").
-		Joins("JOIN drivers ON drivers.id = groups.owner_driver_id")
+	query := database.DatabaseConn.Postgres.WithContext(ctx).
+		Table("pick_drop_services").
+		Joins("LEFT JOIN drivers ON drivers.id = pick_drop_services.owner_driver_id")
 
 	if !utils.IsStringEmpty(status) {
-		base = base.Where("groups.status = ?", status)
+		query = query.Where("pick_drop_services.status = ?", status)
 	}
 
 	if !utils.IsStringEmpty(search) {
-		base = base.Where("groups.name ILIKE ?", "%"+strings.TrimSpace(search)+"%")
+		term := "%" + strings.TrimSpace(search) + "%"
+		query = query.Where("pick_drop_services.name ILIKE ? OR drivers.driver_name ILIKE ? OR drivers.driver_mobile ILIKE ?", term, term, term)
 	}
 
-	countQuery := base.Session(&gorm.Session{})
-	if err = countQuery.Count(&totalRows).Error; err != nil {
-		logger.LogError(sessionId, err)
+	if err = query.Session(&gorm.Session{}).Count(&totalRows).Error; err != nil {
 		return
 	}
 
-	err = base.
-		Select(`
-			groups.id,
-			groups.name,
-			groups.description,
-			groups.status,
-			groups.owner_driver_id,
-			drivers.driver_name AS owner_name,
-			drivers.driver_mobile AS owner_mobile,
-			(SELECT COUNT(*) FROM group_members WHERE group_members.group_id = groups.id AND group_members.status = ?) AS member_count,
-			(SELECT COUNT(*) FROM group_vehicles WHERE group_vehicles.group_id = groups.id AND group_vehicles.status = ?) AS vehicle_count,
-			(SELECT COUNT(*) FROM group_passengers WHERE group_passengers.group_id = groups.id AND group_passengers.status = ?) AS passenger_count,
-			(SELECT COUNT(*) FROM shifts WHERE shifts.group_id = groups.id AND shifts.is_active = true) AS shift_count,
-			groups.created_at
+	err = query.Select(`
+			pick_drop_services.id,
+			pick_drop_services.name,
+			pick_drop_services.description,
+			pick_drop_services.owner_driver_id,
+			COALESCE(drivers.driver_name, '') AS owner_name,
+			COALESCE(drivers.driver_mobile, '') AS owner_mobile,
+			pick_drop_services.status,
+			(SELECT COUNT(*) FROM pick_drop_drivers d WHERE d.service_id = pick_drop_services.id AND d.status = ?) AS driver_count,
+			(SELECT COUNT(*) FROM pick_drop_vehicles v WHERE v.service_id = pick_drop_services.id AND v.status = ?) AS vehicle_count,
+			(SELECT COUNT(*) FROM pick_drop_passengers p WHERE p.service_id = pick_drop_services.id AND p.status = ?) AS passenger_count,
+			(SELECT COUNT(*) FROM shifts s WHERE s.service_id = pick_drop_services.id AND s.status = ?) AS shift_count,
+			pick_drop_services.created_at
 		`,
-			constants.Membership_Status_Approved,
-			constants.Membership_Status_Approved,
-			constants.Membership_Status_Approved,
-		).
-		Order("groups.created_at DESC").
+		constants.Membership_Status_Approved,
+		constants.Membership_Status_Approved,
+		constants.Membership_Status_Approved,
+		constants.Shift_Status_Active,
+	).
+		Order("pick_drop_services.created_at DESC").
 		Limit(pageSize).
 		Offset(offset).
-		Find(&groups).Error
-
-	logger.LogInfo("Response returned from getAllGroups", sessionId)
+		Find(&services).Error
 
 	return
 }
 
-func getGroupById(orgCtx *gin.Context, groupId string) (group postgress.Group, err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	err = database.DatabaseConn.Postgres.WithContext(ctx).Where("id = ?", groupId).First(&group).Error
-	return
+// pickDropServiceCountsRow is the same roster breakdown an owner's own dashboard
+// works out, counted in one round trip.
+type pickDropServiceCountsRow struct {
+	ApprovedDrivers       int64
+	ApprovedVehicleOwners int64
+	ApprovedVehicles      int64
+	ApprovedPassengers    int64
+	PendingRequests       int64
+	ActiveShifts          int64
 }
 
-// getGroupRosters is the admin's read of a fleet's three membership lists. Unlike
-// the manager's own view it is not filtered by status, an admin looking into a
-// complaint needs to see who was turned away too.
-func getGroupRosters(orgCtx *gin.Context, sessionId, groupId string) (
-	members []postgress.GroupMemberDetails,
-	vehicles []postgress.GroupVehicleDetails,
-	passengers []postgress.GroupPassengerDetails,
+// getPickDropServiceAdminDetail reads one service, whoever owns it and whatever its
+// status, with its roster counts and every shift it has ever had that is still active.
+func getPickDropServiceAdminDetail(orgCtx *gin.Context, serviceId string) (
+	service postgress.PickDropServiceDetails,
+	counts pickDropServiceCountsRow,
+	shifts []postgress.ShiftDetails,
 	err error,
 ) {
-	logger.LogInfo("Request received in getGroupRosters", sessionId)
-
-	var cancel context.CancelFunc
 	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
 	defer cancel()
 
 	db := database.DatabaseConn.Postgres.WithContext(ctx)
 
-	if err = db.Table("group_members").
+	if err = db.Table("pick_drop_services").
 		Select(`
-			group_members.id,
-			group_members.group_id,
-			group_members.driver_id,
-			drivers.driver_name,
-			drivers.driver_mobile,
-			drivers.rating,
-			group_members.role_id,
-			roles.name AS role_name,
-			group_members.join_type,
-			group_members.status,
-			group_members.created_at
+			pick_drop_services.id,
+			pick_drop_services.name,
+			pick_drop_services.description,
+			pick_drop_services.owner_driver_id,
+			COALESCE(drivers.driver_name, '') AS owner_name,
+			COALESCE(drivers.driver_mobile, '') AS owner_mobile,
+			pick_drop_services.status,
+			pick_drop_services.created_at
 		`).
-		Joins("JOIN drivers ON drivers.id = group_members.driver_id").
-		Joins("LEFT JOIN roles ON roles.id = group_members.role_id").
-		Where("group_members.group_id = ?", groupId).
-		Order("group_members.created_at ASC").
-		Find(&members).Error; err != nil {
-		logger.LogError(sessionId, err)
+		Joins("LEFT JOIN drivers ON drivers.id = pick_drop_services.owner_driver_id").
+		Where("pick_drop_services.id = ?", serviceId).
+		Take(&service).Error; err != nil {
 		return
 	}
 
-	if err = db.Table("group_vehicles").
-		Select(`
-			group_vehicles.id,
-			group_vehicles.group_id,
-			group_vehicles.vehicle_id,
-			vehicles.vehicle_number,
-			vehicles.vehicle_info,
-			vehicles.number_of_seats,
-			vehicles.has_ac,
-			vehicles.has_heating,
-			group_vehicles.driver_id,
-			drivers.driver_name,
-			drivers.driver_mobile,
-			group_vehicles.status,
-			group_vehicles.created_at
-		`).
-		Joins("JOIN vehicles ON vehicles.id = group_vehicles.vehicle_id").
-		Joins("JOIN drivers ON drivers.id = group_vehicles.driver_id").
-		Where("group_vehicles.group_id = ?", groupId).
-		Order("group_vehicles.created_at ASC").
-		Find(&vehicles).Error; err != nil {
-		logger.LogError(sessionId, err)
+	if err = db.Raw(`
+		SELECT
+			(SELECT COUNT(*) FROM pick_drop_drivers
+				WHERE service_id = @service AND status = @approved AND join_type = @driverJoin) AS approved_drivers,
+			(SELECT COUNT(*) FROM pick_drop_drivers
+				WHERE service_id = @service AND status = @approved AND join_type = @vehiclesJoin) AS approved_vehicle_owners,
+			(SELECT COUNT(*) FROM pick_drop_vehicles
+				JOIN vehicles ON vehicles.id = pick_drop_vehicles.vehicle_id AND vehicles.status = @active
+				WHERE pick_drop_vehicles.service_id = @service AND pick_drop_vehicles.status = @approved) AS approved_vehicles,
+			(SELECT COUNT(*) FROM pick_drop_passengers WHERE service_id = @service AND status = @approved) AS approved_passengers,
+			(SELECT COUNT(*) FROM pick_drop_drivers WHERE service_id = @service AND status = @pending)
+				+ (SELECT COUNT(*) FROM pick_drop_vehicles WHERE service_id = @service AND status = @pending)
+				+ (SELECT COUNT(*) FROM pick_drop_passengers WHERE service_id = @service AND status = @pending) AS pending_requests,
+			(SELECT COUNT(*) FROM shifts WHERE service_id = @service AND status = @activeShift) AS active_shifts
+	`,
+		map[string]interface{}{
+			"service":      serviceId,
+			"approved":     constants.Membership_Status_Approved,
+			"pending":      constants.Membership_Status_Pending,
+			"active":       constants.Status_Active,
+			"activeShift":  constants.Shift_Status_Active,
+			"driverJoin":   constants.Join_Type_Driver,
+			"vehiclesJoin": constants.Join_Type_Vehicles,
+		},
+	).Scan(&counts).Error; err != nil {
 		return
 	}
 
-	err = db.Table("group_passengers").
-		Select(`
-			group_passengers.id,
-			group_passengers.group_id,
-			group_passengers.passenger_id,
-			passengers.passenger_name,
-			passengers.passenger_mobile,
-			passengers.gender,
-			group_passengers.status,
-			group_passengers.created_at
-		`).
-		Joins("JOIN passengers ON passengers.id = group_passengers.passenger_id").
-		Where("group_passengers.group_id = ?", groupId).
-		Order("group_passengers.created_at ASC").
-		Find(&passengers).Error
-
-	logger.LogInfo("Response returned from getGroupRosters", sessionId)
+	err = shiftAdminJoins(db).
+		Where("shifts.service_id = ?", serviceId).
+		Select(shiftAdminColumns).
+		Order("shifts.status ASC, shifts.start_time ASC").
+		Find(&shifts).Error
 
 	return
 }
 
-func updateGroupStatus(orgCtx *gin.Context, sessionId, groupId, status string) (err error) {
-	logger.LogInfo("Request received in updateGroupStatus", sessionId)
-
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
-
-	err = database.DatabaseConn.Postgres.WithContext(ctx).
-		Model(&postgress.Group{}).
-		Where("id = ?", groupId).
-		Update("status", status).Error
-
-	logger.LogInfo("Response returned from updateGroupStatus", sessionId)
-
-	return
+// shiftAdminJoins is the platform-wide equivalent of the shift join services/shift
+// keeps to itself: every shift, whichever service or driver, with the service, the
+// driver, the vehicle and the vehicle's own owner (who is not always who drives it).
+func shiftAdminJoins(db *gorm.DB) *gorm.DB {
+	return db.Table("shifts").
+		Joins("LEFT JOIN pick_drop_services ON pick_drop_services.id = shifts.service_id").
+		Joins("LEFT JOIN drivers ON drivers.id = shifts.driver_id").
+		Joins("LEFT JOIN vehicles ON vehicles.id = shifts.vehicle_id").
+		Joins("LEFT JOIN drivers AS vehicle_owners ON vehicle_owners.id = vehicles.driver_id")
 }
 
-// getAllShifts is the platform wide shift list, filterable the way an admin chasing
-// a complaint would want it.
-func getAllShifts(orgCtx *gin.Context, sessionId, groupId, driverId, direction, startTime, endTime, status string, page int) (shifts []postgress.ShiftDetails, totalRows int64, err error) {
-	logger.LogInfo("Request received in getAllShifts", sessionId)
+const shiftAdminColumns = `
+	shifts.id,
+	shifts.name,
+	shifts.service_id,
+	COALESCE(pick_drop_services.name, '') AS service_name,
+	COALESCE(pick_drop_services.owner_driver_id, '') AS owner_driver_id,
+	shifts.driver_id,
+	COALESCE(drivers.driver_name, '') AS driver_name,
+	COALESCE(drivers.driver_mobile, '') AS driver_mobile,
+	shifts.vehicle_id,
+	COALESCE(vehicles.vehicle_number, '') AS vehicle_number,
+	COALESCE(vehicles.vehicle_info, '') AS vehicle_info,
+	COALESCE(vehicles.driver_id, '') AS vehicle_owner_id,
+	COALESCE(vehicle_owners.driver_name, '') AS vehicle_owner_name,
+	shifts.days_of_week,
+	shifts.start_date,
+	shifts.end_date,
+	shifts.start_time,
+	shifts.end_time,
+	shifts.seat_capacity,
+	shifts.occupied_seats,
+	shifts.status,
+	shifts.created_at,
+	shifts.updated_at`
 
+func applyAdminShiftFilter(query *gorm.DB, filter adminShiftFilter) *gorm.DB {
+	if filter.Status != constants.Shift_Status_All {
+		query = query.Where("shifts.status = ?", filter.Status)
+	}
+
+	if filter.DayOfWeek > 0 {
+		query = query.Where("? = ANY(shifts.days_of_week)", filter.DayOfWeek)
+	}
+
+	if !utils.IsStringEmpty(filter.Search) {
+		term := "%" + filter.Search + "%"
+		query = query.Where(`(
+			shifts.name ILIKE ?
+			OR pick_drop_services.name ILIKE ?
+			OR drivers.driver_name ILIKE ?
+			OR EXISTS (SELECT 1 FROM shift_locations WHERE shift_locations.shift_id = shifts.id AND shift_locations.location ILIKE ?)
+		)`, term, term, term, term)
+	}
+
+	if !utils.IsStringEmpty(filter.StartTime) {
+		query = query.Where("shifts.start_time >= ?", filter.StartTime)
+	}
+
+	if !utils.IsStringEmpty(filter.EndTime) {
+		query = query.Where("shifts.end_time <= ?", filter.EndTime)
+	}
+
+	return query
+}
+
+// listShiftsAdmin is every shift on the platform, in any service, searchable the same
+// way an owner searches their own.
+func listShiftsAdmin(orgCtx *gin.Context, filter adminShiftFilter, page int) (shifts []postgress.ShiftDetails, totalRows int64, err error) {
 	pageSize := configuration.ConfigurationData.PageSize
 	offset := (page - 1) * pageSize
 
-	var cancel context.CancelFunc
 	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
 	defer cancel()
 
-	query := adminShiftQuery(database.DatabaseConn.Postgres.WithContext(ctx))
+	query := applyAdminShiftFilter(shiftAdminJoins(database.DatabaseConn.Postgres.WithContext(ctx)), filter)
 
-	if !utils.IsStringEmpty(groupId) {
-		query = query.Where("shifts.group_id = ?", groupId)
-	}
-
-	if !utils.IsStringEmpty(driverId) {
-		query = query.Where("shifts.driver_id = ?", driverId)
-	}
-
-	if !utils.IsStringEmpty(direction) {
-		query = query.Where("shifts.direction = ?", direction)
-	}
-
-	if !utils.IsStringEmpty(startTime) {
-		query = query.Where("shifts.start_datetime >= ?", startTime)
-	}
-
-	if !utils.IsStringEmpty(endTime) {
-		query = query.Where("shifts.estimated_end_datetime <= ?", endTime)
-	}
-
-	if strings.EqualFold(status, constants.Ride_Status_Active) {
-		query = query.Where("shifts.is_active = ?", true)
-	} else if strings.EqualFold(status, constants.Ride_Status_InActive) {
-		query = query.Where("shifts.is_active = ?", false)
-	}
-
-	countQuery := query.Session(&gorm.Session{})
-	if err = countQuery.Count(&totalRows).Error; err != nil {
-		logger.LogError(sessionId, err)
+	if err = query.Session(&gorm.Session{}).Count(&totalRows).Error; err != nil {
 		return
 	}
 
-	err = query.
-		Order("shifts.start_datetime DESC").
+	err = query.Select(shiftAdminColumns).
+		Order("shifts.start_time ASC, shifts.created_at DESC").
 		Limit(pageSize).
 		Offset(offset).
 		Find(&shifts).Error
 
-	logger.LogInfo("Response returned from getAllShifts", sessionId)
-
 	return
 }
 
-// adminShiftQuery joins in the fleet, the vehicle, the driver of the day and the
-// manager who built the shift, which is everything an admin needs to see at once.
-func adminShiftQuery(db *gorm.DB) *gorm.DB {
-	return db.Table("shifts").
-		Select(`
-			shifts.id,
-			shifts.group_id,
-			groups.name AS group_name,
-			shifts.vehicle_id,
-			vehicles.vehicle_number,
-			vehicles.vehicle_info,
-			vehicles.has_ac,
-			vehicles.has_heating,
-			shifts.driver_id,
-			drivers.driver_name,
-			drivers.driver_mobile,
-			drivers.rating,
-			shifts.direction,
-			shifts.start_datetime,
-			shifts.estimated_end_datetime,
-			shifts.start_location,
-			shifts.end_location,
-			shifts.number_of_seats,
-			shifts.seats_taken,
-			shifts.route_details,
-			shifts.created_by_driver_id,
-			creators.driver_name AS created_by_name,
-			creators.driver_mobile AS created_by_mobile,
-			shifts.is_active,
-			shifts.created_at,
-			shifts.updated_at
-		`).
-		Joins("JOIN groups ON groups.id = shifts.group_id").
-		Joins("JOIN vehicles ON vehicles.id = shifts.vehicle_id").
-		Joins("JOIN drivers ON drivers.id = shifts.driver_id").
-		Joins("JOIN drivers AS creators ON creators.id = shifts.created_by_driver_id")
-}
+// listShiftRequestsAdmin is every open shift request on the platform, addressed to a
+// service or still open to any of them, searchable the same way an owner searches.
+func listShiftRequestsAdmin(orgCtx *gin.Context, filter adminShiftFilter, page int) (requests []postgress.ShiftRequestDetails, totalRows int64, err error) {
+	pageSize := configuration.ConfigurationData.PageSize
+	offset := (page - 1) * pageSize
 
-func getShiftDetailsById(orgCtx *gin.Context, shiftId string) (shift postgress.ShiftDetails, err error) {
-	var cancel context.CancelFunc
 	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
 	defer cancel()
 
-	err = adminShiftQuery(database.DatabaseConn.Postgres.WithContext(ctx)).
-		Where("shifts.id = ?", shiftId).
-		First(&shift).Error
+	query := database.DatabaseConn.Postgres.WithContext(ctx).Table("shift_requests").
+		Joins("LEFT JOIN passengers ON passengers.id = shift_requests.passenger_id").
+		Joins("LEFT JOIN pick_drop_services ON pick_drop_services.id = shift_requests.service_id")
 
-	return
-}
+	if !utils.IsStringEmpty(filter.Search) {
+		term := "%" + filter.Search + "%"
+		query = query.Where(`(
+			shift_requests.start_location ILIKE ?
+			OR shift_requests.end_location ILIKE ?
+			OR passengers.passenger_name ILIKE ?
+			OR EXISTS (SELECT 1 FROM unnest(shift_requests.route_points) AS point WHERE point ILIKE ?)
+		)`, term, term, term, term)
+	}
 
-// getShiftRoute loads a shift's stops in order and its seats with the passenger and
-// stop already joined on, so a whole trip is read in two queries.
-func getShiftRoute(orgCtx *gin.Context, shiftId string) (stops []postgress.ShiftStop, seats []postgress.ShiftSeatDetails, err error) {
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
-	defer cancel()
+	if filter.DayOfWeek > 0 {
+		query = query.Where("? = ANY(shift_requests.days_of_week)", filter.DayOfWeek)
+	}
 
-	db := database.DatabaseConn.Postgres.WithContext(ctx)
+	if !utils.IsStringEmpty(filter.StartTime) {
+		query = query.Where("shift_requests.start_time >= ?", filter.StartTime)
+	}
 
-	if err = db.Where("shift_id = ?", shiftId).Order("sequence_number ASC").Find(&stops).Error; err != nil {
+	if !utils.IsStringEmpty(filter.EndTime) {
+		query = query.Where("shift_requests.end_time <= ?", filter.EndTime)
+	}
+
+	if err = query.Session(&gorm.Session{}).Count(&totalRows).Error; err != nil {
 		return
 	}
 
-	err = db.Table("shift_seats").
-		Select(`
-			shift_seats.id,
-			shift_seats.shift_id,
-			shift_seats.seat_number,
-			shift_seats.gender,
-			shift_seats.status,
-			shift_seats.passenger_id,
-			passengers.passenger_name,
-			passengers.passenger_mobile,
-			shift_seats.stop_id,
-			shift_stops.sequence_number,
-			shift_stops.location,
-			shift_stops.lat,
-			shift_stops.lng,
-			shift_stops.scheduled_time
+	err = query.Select(`
+			shift_requests.id,
+			shift_requests.passenger_id,
+			COALESCE(passengers.passenger_name, '') AS passenger_name,
+			COALESCE(shift_requests.service_id, '') AS service_id,
+			COALESCE(pick_drop_services.name, '') AS service_name,
+			shift_requests.contact_number,
+			shift_requests.note,
+			shift_requests.days_of_week,
+			shift_requests.start_time,
+			shift_requests.end_time,
+			shift_requests.created_at
 		`).
-		Joins("LEFT JOIN passengers ON passengers.id = shift_seats.passenger_id").
-		Joins("LEFT JOIN shift_stops ON shift_stops.id = shift_seats.stop_id").
-		Where("shift_seats.shift_id = ?", shiftId).
-		Order("shift_seats.seat_number ASC").
-		Find(&seats).Error
+		Order("shift_requests.created_at DESC").
+		Limit(pageSize).
+		Offset(offset).
+		Find(&requests).Error
+
+	return
+}
+
+// listAdvertisementsAdmin is every advertisement on the platform, whatever the
+// status of the service that posted it.
+func listAdvertisementsAdmin(orgCtx *gin.Context, search string, page int) (ads []postgress.AdvertisementDetails, totalRows int64, err error) {
+	pageSize := configuration.ConfigurationData.PageSize
+	offset := (page - 1) * pageSize
+
+	ctx, cancel := context.WithTimeout(orgCtx, time.Duration(configuration.ConfigurationData.Timeout)*time.Second)
+	defer cancel()
+
+	query := database.DatabaseConn.Postgres.WithContext(ctx).Table("pick_drop_advertisements").
+		Joins("LEFT JOIN pick_drop_services ON pick_drop_services.id = pick_drop_advertisements.service_id").
+		Joins("LEFT JOIN drivers ON drivers.id = pick_drop_services.owner_driver_id")
+
+	if !utils.IsStringEmpty(search) {
+		term := "%" + strings.TrimSpace(search) + "%"
+		query = query.Where(`(
+			pick_drop_advertisements.title ILIKE ?
+			OR pick_drop_advertisements.start_location ILIKE ?
+			OR pick_drop_advertisements.end_location ILIKE ?
+			OR pick_drop_services.name ILIKE ?
+		)`, term, term, term, term)
+	}
+
+	if err = query.Session(&gorm.Session{}).Count(&totalRows).Error; err != nil {
+		return
+	}
+
+	err = query.Select(`
+			pick_drop_advertisements.id,
+			pick_drop_advertisements.service_id,
+			COALESCE(pick_drop_services.name, '') AS service_name,
+			COALESCE(pick_drop_services.owner_driver_id, '') AS owner_driver_id,
+			COALESCE(drivers.driver_name, '') AS owner_name,
+			COALESCE(drivers.driver_mobile, '') AS owner_mobile,
+			pick_drop_advertisements.title,
+			pick_drop_advertisements.description,
+			pick_drop_advertisements.fare,
+			pick_drop_advertisements.days_of_week,
+			pick_drop_advertisements.start_time,
+			pick_drop_advertisements.end_time,
+			(SELECT COUNT(*) FROM pick_drop_vehicles
+				JOIN vehicles ON vehicles.id = pick_drop_vehicles.vehicle_id AND vehicles.status = ?
+				WHERE pick_drop_vehicles.service_id = pick_drop_advertisements.service_id
+				  AND pick_drop_vehicles.status = ?) AS vehicle_count,
+			pick_drop_advertisements.created_at
+		`, constants.Status_Active, constants.Membership_Status_Approved).
+		Order("pick_drop_advertisements.created_at DESC").
+		Limit(pageSize).
+		Offset(offset).
+		Find(&ads).Error
 
 	return
 }

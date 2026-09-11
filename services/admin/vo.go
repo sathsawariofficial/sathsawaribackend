@@ -152,96 +152,20 @@ func createApprochInfoResp(approches []postgress.ApprochInfo, totalRows int64) u
 	return approchInfoResp
 }
 
-func createdRoleResp(roleId string) utils.APIResponse {
-	return utils.APIResponse{
-		Code:    http.StatusOK,
-		Message: fmt.Sprintf(constants.Created_Successfully, "Role"),
-		Data: AdminRoleCreatedResponse{
-			Id: roleId,
-		},
-	}
-}
-
-func rolesResp(roles []postgress.Role, permissions map[string][]adminRolePermissionRow, totalRows int64) utils.APIResponse {
-	roleDetails := []AdminRoleDetail{}
-
-	for _, role := range roles {
-		permissionDetails := []AdminPermissionDetail{}
-		for _, permission := range permissions[role.ID] {
-			permissionDetails = append(permissionDetails, AdminPermissionDetail{
-				ID:          permission.ID,
-				Code:        permission.Code,
-				Description: permission.Description,
-				IsSystem:    permission.IsSystem,
-				CreatedAt:   permission.CreatedAt,
-			})
-		}
-
-		roleDetails = append(roleDetails, AdminRoleDetail{
-			ID:          role.ID,
-			Name:        role.Name,
-			Description: role.Description,
-			IsSystem:    role.IsSystem,
-			CreatedAt:   role.CreatedAt,
-			Permissions: permissionDetails,
-		})
-	}
-
-	return utils.APIResponse{
-		Code:    http.StatusOK,
-		Message: constants.Success,
-		Data: AdminRoleListResponse{
-			TotalPages: utils.CalculatePagesize(totalRows),
-			Roles:      roleDetails,
-		},
-	}
-}
-
-func createdPermissionResp(permissionId string) utils.APIResponse {
-	return utils.APIResponse{
-		Code:    http.StatusOK,
-		Message: fmt.Sprintf(constants.Created_Successfully, "Permission"),
-		Data: AdminPermissionCreatedResponse{
-			Id: permissionId,
-		},
-	}
-}
-
-func permissionsResp(permissions []postgress.Permission, totalRows int64) utils.APIResponse {
-	permissionDetails := []AdminPermissionDetail{}
-
-	for _, permission := range permissions {
-		permissionDetails = append(permissionDetails, AdminPermissionDetail{
-			ID:          permission.ID,
-			Code:        permission.Code,
-			Description: permission.Description,
-			IsSystem:    permission.IsSystem,
-			CreatedAt:   permission.CreatedAt,
-		})
-	}
-
-	return utils.APIResponse{
-		Code:    http.StatusOK,
-		Message: constants.Success,
-		Data: AdminPermissionListResponse{
-			TotalPages:  utils.CalculatePagesize(totalRows),
-			Permissions: permissionDetails,
-		},
-	}
-}
-
 func platformOverviewResp(o postgress.PlatformOverview) utils.APIResponse {
 	return utils.APIResponse{
 		Code:    http.StatusOK,
 		Message: constants.Success,
 		Data: AdminOverviewResponse{
-			Drivers:              AdminCountPair{Total: o.TotalDrivers, Live: o.ActiveDrivers, Label: "active"},
-			Passengers:           AdminCountPair{Total: o.TotalPassengers, Live: o.ActivePassengers, Label: "active"},
-			Vehicles:             AdminCountPair{Total: o.TotalVehicles, Live: o.SeatedVehicles, Label: "fleet ready"},
-			Groups:               AdminCountPair{Total: o.TotalGroups, Live: o.ActiveGroups, Label: "active"},
-			Shifts:               AdminCountPair{Total: o.TotalShifts, Live: o.UpcomingShifts, Label: "upcoming"},
-			Rides:                AdminCountPair{Total: o.TotalRides, Live: o.ActiveRides, Label: "active"},
-			PendingGroupRequests: o.PendingRequests,
+			Drivers:             AdminCountPair{Total: o.TotalDrivers, Live: o.ActiveDrivers, Label: "active"},
+			Passengers:          AdminCountPair{Total: o.TotalPassengers, Live: o.ActivePassengers, Label: "active"},
+			Vehicles:            AdminCountPair{Total: o.TotalVehicles, Live: o.SeatedVehicles, Label: "seats recorded"},
+			Rides:               AdminCountPair{Total: o.TotalRides, Live: o.ActiveRides, Label: "active"},
+			Services:            AdminCountPair{Total: o.TotalServices, Live: o.ActiveServices, Label: "active"},
+			Shifts:              AdminCountPair{Total: o.TotalShifts, Live: o.ActiveShifts, Label: "active"},
+			Advertisements:      o.TotalAdvertisements,
+			OpenShiftRequests:   o.OpenShiftRequests,
+			PendingJoinRequests: o.PendingJoinRequests,
 		},
 	}
 }
@@ -273,214 +197,187 @@ func passengersResp(passengers []postgress.Passenger, totalRows int64) utils.API
 	}
 }
 
-func passengerProfileResp(
-	passenger postgress.Passenger,
-	groups []postgress.GroupPassengerDetails,
-	preferences []postgress.PassengerLocationPreference,
-) utils.APIResponse {
-	groupDetails := []AdminPassengerGroup{}
-	for _, group := range groups {
-		groupDetails = append(groupDetails, AdminPassengerGroup{
-			GroupId: group.GroupID,
-			// the joined query aliases the group name into this column
-			GroupName: group.PassengerName,
-			Status:    group.Status,
-			JoinedAt:  group.CreatedAt,
-		})
-	}
-
-	form := []AdminSchedulePreference{}
-	for _, preference := range preferences {
-		form = append(form, AdminSchedulePreference{
-			DayOfWeek:     preference.DayOfWeek,
-			Direction:     preference.Direction,
-			IsEnabled:     preference.IsEnabled,
-			Location:      preference.Location,
-			Lat:           preference.Lat,
-			Lng:           preference.Lng,
-			ScheduledTime: preference.ScheduledTime,
-		})
-	}
-
+func passengerProfileResp(passenger postgress.Passenger) utils.APIResponse {
 	return utils.APIResponse{
 		Code:    http.StatusOK,
 		Message: constants.Success,
 		Data: AdminPassengerProfileResponse{
-			Passenger:   mapPassengerDetail(passenger),
-			Groups:      groupDetails,
-			TravelForm:  form,
-			TotalGroups: len(groupDetails),
+			Passenger: mapPassengerDetail(passenger),
 		},
 	}
 }
 
-func mapGroupOverview(group postgress.AdminGroupOverview) AdminGroupDetail {
-	return AdminGroupDetail{
-		ID:             group.ID,
-		Name:           group.Name,
-		Description:    group.Description,
-		Status:         group.Status,
-		OwnerId:        group.OwnerDriverID,
-		OwnerName:      group.OwnerName,
-		OwnerMobile:    group.OwnerMobile,
-		MemberCount:    group.MemberCount,
-		VehicleCount:   group.VehicleCount,
-		PassengerCount: group.PassengerCount,
-		ShiftCount:     group.ShiftCount,
-		CreatedAt:      group.CreatedAt,
+////////////////////////////// PICK & DROP OVERSIGHT //////////////////////////////
+
+func mapServiceSummary(row postgress.PickDropServiceDetails) AdminServiceSummary {
+	return AdminServiceSummary{
+		ID:             row.ID,
+		Name:           row.Name,
+		Description:    row.Description,
+		OwnerDriverId:  row.OwnerDriverID,
+		OwnerName:      row.OwnerName,
+		OwnerMobile:    row.OwnerMobile,
+		Status:         row.Status,
+		DriverCount:    row.DriverCount,
+		VehicleCount:   row.VehicleCount,
+		PassengerCount: row.PassengerCount,
+		ShiftCount:     row.ShiftCount,
+		CreatedAt:      row.CreatedAt,
 	}
 }
 
-func adminGroupsResp(groups []postgress.AdminGroupOverview, totalRows int64) utils.APIResponse {
-	details := []AdminGroupDetail{}
-	for _, group := range groups {
-		details = append(details, mapGroupOverview(group))
+func servicesResp(services []postgress.PickDropServiceDetails, totalRows int64) utils.APIResponse {
+	details := []AdminServiceSummary{}
+	for _, row := range services {
+		details = append(details, mapServiceSummary(row))
 	}
 
 	return utils.APIResponse{
 		Code:    http.StatusOK,
 		Message: constants.Success,
-		Data: AdminGroupListResponse{
+		Data: AdminServicesResponse{
 			TotalPages: utils.CalculatePagesize(totalRows),
-			Groups:     details,
+			Services:   details,
 		},
 	}
 }
 
-func adminGroupDetailsResp(
-	overview postgress.AdminGroupOverview,
-	members []postgress.GroupMemberDetails,
-	vehicles []postgress.GroupVehicleDetails,
-	passengers []postgress.GroupPassengerDetails,
-) utils.APIResponse {
-	memberDetails := []AdminGroupMember{}
-	for _, member := range members {
-		memberDetails = append(memberDetails, AdminGroupMember{
-			ID:           member.ID,
-			DriverId:     member.DriverID,
-			DriverName:   member.DriverName,
-			DriverMobile: member.DriverMobile,
-			RoleName:     member.RoleName,
-			JoinType:     member.JoinType,
-			Status:       member.Status,
-			CreatedAt:    member.CreatedAt,
-		})
+func mapShiftSummary(row postgress.ShiftDetails) AdminShiftSummary {
+	days := make([]int, 0, len(row.DaysOfWeek))
+	for _, d := range row.DaysOfWeek {
+		days = append(days, int(d))
 	}
 
-	vehicleDetails := []AdminGroupVehicle{}
-	for _, vehicle := range vehicles {
-		vehicleDetails = append(vehicleDetails, AdminGroupVehicle{
-			ID:            vehicle.ID,
-			VehicleId:     vehicle.VehicleID,
-			VehicleNumber: vehicle.VehicleNumber,
-			VehicleInfo:   vehicle.VehicleInfo,
-			NumberOfSeats: vehicle.NumberOfSeats,
-			HasAC:         vehicle.HasAC,
-			HasHeating:    vehicle.HasHeating,
-			DriverName:    vehicle.DriverName,
-			Status:        vehicle.Status,
-			CreatedAt:     vehicle.CreatedAt,
-		})
+	return AdminShiftSummary{
+		ID:               row.ID,
+		Name:             row.Name,
+		ServiceId:        row.ServiceID,
+		ServiceName:      row.ServiceName,
+		ServiceOwnerId:   row.OwnerDriverID,
+		DriverId:         row.DriverID,
+		DriverName:       row.DriverName,
+		DriverMobile:     row.DriverMobile,
+		VehicleId:        row.VehicleID,
+		VehicleNumber:    row.VehicleNumber,
+		VehicleOwnerId:   row.VehicleOwnerID,
+		VehicleOwnerName: row.VehicleOwnerName,
+		DaysOfWeek:       days,
+		StartDate:        row.StartDate,
+		EndDate:          row.EndDate,
+		StartTime:        row.StartTime,
+		EndTime:          row.EndTime,
+		SeatCapacity:     row.SeatCapacity,
+		OccupiedSeats:    row.OccupiedSeats,
+		Status:           row.Status,
+		CreatedAt:        row.CreatedAt,
 	}
+}
 
-	passengerDetails := []AdminGroupPassenger{}
-	for _, passenger := range passengers {
-		passengerDetails = append(passengerDetails, AdminGroupPassenger{
-			ID:              passenger.ID,
-			PassengerId:     passenger.PassengerID,
-			PassengerName:   passenger.PassengerName,
-			PassengerMobile: passenger.PassengerMobile,
-			Gender:          passenger.Gender,
-			Status:          passenger.Status,
-			CreatedAt:       passenger.CreatedAt,
-		})
+func serviceDetailResp(service postgress.PickDropServiceDetails, counts pickDropServiceCountsRow, shifts []postgress.ShiftDetails) utils.APIResponse {
+	summaries := []AdminShiftSummary{}
+	for _, row := range shifts {
+		summaries = append(summaries, mapShiftSummary(row))
 	}
 
 	return utils.APIResponse{
 		Code:    http.StatusOK,
 		Message: constants.Success,
-		Data: AdminGroupDetailsResponse{
-			Group:      mapGroupOverview(overview),
-			Members:    memberDetails,
-			Vehicles:   vehicleDetails,
-			Passengers: passengerDetails,
+		Data: AdminServiceDetailResponse{
+			Service: mapServiceSummary(service),
+			Counts: AdminServiceCounts{
+				ApprovedDrivers:       counts.ApprovedDrivers,
+				ApprovedVehicleOwners: counts.ApprovedVehicleOwners,
+				ApprovedVehicles:      counts.ApprovedVehicles,
+				ApprovedPassengers:    counts.ApprovedPassengers,
+				PendingRequests:       counts.PendingRequests,
+				ActiveShifts:          counts.ActiveShifts,
+			},
+			Shifts: summaries,
 		},
 	}
 }
 
-func mapShiftDetail(shift postgress.ShiftDetails) AdminShiftDetail {
-	return AdminShiftDetail{
-		ID:                   shift.ID,
-		GroupId:              shift.GroupID,
-		GroupName:            shift.GroupName,
-		VehicleNumber:        shift.VehicleNumber,
-		VehicleInfo:          shift.VehicleInfo,
-		DriverId:             shift.DriverID,
-		DriverName:           shift.DriverName,
-		DriverMobile:         shift.DriverMobile,
-		Direction:            shift.Direction,
-		StartDatetime:        shift.StartDatetime,
-		EstimatedEndDatetime: shift.EstimatedEndDatetime,
-		StartLocation:        shift.StartLocation,
-		EndLocation:          shift.EndLocation,
-		NumberOfSeats:        shift.NumberOfSeats,
-		SeatsTaken:           shift.SeatsTaken,
-		CreatedByName:        shift.CreatedByName,
-		CreatedByMobile:      shift.CreatedByMobile,
-		IsActive:             shift.IsActive,
-		CreatedAt:            shift.CreatedAt,
-	}
-}
-
-func adminShiftsResp(shifts []postgress.ShiftDetails, totalRows int64) utils.APIResponse {
-	details := []AdminShiftDetail{}
-	for _, shift := range shifts {
-		details = append(details, mapShiftDetail(shift))
+func shiftsResp(shifts []postgress.ShiftDetails, totalRows int64) utils.APIResponse {
+	details := []AdminShiftSummary{}
+	for _, row := range shifts {
+		details = append(details, mapShiftSummary(row))
 	}
 
 	return utils.APIResponse{
 		Code:    http.StatusOK,
 		Message: constants.Success,
-		Data: AdminShiftListResponse{
+		Data: AdminShiftsResponse{
 			TotalPages: utils.CalculatePagesize(totalRows),
 			Shifts:     details,
 		},
 	}
 }
 
-func adminShiftDetailsResp(shift postgress.ShiftDetails, stops []postgress.ShiftStop, seats []postgress.ShiftSeatDetails) utils.APIResponse {
-	stopDetails := []AdminShiftStop{}
-	for _, stop := range stops {
-		stopDetails = append(stopDetails, AdminShiftStop{
-			SequenceNumber: stop.SequenceNumber,
-			Location:       stop.Location,
-			Lat:            stop.Lat,
-			Lng:            stop.Lng,
-			ScheduledTime:  stop.ScheduledTime,
-		})
-	}
+func shiftRequestsResp(requests []postgress.ShiftRequestDetails, totalRows int64) utils.APIResponse {
+	details := []AdminShiftRequestItem{}
+	for _, row := range requests {
+		days := make([]int, 0, len(row.DaysOfWeek))
+		for _, d := range row.DaysOfWeek {
+			days = append(days, int(d))
+		}
 
-	seatDetails := []AdminShiftSeat{}
-	for _, seat := range seats {
-		seatDetails = append(seatDetails, AdminShiftSeat{
-			SeatNumber:      seat.SeatNumber,
-			Gender:          seat.Gender,
-			Status:          seat.Status,
-			PassengerName:   seat.PassengerName,
-			PassengerMobile: seat.PassengerMobile,
-			StopSequence:    seat.SequenceNumber,
-			Location:        seat.Location,
-			ScheduledTime:   seat.ScheduledTime,
+		details = append(details, AdminShiftRequestItem{
+			ID:            row.ID,
+			PassengerId:   row.PassengerID,
+			PassengerName: row.PassengerName,
+			ServiceId:     row.ServiceID,
+			ServiceName:   row.ServiceName,
+			ContactNumber: row.ContactNumber,
+			Note:          row.Note,
+			DaysOfWeek:    days,
+			StartTime:     row.StartTime,
+			EndTime:       row.EndTime,
+			CreatedAt:     row.CreatedAt,
 		})
 	}
 
 	return utils.APIResponse{
 		Code:    http.StatusOK,
 		Message: constants.Success,
-		Data: AdminShiftDetailsResponse{
-			Shift: mapShiftDetail(shift),
-			Stops: stopDetails,
-			Seats: seatDetails,
+		Data: AdminShiftRequestsResponse{
+			TotalPages: utils.CalculatePagesize(totalRows),
+			Requests:   details,
+		},
+	}
+}
+
+func advertisementsResp(ads []postgress.AdvertisementDetails, totalRows int64) utils.APIResponse {
+	details := []AdminAdvertisementItem{}
+	for _, row := range ads {
+		days := make([]int, 0, len(row.DaysOfWeek))
+		for _, d := range row.DaysOfWeek {
+			days = append(days, int(d))
+		}
+
+		details = append(details, AdminAdvertisementItem{
+			ID:            row.ID,
+			ServiceId:     row.ServiceID,
+			ServiceName:   row.ServiceName,
+			OwnerDriverId: row.OwnerDriverID,
+			OwnerName:     row.OwnerName,
+			OwnerMobile:   row.OwnerMobile,
+			Title:         row.Title,
+			Description:   row.Description,
+			Fare:          row.Fare,
+			DaysOfWeek:    days,
+			StartTime:     row.StartTime,
+			EndTime:       row.EndTime,
+			VehicleCount:  row.VehicleCount,
+			CreatedAt:     row.CreatedAt,
+		})
+	}
+
+	return utils.APIResponse{
+		Code:    http.StatusOK,
+		Message: constants.Success,
+		Data: AdminAdvertisementsResponse{
+			TotalPages:     utils.CalculatePagesize(totalRows),
+			Advertisements: details,
 		},
 	}
 }
